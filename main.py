@@ -12,7 +12,8 @@ from cfdata import CFData
 class Interface:
         
     #If this function returns false, the destroy function is called. 
-    #ToDo: Edit function to create a pop-up window to ask if the user is sure they want to exit.
+    # ToDo: Edit function to create a pop-up window to ask if the user 
+    # is sure they want to exit.
     def delete_event(self, widget, event, data=None):
         return False
 
@@ -20,9 +21,8 @@ class Interface:
     def destroy(self, widget, data=None):
         gtk.main_quit()
 
-
-    #This function is called when setting up the interface; it sets the properties of the main window.
     def setWindowProperties(self, data=None):
+        '''Setup window properties (called while setting up the interface) '''
         
         #Set Window Design Properties       
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -34,17 +34,13 @@ class Interface:
         #Connect signals and functions
         self.window.connect("delete_event", self.delete_event)
         self.window.connect("destroy", self.destroy)
-
-
-            
-
-    #This function is used to initialise the variables that will be used by the rest of the program.
+        
     def initialiseVariables(self):
+        ''' Initialise the variables used by the rest of the program. '''
         
         #openFile is the window that pops-out when choosing the data file. 
         #This needs to be initialised so that there aren't multiple windows to choose a file.
         self.openFile = None    
-
 
         #Sets the titles of the Field Selection tree view and also the alignment of the titles
         self.fieldSelectionTitlesAlignment = 0.5
@@ -92,14 +88,8 @@ class Interface:
         self.mapThumbnailScalingX = 0.15
         self.mapThumbnailScalingY = 0.15
 
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                 fileChanged                               #   
-    #                                                                   #
-    #########################################################################################################################################
-    
-    #This function is called when a new file is selected.
     def fileChanged(self, fileName):
+        ''' Called when a new file is selected '''
         #The functions from the CFData class to extract the data and update the field names are called
         self.ClimateData.readDataSet(fileName)
         self.ClimateData.getFieldNames()
@@ -108,17 +98,12 @@ class Interface:
         self.fieldSelectionData.clear()
         for fieldData in self.ClimateData.fieldDataSet:
             self.fieldSelectionData.append(fieldData)
-    
-
-    #########################################################################################################################################
-    #                                                                   #
-    #                               Menu Region                             #   
-    #                                                                   #
-    #########################################################################################################################################
-
-    #This function is called when the open button is clicked from the menu bar.
-    #It creates a window to select which file to extract data from.
+            
     def addOpenFile(self, widget, Data=None):
+        '''
+        Called when the open button is clicked from the menu bar.
+        Creates a window to select which file to extract data from.
+        '''
         #If the cancel button is clicked the widget is destroyed
         def cancelOpenFile(widget, self, Data=None):
             self.openFile.destroy()
@@ -144,17 +129,16 @@ class Interface:
         self.openFile.cancel_button.connect("clicked", cancelOpenFile, self)
         self.openFile.ok_button.connect("clicked", loadFile, self)
     
-    
-    #This function is called when setting up the interface. It creates the menu bar at the top.
-    #To add this menu bar into the interface self.menuBar must be added to a container in the main code.
     def addMenu(self, Data=None):
-
+        '''
+        called when setting up the interface. It creates the menu bar at the top.
+        To add this menu bar into the interface 
+        self.menuBar must be added to a container in the main code.
+        '''
 
         #Create Sub-menus       
         self.fileMenu = gtk.Menu()
         self.optionsMenu = gtk.Menu()
-        
-        
         
         #Create Items in File Sub-menu
         self.openOption = gtk.MenuItem("Open")
@@ -162,72 +146,52 @@ class Interface:
         self.openOption.connect("activate", self.addOpenFile)
         self.openOption.show()
         
-        
         self.quitOption = gtk.MenuItem("Quit")
         self.fileMenu.append(self.quitOption)
         self.quitOption.connect_object("activate", self.destroy, "file.quit")
         self.quitOption.show()
-        
-        
-        
         
         #Create Items in Options Sub-menu
         self.XConvOption = gtk.MenuItem("XConv Defaults")
         self.optionsMenu.append(self.XConvOption)
         self.XConvOption.show()
         
-        
         self.STASHOption = gtk.MenuItem("STASH Master File")
         self.optionsMenu.append(self.STASHOption)
         self.STASHOption.show()
-        
         
         self.netCDFOption = gtk.MenuItem("netCDF Attributes")
         self.optionsMenu.append(self.netCDFOption)
         self.netCDFOption.show()
         
-        
         self.globalnetCDFOption = gtk.MenuItem("Global netCDF Attributes")
         self.optionsMenu.append(self.globalnetCDFOption)
         self.globalnetCDFOption.show()
         
-
-
-                
         #Create Items to Display and Connect Sub-Menus
         self.fileItem = gtk.MenuItem("File")
         self.fileItem.show()
         self.fileItem.set_submenu(self.fileMenu)
         
-        
         self.optionsItem = gtk.MenuItem("Options")
         self.optionsItem.show()
         self.optionsItem.set_submenu(self.optionsMenu)
         
-
-
         #Create Menu Bar and Add Sub-Menus to Menu Bar
         self.menuBar = gtk.MenuBar()
         self.menuBar.append(self.fileItem)
         self.menuBar.append(self.optionsItem)
         self.menuBar.show()
 
-        
-        
-    
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                addErrorMessage                            #   
-    #                                                                   #
-    #########################################################################################################################################   
-
-    #This function takes in a message and adds it to the last line of the output area.
-    #ToDo - Automatically scroll to the bottom of the area when a new message is added.
     def addErrorMessage(self, message):
+        '''
+        takes in a message and adds it to the last line of the output area.
+        #ToDo - Automatically scroll to the bottom of the area when a new 
+                message is added.
+        '''
+        
         lastLine = self.outputBuffer.get_end_iter()
         self.outputBuffer.insert(lastLine, message + "\n")  
-
-
 
     """-------------------------------------------------------------------------------------------------------------------------------------|
     |                                                                   |                               |
@@ -238,7 +202,7 @@ class Interface:
     |           #                       #       #           #           |
     |           #                       #       #           #           |
     |           #                       #       #           #           |
-    |           #                       #       #       3       #           |
+    |           #                       #       #       3   #           |
     |           #                       #       #           #           |
     |           #                       #       #           #           |   
     |           #           1           #   2   #           #           |   
@@ -248,7 +212,7 @@ class Interface:
     |           #                       #       #########################           |
     |           #                       #       #           #           |       
     |           #                       #       #           #           |       
-    |           #                       #       #       4       #           |       
+    |           #                       #       #       4   #           |       
     |           #                       #       #           #           |
     |           #                       #       #           #           |               
     |           #########################################################################################           |       
@@ -256,7 +220,7 @@ class Interface:
     |           #               #           #               #           |           
     |           #               #           #               #           |   
     |           #               #           #               #           |               
-    |           #       5       #       6       #       7       #           |               
+    |           #       5       #       6   #       7       #           |               
     |           #               #           #               #           |               
     |           #               #           #               #           |   
     |           #               #           #               #           |   
@@ -266,15 +230,10 @@ class Interface:
     |                                                                   |
     --------------------------------------------------------------------------------------------------------------------------------------"""
 
-    #########################################################################################################################################
-    #                                    Function                               #
-    #                                selectionChanged                           #   
-    #                                                                   #
-    #########################################################################################################################################
-    
-
-    #This function is called when a new field is selected. It updates all the relevant data.
     def selectionChanged(self, widget, Data=None):
+        '''
+        Called when a new field is selected. It updates all the relevant data.
+        '''
         
         #The function  adds every value in the array into the ListStore which are both passed into it. It also indexes each item
         def createListStores (listStore, dataArray):
@@ -307,25 +266,21 @@ class Interface:
                 
         #Update the labels
         self.updateLabels(self.currentXYZT)
-
-
-
-    #########################################################################################################################################
-    #                                  Function                             #
-    #                                selectMaximum                              #   
-    #                                                                   #
-    #########################################################################################################################################
-    
-    
-    #This function is called when the select maximum button is clicked. 
-    #It changes the Maximum of the selected variable to the last value in the selection
+  
     def selectMaximum(self, widget, Data=None):
+        '''
+        Called when the select maximum button is clicked. 
+        Changes the Maximum of the selected variable to the last value in the 
+        selection
+        '''
     
-        #This function keeps updating TempValue, so the final time it is called TempValue will be the last value in the selection
         def getLast (model, path, iter):
+            ''' 
+            Keeps updating TempValue, so the final time it is called 
+            TempValue will be the last value in the selection
+            '''
             self.TempValue = [model.get_value(iter, 0),model.get_value(iter, 1)]
              
-            
         #Set temporary value as [] so if there is no selection the maximum will not be changed
         self.TempValue = []
         
@@ -360,20 +315,15 @@ class Interface:
         else:
                 self.addErrorMessage("Error - There are no values selected")
 
-        
-        
         #Update the labels
         self.updateLabels(self.currentXYZT) 
 
-    #########################################################################################################################################
-    #                                   Function                                #
-    #                                 selectMinimum                             #   
-    #                                                                   #
-    #########################################################################################################################################   
-    
-    #This function is called when the Select Minimum button is clicked. 
-    #It changes the Minimum of the selected variable to the first value in the selection
     def selectMinimum(self, widget, Data=None):
+        '''
+        Called when select minimum button is clicked.
+        It changes the minimum of the selected variable to the first value 
+        in the selection.
+        '''
     
         #TempValue will only be empty on the first call of the function, so will only store the first value
         def getFirst (model, path, iter):
@@ -415,16 +365,13 @@ class Interface:
         #Update the labels
         self.updateLabels(self.currentXYZT)
 
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                 selectValue                               #   
-    #                                                                   #
-    #########################################################################################################################################
-
-    #This function is called when the Select button is clicked
-    #If T is selected, the function changes the chosen T value to the selected T value
-    #If another variable is selected the function changes both the maximum and minimum to the last and first value in the selection respectively.   
     def selectValue(self, widget, Data=None):
+        '''
+        Called when the Select button is clicked
+        If T is selected, the function changes the chosen T value to the selected T value
+        If another variable is selected the function changes both the 
+        maximum and minimum to the last and first value in the selection respectively.   
+        '''
         
         #Checks if T is selected.
         if self.currentXYZT == 3:
@@ -472,16 +419,12 @@ class Interface:
 
         #Update the labels.
         self.updateLabels(self.currentXYZT)
-
-    #########################################################################################################################################
-    #                                  Function                             #
-    #                                    reset                              #   
-    #                                                                   #
-    #########################################################################################################################################
-
-    #This function is called when the Reset button is clicked
-    #It resets the chosen values of the variable selected to default
-    def reset(self, widget):        
+        
+    def reset(self, widget):   
+        '''
+        Called when the Reset button is clicked
+        It resets the chosen values of the variable selected to default
+        '''     
         #For X or Y (0 or 1) change minimum to lowest and maximum to highest value in the array.
         #For Z or T (2 or 3) change the selected value to the first in the array
         
@@ -500,16 +443,14 @@ class Interface:
         
         #Update the lables
         self.updateLabels(self.currentXYZT)
-        
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                 xyztClicked                               #   
-    #                                                                   #
-    #########################################################################################################################################       
-    
-    #This function is called a variable button is clicked; whether to change the variable, when a .set_active() function is called or even if a toggled button is clicked again.
-    #It updates the labels, and the tree view to display the information about the newly selected variable
+     
     def xyztClicked(self, widget, variable):
+        '''
+        Called when a variable button is clicked; whether to change the variable, 
+        when a .set_active() function is called or even if a toggled button is 
+        clicked again. It updates the labels, and the tree view to display the 
+        information about the newly selected variable
+        '''
 
         #If widget is now active, it was either inactive before so the variable has changed, or the .set_active(True) function has been run on an already active button
         if widget.get_active():
@@ -558,17 +499,12 @@ class Interface:
             #There must be a button toggled down.
             if variable == self.currentXYZT:
                 widget.set_active(True)
-
-
-    #########################################################################################################################################
-    #                                  Function                             #
-    #                                updateLabels                               #   
-    #                                                                   #
-    #########################################################################################################################################
-
-    #This function is called whenever the data that the labels are showing changes.
-    #It simple updates the labels to show the new data.
+   
     def updateLabels(self, variable):
+        '''
+        Called whenever the data that the labels are showing changes.
+        It simply updates the labels to show the new data.
+        '''
 
         #shortcut is to avoid rewriting self.Climate data multiple times. Can be changed
         shortcut = self.ClimateData
@@ -591,16 +527,12 @@ class Interface:
         for outputLabel, outputData in zip(self.xyztOutputLabels, self.OutputData):
             outputLabel.set_markup(self.labelSize + outputData + self.labelEnd )
             outputLabel.set_alignment(0, 0.5)
-
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                   plotMap                             #   
-    #                                                                   #
-    #########################################################################################################################################
-    
-    #This method is called when the Add To Maps button or the Plot Map button are clicked
-    #It either plots the map to display or plots the map to add to the viewing area.
+                
     def plotMap(self, widget, mode):
+        '''
+        Called when the Add To Maps button or the Plot Map button are clicked
+        It either plots the map to display or plots the map to add to the viewing area.
+        '''
         
         #Checks to see if a field has actually been selected.
         if self.ClimateData.dataIndex != None:
@@ -618,7 +550,6 @@ class Interface:
                 #The reset function is called to set file name to None inside CFPlot
                 #This will display the map in a pop out window when 'con' is called.
                 cfp.reset()
-
 
             #If the add maps button has been clicked:
             else:
@@ -651,7 +582,6 @@ class Interface:
             else:
                 cfp.mapset(proj='spstere')
 
-
             #Checks to see if the data is two dimensional. 
             #If it is the number of length 1 dimensions in the shape of the four dimensional array will be 2
             if (Data[i].subspace[:, self.ClimateData.MinimumZ[1]:self.ClimateData.MaximumZ[1]+1, 
@@ -677,34 +607,36 @@ class Interface:
                 #Calls two other functions which add the map to the viewing area.
                 self.addNewMaps()
                 self.addMapsToDisplay()     
-    
-            
-    #This function is called when any of the map property radio buttons are called. 
-    #mapMode is changed depending on which button was pressed.
+                
+   
     def mapModeSelection(self, widget, mode):
+        '''
+        Called when any of the map property radio buttons are called. 
+        mapMode is changed depending on which button was pressed.
+        '''
         if widget.get_active():
             self.mapMode = mode
     
-    #This function is called when the Hovmuller check button is clicked
-    #If changed to active the plotType is set to 0 (which  means Hovmuller plot is true) else 1
     def plotTypeSelection(self, widget):
+        '''  Called when the Hovmuller check button is clicked
+        If changed to active the plotType is set to 0 
+        (which  means Hovmuller plot is true) else 1
+        '''
+        
         if widget.get_active():
             self.plotType = 0
         else:
             self.plotType = 1
 
-
-    #########################################################################################################################################
-    #                                  Region #1                                #
-    #                           Field Selection Region                              #   
-    #                          (self.fieldSelectionInputWindow)                         #
-    #########################################################################################################################################   
-    
-
-    #This function is called when the Create Maps page is being created. 
-    #It creates the Tree View for the user to select which field from the file they want to use 
     def addFieldSelection(self):
+        ''' Region #1                                
+            Field Selection Region                             
+            (self.fieldSelectionInputWindow)  
+            Called when Create Maps page is being created.
+            Creates a Tree View for the user to select which field from the 
+            file they want to use.
             
+        '''
                 
         #The Tree View is put into a scrolled window which has a vertical scrolling bar but not a horizontal scrolled bar. 
         self.fieldSelectionInputWindow = gtk.ScrolledWindow()
@@ -722,8 +654,6 @@ class Interface:
         
         #The tree view's model is set to this list store. If the list store is edited the tree view will automatically change   
         self.fieldSelectionView.set_model(self.fieldSelectionData)      
-        
-        
         
         #The cell renderer is used to display the text in list store.
         self.fieldSelectionRenderer = gtk.CellRendererText() 
@@ -760,18 +690,13 @@ class Interface:
         self.fieldSelectionChoice = self.fieldSelectionView.get_selection()
         self.fieldSelectionChoice.connect("changed", self.selectionChanged)
 
-
-
-
-    #########################################################################################################################################
-    #                                  Region #2                                #
-    #                               XYZT Selection                              #   
-    #                              (self.xyztTreeviewWindow)                            #
-    #########################################################################################################################################
-    
-    #This function is called when the Create Maps page is being created
-    #It creates the tree view to see the data in the arrays of each variable
     def addXYZTSelection(self):
+        ''' Region #2
+            XYZT Selection
+            (Self.xyztTreeViewWindow)
+            Called when Create Maps page is being created.
+            Creates teh tree view to see the data in the arrays of each variable
+        '''
         #Creates a cell renderer to display the text        
         self.valueRenderer = gtk.CellRendererText()
         self.valueRenderer.set_property('xalign', 1)            
@@ -800,18 +725,17 @@ class Interface:
         #Set the model of the tree view to be a list store with two columns, float and int. 
         #The second column is not displayed.
         self.xyztTreeview.set_model(gtk.ListStore(float, int))
-        
-
-    #########################################################################################################################################
-    #                                   Region #3                               #
-    #                           Select Data Page (Variable Display)                     #   
-    #                               (self.xyztVBox)                             #
-    #########################################################################################################################################
-    
-
-    #This function is called when the Create Maps page is being created
-    #It creates the labels and buttons for the Select Data tab in the notebook on the top right of the page.
+     
     def addSelectDataPage(self):
+        ''' Region #3
+            Select Data Page (Variable Display)
+            (self.xyztVBox)
+            Called when Create Maps page is bieng created
+            Creates the labels and buttons for the Select Data tab in the 
+            notebook on the top right of the page.
+   
+        '''
+        
         #A container to hold all of the labels and buttons is created
         self.xyztVBox = gtk.VBox()
 
@@ -872,13 +796,10 @@ class Interface:
             informationLabel.set_markup(self.labelSize + labelName + self.labelEnd)
             informationLabel.set_alignment(0, 0.5)
         
-        
-        
         #A table to pack the all buttons is created with 3 rows and 4 columns. 
         self.xyztButtonTable = gtk.Table(3, 4, False)
         self.xyztVBox.pack_start(self.xyztButtonTable, False, False, 2) 
         
-    
         #The X, Y, Z, T ToggleButtons are created and placed into the table. 
         #All buttons connect to the same function, xyztClicked(), however pass a different parameter into it.       
         self.xBtn = gtk.ToggleButton('X')
@@ -893,13 +814,11 @@ class Interface:
         self.tBtn = gtk.ToggleButton('T')   
         self.tBtn.connect('clicked', self.xyztClicked, 3)   
         
-        
         self.xyztButtonTable.attach(self.xBtn, 0, 1, 2, 3, gtk.SHRINK|gtk.FILL,gtk.SHRINK|gtk.FILL, 25,25 )
         self.xyztButtonTable.attach(self.yBtn, 1, 2, 2, 3, gtk.SHRINK|gtk.FILL,gtk.SHRINK|gtk.FILL, 25,25 )
         self.xyztButtonTable.attach(self.zBtn, 2, 3, 2, 3, gtk.SHRINK|gtk.FILL,gtk.SHRINK|gtk.FILL, 25,25 )
         self.xyztButtonTable.attach(self.tBtn, 3, 4, 2, 3, gtk.SHRINK|gtk.FILL,gtk.SHRINK|gtk.FILL, 25,25 )
         
-            
         #The selection buttons and reset buttons are created and put into the table.
         #The buttons are connected to their respective functions
 
@@ -912,7 +831,6 @@ class Interface:
         self.selectBtn = gtk.Button('Select')
         self.selectBtn.connect("clicked", self.selectValue)
         
-        
         self.resetBtn = gtk.Button('Reset')
         self.resetBtn.connect("clicked", self.reset)
         
@@ -921,26 +839,23 @@ class Interface:
         self.xyztButtonTable.attach(self.selectBtn, 0, 2, 0, 1, gtk.EXPAND|gtk.FILL,gtk.EXPAND|gtk.FILL, 25,10 )
         self.xyztButtonTable.attach(self.resetBtn, 2, 4, 0, 1, gtk.EXPAND|gtk.FILL,gtk.EXPAND|gtk.FILL, 25,10 )
         
-        
-        
         #Put all buttons into a list to make them easier to access.
         self.xyztButtons = [self.xBtn, self.yBtn, self.zBtn, self.tBtn, self.selectMinimumBtn, self.selectMaximumBtn,self.selectBtn, self.resetBtn]
-        
         
         #Start with buttons inactive
 
         for btn in self.xyztButtons:
             btn.set_sensitive(False)
-
-    #########################################################################################################################################
-    #                                     Region #3                             #
-    #                               Map Properties Page                         #   
-    #                                (self.mapPropertiesTable)                          #
-    #########################################################################################################################################
-    
-    #This function is called when the Create Maps page is being created
-    #It adds the second page to the notebook in the top right of the page, Map Properties
+            
     def addMapPropertiesPage(self):
+        ''' Region #3
+            Map Properties Page
+            (self.mapPropertiesTable)
+            Called when the Create Maps page is being created
+            Adds the second page to the notebook in the top right of the page, 
+            Map Properties
+        
+        '''
 
         #A table to contain all the options is created. It currently has 4 rows and a single column
         self.mapPropertiesTable = gtk.Table(4, 1, False)
@@ -961,23 +876,21 @@ class Interface:
         self.mapPropertiesTable.attach(self.southernPoleRadioButton, 0, 1, 2, 3)
         self.southernPoleRadioButton.connect("toggled", self.mapModeSelection, 2)
 
-        
         #A check button to decide if the user wants a Hovmuller plot is created
         #It is added to the table and connected to a function.      
         self.HovmullerPlotCheckButton = gtk.CheckButton("Hovmuller Plot")
         self.mapPropertiesTable.attach(self.HovmullerPlotCheckButton, 0, 1, 3, 4)
         self.HovmullerPlotCheckButton.connect("toggled", self.plotTypeSelection)
-
-
-    #########################################################################################################################################
-    #                                   Region #4                           #
-    #                               Plotting Buttons Area                           #   
-    #                                     (self.PlotOptions)                            #
-    #########################################################################################################################################
-    
-    #This function is called when the Create Maps page is created
-    #It adds the buttons to plot the map, view the data and add the maps to the viewing area
+        
     def addPlottingButtonsArea(self):
+        ''' Region #4
+            Plotting Buttons Area
+            (self.PlotOptions)
+            Called when Create Maps page is created.
+            adds the buttons to plot the map, view the data and add the maps to 
+            the viewing area
+    
+        '''
         
         #A table to add all the buttons and labels to is created        
         self.PlotOptions = gtk.Table(2, 3, False)
@@ -1008,15 +921,14 @@ class Interface:
         self.PlotOptions.attach(self.plotMapBtn, 2, 3, 1, 2)
         self.plotMapBtn.connect("clicked", self.plotMap, 0)
 
-    #########################################################################################################################################
-    #                                     Region #5                         #
-    #                                   Output Messages Area                        #   
-    #                                         (self.outputFrame)                        #
-    #########################################################################################################################################
-    
-    #This function is called when the Create Maps page is created
-    #It adds the output message box, where any errors or other messages are displayed on
     def addOutputMessagesArea(self):
+        ''' Region #5
+            Output Messages Area
+            (self.outputFrame)
+            Called when Create Maps page is created.
+            Adds the output message box, where any errors or other messages are 
+            displayed.        
+        '''
         
         #The output box is put into a scrolled window which only has a vertical scroll bar
         self.outputWindow = gtk.ScrolledWindow()
@@ -1035,20 +947,18 @@ class Interface:
         #This buffer is stored in outputBuffer, any messages will be added to this. 
         self.outputBuffer = self.outputTextView.get_buffer()
         
-
         #The output window is stored into a frame for clarity
         self.outputFrame = gtk.Frame(label="Output Messages")   
         self.outputFrame.add(self.outputWindow)
 
-    #########################################################################################################################################
-    #                                     Region #6                         #
-    #                                      Map Listings Area                        #   
-    #                                      (self.mapListingsWindow)                     #
-    #########################################################################################################################################
-    
-    #This function is called when the selected map from the user created list of maps is changed
-    #It changes the map thumbnail being displayed at the bottom right of the page
     def mapChanged(self, widget, Data=None):
+        ''' Region #6
+            Map Listings Area
+            (self.mapListingsWindow)
+            Called when the selected map from the user created list of maps is changed
+            Changes the map thumbnail being displayed at the bottom right of the page
+        '''
+        
         #The currently selected map is extracted from the tree view
         theModel, thePath = widget.get_selected()
         
@@ -1065,9 +975,12 @@ class Interface:
                     self.mapThumbnail.set_from_pixbuf(scaledMap)
 
                     
-    #This function is called when the Create Maps page is created
-    #It adds a tree view to show the maps the user has created
+   
     def addMapListings(self):
+        '''
+        Called when the Create Maps page is created
+        It adds a tree view to show the maps the user has created
+        '''
         
         #The scrolled window is created to contain the tree view, with only a vertical scroll bar.
         self.mapListingsWindow = gtk.ScrolledWindow()
@@ -1102,18 +1015,14 @@ class Interface:
         #The tree view is added to the scrolled window.
         self.mapListingsWindow.add(self.mapListings)
         
-        
-    
-        
-    #########################################################################################################################################
-    #                                     Region #7                         #
-    #                                   Map Thumbnail View Area                     #   
-    #                                      (self.mapThumbnailFrame)                     #
-    #########################################################################################################################################
-    
-    #This function is called when the Create Maps page is created
-    #It prepares an area for map thumbnails to be displayed.
     def addThumbnailArea(self):
+        ''' Region #7
+            Map Thumbnail View Area
+            (self.mapThumbnailFrame)
+            Called when create maps is created.
+            It prepares an area for map thumbnails to be displayed
+        
+        '''
                     
         #The map thumbnail is an image, which initially is empty
         self.mapThumbnail = gtk.Image()
@@ -1126,25 +1035,12 @@ class Interface:
         
         #The image is added to the frame.
         self.mapThumbnailFrame.add(self.mapThumbnail)
-        
-        
     
-    
-    
-    
-    
-
-    #########################################################################################################################################
-    #                                                                   #
-    #                                   Create Maps Page                            #   
-    #                                   (self.fieldSelectionVBox)                       #
-    #                                                                   #
-    #########################################################################################################################################
-        
-
-    #This method is called in the main code
-    #It adds the Create Maps page
     def addCreateMapsPage(self):
+        ''' Create Maps Page
+            (self.fieldSelectionVBox)
+            Called in the main code; adds the Create Maps Page
+        '''
 
         #Each region is created
         #A seperate container for each of these regions is made so that the layout can easily be changed.
@@ -1175,8 +1071,6 @@ class Interface:
         
         #Region 7
         self.addThumbnailArea()
-        
-
     
         #Regions are joined together
 
@@ -1197,25 +1091,21 @@ class Interface:
         self.outputsHBox.pack_start(self.mapListingsWindow, False, False, 2)
         self.outputsHBox.pack_start(self.mapThumbnailFrame, False, False, 2)
 
-        
         #Join All Regions
         self.CreateMapsVBox = gtk.VBox()
         self.CreateMapsVBox.pack_start(self.viewFieldsHBox, True, True, 2)
         self.CreateMapsVBox.pack_start(self.outputsHBox, True, True, 2)
-
-
-
         
     """-------------------------------------------------------------------------------------------------------------------------------------|
     |                                                                   |                               |
-    |                                 View Maps Page                            |
+    |                                 View Maps Page                    |
     |                                                                   |
     |           #########################################################################################           |
     |           #                                           #           |
     |           #                                           #           |
     |           #                                           #           |
     |           #                                           #           |
-    |           #                                               #           |
+    |           #                                           #           |
     |           #                                           #           |
     |           #                                           #           |   
     |           #                                           #           |   
@@ -1225,7 +1115,7 @@ class Interface:
     |           #                                           #           |
     |           #                                           #           |       
     |           #                                           #           |       
-    |           #                                               #           |       
+    |           #                                           #           |       
     |           #                                           #           |
     |           #                                           #           |               
     |           #                                           #           |       
@@ -1233,7 +1123,7 @@ class Interface:
     |           #                                           #           |           
     |           #                                           #           |   
     |           #########################################################################################           |               
-    |           #                                               #           |               
+    |           #                                           #           |               
     |           #                                           #           |               
     |           #                                           #           |   
     |           #                                           #           |   
@@ -1243,14 +1133,6 @@ class Interface:
     |                                                                   |
     --------------------------------------------------------------------------------------------------------------------------------------"""       
         
-    #########################################################################################################################################
-    #                                                                   #
-    #                                    Map Layout Class                           #   
-    #                                                                   #
-    #########################################################################################################################################
-    
-    
-    #Class for each map viewing area.
     class LayoutContent(gtk.EventBox):
     
         def __init__(self, xScale, yScale, layout):
@@ -1300,10 +1182,11 @@ class Interface:
 
             #Puts the event box at the top left of the layout       
             self.mapLayout.put(self, 0, 0)
-
-        #This function is called when a map thumbnail is drag and dropped onto the area.
-        #It retrieves the map from the list of maps, stores and displays it.
         def addImage(self, widget, context, x, y, selection, targetType, time, pixbufs):
+            '''
+            Called when a map thumbnail is drag and dropped onto the area.
+            Retrieves the map from the list of maps, stores and displays it.
+            '''
             
             #If there isn't a map alreading being stored, create an empty image and add it to the event box
             if self.mapImage == None:
@@ -1337,32 +1220,42 @@ class Interface:
             #Store the original pixbuf to mantain quality when zooming
             self.mapPixbuf = mapPixbuf
 
-        #This function is called when the mouse is clicked on the event box
-        #It stores the position of the mouse and finds the position of the event box
         def mouseClicked(self, widget, event):
+            '''
+            Called when the mouse is clicked in the event box.
+            Stores position of the mouse and finds the position in the event box.
+            '''
             self.clicked = True
             self.clickedX = event.x
             self.clickedY = event.y
             self.X, self.Y = self.mapLayout.child_get(self, 'x', 'y')
         
-        #This function is called when the mouse is realsed
-        #It simple sets clicked to False
         def mouseReleased(self, widget, event):
+            '''
+            Called when the mouse is released
+            Simple sets clicked to False
+            '''
             self.clicked = False
         
-        #This function is called when the mouse is moved
-        #If the mouse is clicked the map is moved depending on the mouses movement
         def mouseMoved(self, widget, event):
+            '''
+            Called when the mouse is moved.
+            If the mouse is clicked the map is moved depending on mouse movement.
+            '''
+            
             #Check to see if the mouse in currently clicked
             if self.clicked:
                 #If it is move the eventbox from its position when the mouse was clicked + the mouses displacement from the position where the mouse was clicked.
                 self.mapLayout.move(self, self.X + int(event.x - self.clickedX), self.Y + int(event.y - self.clickedY))
         
-        #This function is called when the image must be rescaled
-        #It rescales the image based on xScaling and yScaling
-        #xAdjustment and yAdjustment are to allow the maps position to be changed so zooming in stays on focus with the centre
-        #However this has not yet been added
         def updateImage(self, xAdjustment, yAdjustment):
+            ''' Called when the image must be rescaled
+                Rescales the image based on xScaling and yScaling
+                xAdjustment and yAdjustment are to allow the maps position to be 
+                changed so zooming in stays on focus with the centre
+                However this has not yet been added
+            '''
+            
             #Checks to see if there is currently a map in the box
             if self.mapImage != None:   
                 #If there is the original pixbuf is scaled and the map image is set from the scaled pixbuf.
@@ -1370,9 +1263,11 @@ class Interface:
                 self.mapImage.set_from_pixbuf(scaledPixbuf)         
                 self.mapLayout.move(self, self.X + xAdjustment, self.Y + yAdjustment)
         
-        #This function is called when zoom in or zoom out buttons are clicked on the toolbar
-        #It updates the scaling and updates the map
         def zoom(self, scale):
+            '''
+            Called when zoom in or zoom out buttons are clicked on the toolbar
+            It updates the scaling and updates the map
+            '''
             #Checks to see if there is currently a map in the box
             if self.mapImage != None:
                 #If there is, find the maps current position
@@ -1387,10 +1282,12 @@ class Interface:
                 #To Do: Zoom functions should keep the centre in focus. Change parameters of updateImage to allow for this
                 self.updateImage(0, 0)
         
-        #This function is called when a new image is placed into the area or the image currently in the area is reset
-        #It resets all the variables so the scale returns to default and its positioned again at the top left   
         def resetVariables(self):
-            
+            '''
+            Called when a new image is placed into the area or the image currently 
+            in the area is reset. Resets all the variables so the scale returns to 
+            default and its positioned again at the top left.
+            '''
             #Set variables back to default
             self.X = 0
             self.Y = 0
@@ -1400,19 +1297,22 @@ class Interface:
             self.ClickedY = 0
             self.Clicked = False
         
-        #This function is called when the reset button on the toolbar is clicked
-        #It resets the image to its default scale and position
         def reset (self):
+            '''
+            Called when the reset button on the toolbar is clicked
+            Resets the image to its default scale and position
+            '''
             #Check if there is a map in the box
             if self.mapImage != None:
                 #If there is call on these two functions to fully reset the image
                 self.resetVariables()
                 self.updateImage(0, 0)
-        
-
-        #This function is called when the remove button on the toolbar is clicked
-        #It removes the map from the eventbox
+ 
         def removeImage(self):
+            '''
+            Called when remove button on the toolbar is clicked
+            Removes the map from the eventbox
+            '''
             #Check if there is a map in the event box
             if self.mapImage != None:
                 #If there is remove the image
@@ -1422,19 +1322,26 @@ class Interface:
                 #Clear the index
                 self.index = None
                 
-        #This function is called when the save button is clicked on the toolbar
-        #ToDo: Make the function to save the map to the desired location    
         def saveMap(self):
+            '''
+            Called when the save button is clicked on the toolbar
+            #ToDo: Make the function to save the map to the desired location   
+            '''
             pass
         
-        #This function returns the index of the map stored
-        #It is called when a map needs to be deleted
         def mapID(self):
+            '''
+            Returns the index of the map stored
+            Called when a map needs to be deleted
+            
+            '''
             if self.mapImage != None:
                 return self.index
         
-        #This function is called when the delete button is clicked on the toolbar       
         def deleteMap(self, mapIndex):
+            '''
+            Called when the delete button is clicked on the toolbar
+            '''
             #Checks to see if the map currently being deleted is being shown in this layout
             if self.index == mapIndex:
                 #If it is it is removed
@@ -1444,9 +1351,11 @@ class Interface:
             elif self.index > mapIndex:
                 self.index -= 1
         
-        #This function is called when the compare button is clicked on the toolbar
-        #It copies the scaling and position of one content to another
-        def compareMaps(self, contents):
+        def compareMaps(self, contents):      
+            '''
+            Called when the compare button is clicked on the toolbar
+            Copies the scaling and position of one content to another
+            '''
 
             #Get the current position of the map in the layout
             self.X, self.Y = self.mapLayout.child_get(self, 'x', 'y')
@@ -1460,18 +1369,16 @@ class Interface:
             #Update the image in the other event box
             contents.updateImage(0, 0)  
 
-    #########################################################################################################################################
-    #                                                                   #
-    #                                    Toolbar Class                          #   
-    #                                                                   #
-    #########################################################################################################################################
-    
-    #Class to for toolbars (Initially there were multiple toolbars) 
-    #This class can be removed since there is no longer a need for it
     class MapToolbar(gtk.Toolbar):  
-    
+        '''
+        Toolbar class
+         (Initially there were multiple toolbars) 
+        #This class can be removed since there is no longer a need for it
+        '''
         def __init__(self, content):
-            #Class a a toolbar type so the toolbar must be initialised
+            ''' 
+            Initialise toolbar
+            '''
             gtk.Toolbar.__init__(self)  
             
             #Set the orientation to horizontal
@@ -1521,8 +1428,6 @@ class Interface:
             else:
                 self.mapContent.compareMaps(self.mapContents[0])
         
-
-        
         def leftMap(self, widget):
             #If the button has been toggled on when the right button is also toggled on, 
             #it changes the map contents and sets the toggle on the right off
@@ -1559,7 +1464,6 @@ class Interface:
                 #Update the thumbnails
                 CF.addMapsToDisplay()
         
-
         #These functions just call functions from the event box class
         
         def zoom(self, widget, scale):
@@ -1573,19 +1477,12 @@ class Interface:
             
         def saveMap(self, widget):
             self.mapContent.saveMap()
-            
-        
-
-
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                   addNewMaps                              #   
-    #                                                                   #
-    #########################################################################################################################################
-
-    #This function is called when a new map is added by the user
-    #It adds the map to the list of maps
+  
     def addNewMaps(self):
+        '''
+        Called when a new map is added by the user.
+        Adds the map to the list of maps.
+        '''
         #Cycle through the new maps
         for plottedMap in self.newMaps:
             #Retrieve a pixbuf from the file
@@ -1597,15 +1494,11 @@ class Interface:
         #Clear the new maps so they do not get added multiple times
         self.newMaps = []
 
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                  addMapsToDisplay                             #   
-    #                                                                   #
-    #########################################################################################################################################
-
-    #This function is called whenever a map is added or deleted from the list of maps
-    #It redraws the thumbnails and sets the model of the treeview of maps
     def addMapsToDisplay(self):
+        '''
+        Called whenever a map is added or deleted from the list of maps.
+        Redraws the thumbnails and sets the model of the treeview of maps.
+        '''
 
         #Remove the hBox from the viewport and re-create it
         self.mapDisplayViewport.remove(self.hBox)
@@ -1659,41 +1552,31 @@ class Interface:
             
             #Add the map name to the map listing model
             self.mapListingsModel.append([mapPixbuf[1]])
-            
         
-
-        
-    #This function is called when a map thumbnail is dragged.
-    #It sets the data which is sent to the reciever 
-    def SendData (self, widget, context, selection, targetType, eventTime):     
+    def SendData (self, widget, context, selection, targetType, eventTime):   
+        '''
+        Called when a map thumbnail is dragged.
+        Sets teh data which is sent to the receiver.
+        '''  
         selection.set(selection.target, targetType, "map")  
     
-    #This function is called when a map thumbnail is dropped onto a viewing area
-    #It sends all the data from the map thumnail and also the list of maps
     def replaceImage(self, widget, context, x, y, selection, targetType, time, contents):
+        '''
+        Called when a map thumbnail is dropped onto a viewing area.
+        Sends all the data from the map thumbnail and also the list of maps.
+        '''
         contents.addImage(widget, context, x, y, selection, targetType, time, self.maps)
 
-
-
-    #########################################################################################################################################
-    #                                                                   #
-    #                                Create Double Map View Page                        #   
-    #                                   (self.doubleViewHBox)                           #
-    #                                                                   #
-    #########################################################################################################################################
-    
-    #This function is called when the View Maps page is created
-    #It adds the two map view areas to the top of the page as well as the toolbar
     def addDoubleMapViewPage(self):
-        
-        
+        ''' Create Double Map View Page
+            Called when View Maps page is created.
+            Adds two map view areas to the top of the page as well as the toolbar
+        '''
         
         #The first map area is created. 
         #A layout which contains the event box class is made
         self.doubleViewLayout0 = gtk.Layout()       
         
-        
-
         #The event box is made
         self.doubleViewContent0 = self.LayoutContent(0.45, 0.4, self.doubleViewLayout0)
 
@@ -1721,7 +1604,6 @@ class Interface:
         self.viewFrame1 = gtk.Frame(None)
         self.viewFrame1.add(self.doubleViewLayout1)
 
-
         #The layout frames are packed side by side in a horizontal box
         self.doubleViewHBox = gtk.HBox()
         self.doubleViewHBox.pack_start(self.viewFrame0, True, True, 5)
@@ -1734,13 +1616,11 @@ class Interface:
         self.doubleViewVBox = gtk.VBox()
         self.doubleViewVBox.pack_start(self.doubleViewHBox, True, True, 5)
         self.doubleViewVBox.pack_end(self.doubleViewToolbar, False, False, 5)
-
-
     
-    #This function is called when the View Maps page is created
-    #It makes the thumbnail area    
     def addMapThumbnails(self):
-        
+        ''' Called when the View Maps page is created. 
+        Makes the thumbnail area.
+        '''
         #The thumbnails are in a scrolled window with a horizontal scroll bar only.
         self.mapDisplayBar = gtk.ScrolledWindow()
         self.mapDisplayBar.set_policy(gtk.POLICY_ALWAYS, gtk.POLICY_NEVER)
@@ -1754,16 +1634,12 @@ class Interface:
         self.hBox = gtk.HBox()
         self.hBox.set_size_request(0, int(self.windowHeight * self.mapThumbnailScalingY))
         self.mapDisplayViewport.add(self.hBox)
-    
-    #########################################################################################################################################
-    #                                                                   #
-    #                                Create View Maps Page                          #   
-    #                                                                   #
-    #########################################################################################################################################           
-    
-    #This function is called in the main code
-    #It creates the View Maps Page
+ 
     def addMapDisplay(self):
+        '''
+        Creates View Maps Page
+        Called by the main code.
+        '''
         
         #Create the two regions
         self.addDoubleMapViewPage()
@@ -1774,8 +1650,6 @@ class Interface:
         self.mapDisplayVBox.pack_start(self.doubleViewVBox, True, True, 2)
         self.mapDisplayVBox.pack_end(self.mapDisplayBar, False, False, 2)
         
-
-
     """-------------------------------------------------------------------------------------------------------------------------------------|
     |                                                                   |                               |
     |                                 View Data Page                            |
@@ -1814,15 +1688,11 @@ class Interface:
     --------------------------------------------------------------------------------------------------------------------------------------"""
 
 
-    #########################################################################################################################################
-    #                                  Function                                 #
-    #                                      viewData                             #   
-    #                                                                   #
-    #########################################################################################################################################   
-
-    #This function is called when the View Data button is clicked from the Create Maps page
-    #It loads all the data currently selected into a table style view
-    def viewData(self, widget, Data=None):  
+    def viewData(self, widget, Data=None): 
+        '''
+        Called when the View Data button is clicked from the Create Maps Page.
+        Loads all the data currently selected into a table style view
+        '''
         
         #Check to see if there is a field currently selected 
         if self.ClimateData.dataIndex != None:
@@ -1843,7 +1713,6 @@ class Interface:
             #Initialise axes variables              
             xAxis = None
             yAxis = None
-            
             
             #This loop finds the first dimension with a length greater than 1 and stores in the xAxis, and the second to the yAxis
             #The viewingData.shape is reversed because by default the order is [t, z, y, x] which is the reverse of what is needed
@@ -1894,7 +1763,6 @@ class Interface:
             self.viewDataXViewport.add(self.viewDataXTable)
             self.viewDataXTable.show()
             self.viewDataXViewport.show()
-        
         
             #Similar to the code above, but with the y axis instead
             yAxisLength = maxmins[yAxis][1][1] - maxmins[yAxis][0][1] + 1
@@ -1952,42 +1820,39 @@ class Interface:
             self.viewDataViewport.show()
 
 
-    #########################################################################################################################################
-    #                                                                   #
-    #                                      Functions                                #   
-    #                                                                   #
-    #########################################################################################################################################
+    ######################################################################
+    #                                                                    #
+    #                            Functions                               #   
+    #                                                                    #
+    ######################################################################
     
-    #This function is called when the mouse enters a new label in the table of labels
-    #ToDo : Display the data, the x axis value and the y axis value of the label being hovered over
     def viewXY (self, widget, s, i, j):
+        '''
+        Called when the mouse enters a new label in the table of labels
+        #ToDo : Display the data, the x axis value and the y axis value of the 
+        label being hovered over
+        '''
         pass
     
-    #This function is called when the user scrolls the data viewport
-    #It copies the scrolling adjustment to the respective x or y axis so that scrolling the data will scroll the axes as well.
     def scrolled(self, widget, widgetToChange):
+        '''
+        Called when the user scrolls the data viewport
+        Copies the scrolling adjustment to the respective x or y axis so 
+        that scrolling the data will scroll the axes as well.
+        '''
         widgetToChange.set_value(widget.get_value())    
 
-
-    #########################################################################################################################################
-    #                                                                   #
-    #                                Create View Data Page                          #   
-    #                                                                   #
-    #########################################################################################################################################
-
-
-
-    #This function is called in the main code 
-    #It adds the View Data page to the notebook.
     def addViewDataPage(self):  
-        
-            
+        '''
+        Create View Data Page
+        Adds the view data page to the notebook
+        '''
         #Create a table to store the labels
         self.viewDataXTable = gtk.Table(1, 1, False)
         
         #Create a viewport to store the table
         self.viewDataXViewport = gtk.Viewport()
-        
+         
         #Store the adjustment of the viewport   
         self.viewDataXAdjustment = self.viewDataXViewport.get_hadjustment()
 
@@ -1997,14 +1862,12 @@ class Interface:
         #Add table to the viewport
         self.viewDataXViewport.add(self.viewDataXTable)
         
-        
         #Similar to code above, but with the Y Axis
         self.viewDataYTable = gtk.Table(1, 1, False)
         self.viewDataYViewport = gtk.Viewport()
         self.viewDataYViewport.set_size_request(100,50) 
         self.viewDataYAdjustment = self.viewDataYViewport.get_vadjustment()
         self.viewDataYViewport.add(self.viewDataYTable)
-        
         
         #A scrolled window is needed for the user to be able to look through the data
         #The viewport is added to this scrolled window      
@@ -2016,13 +1879,10 @@ class Interface:
         self.viewDataWindow.add(self.viewDataViewport)
         self.viewDataViewport.add(self.viewDataTable)
 
-
         #If the scrolled window is scrolled, copy the scrolling to the other viewports
         #This makes the row and column titles an overlay
         self.viewDataHAdjustment.connect("value-changed", self.scrolled, self.viewDataXAdjustment)  
         self.viewDataVAdjustment.connect("value-changed", self.scrolled, self.viewDataYAdjustment)
-        
-        
         
         #Create a table to store all the viewports and scrolled window
         self.viewDataMainTable = gtk.Table(2, 2, False)
@@ -2031,29 +1891,14 @@ class Interface:
         self.viewDataMainTable.attach(self.viewDataWindow, 1, 2, 1, 2, gtk.EXPAND|gtk.FILL, gtk.EXPAND|gtk.FILL)
 
 
-        
-        
-        
-        
-
-    """-------------------------------------------------------------------------------------------------------------------------------------|
-    |                                                                   |
-    |                                                                   |
-    |                                                                   |                               |
-    |                                 Create Interface                          |           
-    |                                                                   |                               
-    |                                                                   |
-    |                                                                   |
-    --------------------------------------------------------------------------------------------------------------------------------------"""
-        
     def __init__(self):
+        ''' Create '''
         
         #Initalise variables, CFData and the window properties
         self.setWindowProperties()
         self.initialiseVariables()
         self.ClimateData = CFData()     
-        
-
+    
         #Add a vertical box to store the menu bar and notebook and add to window
         self.VerticalBox = gtk.VBox(False,0)
         self.window.add(self.VerticalBox)   
