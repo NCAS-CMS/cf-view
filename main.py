@@ -109,16 +109,15 @@ class Interface:
             self.openFile.destroy()
             self.openFile = None
         
-        #If the ok button is clicked the filename is checked to see if it is a .nc file. 
-        #If it is it calls the function "fileChanged" and destroys the widget
-        #If not an error message is outputted.
-        def loadFile(widget, self, Data=None):
-            if self.openFile.get_filename()[-3:] == '.nc':
-                self.fileChanged(self.openFile.get_filename())
-                cancelOpenFile(None, self)
-            else:
-                self.addErrorMessage("Error - File type must be netCDF")
+        # If the ok button is clicked the filename is checked to see if it is a 
+        # nc file. It used to die, but now it emits a warning.
         
+        def loadFile(widget, self, Data=None):
+            if self.openFile.get_filename()[-3:] <> '.nc':
+                self.addErrorMessage("Warning - Unpredictable if file not netCDF")
+            self.fileChanged(self.openFile.get_filename())
+            cancelOpenFile(None, self)
+            
         #If there is already an open file window, it is destroyed. 
         if self.openFile != None:
             self.openFile.destroy()
@@ -1819,7 +1818,6 @@ class Interface:
             self.viewDataTable.show()
             self.viewDataViewport.show()
 
-
     ######################################################################
     #                                                                    #
     #                            Functions                               #   
@@ -1889,7 +1887,6 @@ class Interface:
         self.viewDataMainTable.attach(self.viewDataXViewport, 1, 2, 0, 1, gtk.SHRINK|gtk.FILL, gtk.SHRINK|gtk.FILL)
         self.viewDataMainTable.attach(self.viewDataYViewport, 0, 1, 1, 2, gtk.SHRINK|gtk.FILL, gtk.SHRINK|gtk.FILL)
         self.viewDataMainTable.attach(self.viewDataWindow, 1, 2, 1, 2, gtk.EXPAND|gtk.FILL, gtk.EXPAND|gtk.FILL)
-
 
     def __init__(self):
         ''' Create '''
