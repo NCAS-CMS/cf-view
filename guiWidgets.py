@@ -14,14 +14,73 @@ class guiFrame(gtk.Frame):
         if ysize is not None: self.ysize=ysize
         self.set_size_request(self.xsize,self.ysize)
         
-class fileMetadata(guiFrame):
-    def __init__(self,title='File Metadata',xsize=None,ysize=None):
-        ''' Initialise '''
-        super(fileMetadata,self).__init__(title=title,xsize=xsize,ysize=ysize)
-    def set_data(self,data):
-        ''' Set file metadata information, aka common properties '''
-        pass
+def cfkeyvalue(f,p):
+    ''' Utility method for making a pango string from a cf field <f> and 
+    a specific property <p>. '''
+    s='<b>%s</b>'%p
+    if hasattr(f,p):
+        v=getattr(f,p)
+    else: return ''
+    if hasattr(v,'__call__'): v=v()
+    return '%s: %s'%(s,v)
     
+class fieldMetadata(guiFrame):
+    ''' Provides a frame widget for field metadata, and packs it with content
+    via the set_data method which takes one or more fields in a list. If 
+    multiple fields are provided, show the metadata common to the fields. '''
+    
+    size='small'   # font size for the content
+    
+    def __init__(self,title='Field Metadata',xsize=None,ysize=None):
+        ''' Initialise '''
+        super(fieldMetadata,self).__init__(title=title,xsize=xsize,ysize=ysize)
+        self.sw=gtk.ScrolledWindow()
+        self.sw.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
+        # the following doesn't seem to get honoured, even
+        # though if we get it back, it's definitely set shadow_none
+        self.sw.set_shadow_type(gtk.SHADOW_NONE)
+        # print 'shadow',self.sw.get_shadow_type()
+        # if we have to have a frame drawn around the sw, 
+        # and it seems we do, we might as well have some space around it.
+        self.sw.set_border_width(5)
+        self.add(self.sw)
+        # put a vbox in the scrolled window for the label etc.
+        self.vbox=gtk.VBox()
+        self.sw.add_with_viewport(self.vbox)
+        # and tell the set_data method when it's the first time through.
+        self.shown=False
+        
+    def set_data(self,fields):
+        ''' Show field metadata information for a specific field.
+        If more than one field in fields, show common metadata. '''
+        string="<span size='%s'>"%self.size
+        common=[]
+        if len(fields)>1:
+            string+='<i>Common Field Metadata</i>\n'
+            # find intersection, don't you love python?
+            sets=[set([cfkeyvalue(f,p) for p in f.properties]) for f in fields]
+            u=set.intersection(*sets)
+        else:
+            # just show the field properties
+            u=[cfkeyvalue(fields[0],p) for p in fields[0].properties]
+        for i in u: 
+            if i<>'':string+='%s\n'%i
+        string+='</span>'
+        if self.shown:  self.label.destroy()
+        # now build the label
+        self.label=gtk.Label(string)
+        self.label.set_line_wrap(True)
+        self.label.set_use_markup(True)
+        self.label.set_justify(gtk.JUSTIFY_LEFT)
+        # shove it in a box and make sure it doesn't expand.
+        hbox=gtk.HBox()
+        hbox.pack_start(self.label,expand=False,padding=5)
+        self.vbox.pack_start(hbox,expand=False,padding=5)
+        self.show()
+        self.shown=True
+    
+    def show(self):
+        super(fieldMetadata,self).show_all()
         
 class fieldSelector(guiFrame):
     ''' Provides a widget for data discovery, depends on the CF api
@@ -59,6 +118,10 @@ class fieldSelector(guiFrame):
             self.fieldRenderer.set_property(k,v)
             
         self.columns_are_setup=False
+        
+        # Allow multiple selections
+        treeselector=self.view.get_selection()
+        treeselector.set_mode(gtk.SELECTION_MULTIPLE)
         
         #Add the tree view to the scrolled window and the sw to self (frame)
         self.sw.add(self.view)
@@ -127,10 +190,14 @@ class fieldSelector(guiFrame):
             self.fieldStore.append(self.cf_field_to_columns(i,field))
             i+=1
         
-    def changed(self,data):
+    def changed(self,treeSelection):
         ''' Called when the liststore changes '''
-        print data
-        self.selection_callback()
+        (treestore, pathlist) = treeSelection.get_selected_rows()
+        # at this point pathlist is a list of tuples that looks like
+        # [((6,),(7,), ...]
+        # These indices are the field indexes in the file!
+        indices=[i[0] for i in pathlist]
+        self.selection_callback(indices)
     
     def show(self):
         ''' Show widgets '''
@@ -164,18 +231,26 @@ class QuarterFrame(guiFrame):
     def __init__(self,xsize=None,ysize=None):
         ''' Initialise with optional quarter frame size '''
         super(QuarterFrame,self).__init__(xsize=xsize,ysize=ysize)
+        self.set_shadow_type(gtk.SHADOW_NONE)  # no border
+        # two boxes inside a vbox for the frames to sit in
         vbox=gtk.VBox()
         hboxTop=gtk.HBox()
         hboxBottom=gtk.HBox()
         vbox.pack_start(hboxTop)
         vbox.pack_start(hboxBottom)
         self.add(vbox)
+        # find out the frame sizes
         ls,rs=int(self.xsplit[0]*self.xsize),int(self.xsplit[1]*self.xsize)
         ts,bs=int(self.ysplit[0]*self.ysize),int(self.ysplit[1]*self.ysize)
+        # and then create them
         self.topLeft=guiFrame(xsize=ls,ysize=ts)
         self.topRight=guiFrame(xsize=rs,ysize=ts)
         self.bottomLeft=guiFrame(xsize=ls,ysize=bs)
         self.bottomRight=guiFrame(xsize=rs,ysize=bs)
+        # don't want borders around the subframes:
+        for f in [self.topLeft,self.topRight,self.bottomLeft,self.bottomRight]:
+            f.set_shadow_type(gtk.SHADOW_NONE)
+        # and place them in the boxes
         hboxTop.pack_start(self.topLeft)
         hboxTop.pack_start(self.topRight)
         hboxBottom.pack_start(self.bottomLeft)

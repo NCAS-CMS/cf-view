@@ -160,19 +160,19 @@ class xconvLike(gw.QuarterFrame):
         ''' Initialise with no arguments '''
         super(xconvLike,self).__init__()
         self.fieldSelector=gw.fieldSelector(self.selection)
-        self.fileMetadata=gw.fileMetadata()
+        self.fieldMetadata=gw.fieldMetadata()
         self.topLeft.add(self.fieldSelector)
-        self.bottomLeft.add(self.fileMetadata)
+        self.bottomLeft.add(self.fieldMetadata)
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''
+        self.cf_dataset=data
         self.fieldSelector.set_data(data)
-        self.fileMetadata.set_data(data)
-    
+        
     def selection(self,data):
         ''' A call to set properties '''
-        print 'selection called',data
-
+        fields=[self.cf_dataset[i] for i in data]
+        self.fieldMetadata.set_data(fields)
             
 def main():
     ''' main loop for the cfgui '''
