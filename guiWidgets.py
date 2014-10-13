@@ -1,6 +1,9 @@
 
 import pygtk
 import gtk
+import cf
+import unittest, numpy
+
 
 class guiFrame(gtk.Frame):
     ''' Mixin to simplify framesetup with size and label '''
@@ -13,27 +16,13 @@ class guiFrame(gtk.Frame):
         if xsize is not None: self.xsize=xsize
         if ysize is not None: self.ysize=ysize
         self.set_size_request(self.xsize,self.ysize)
-        
-def cfkeyvalue(f,p):
-    ''' Utility method for making a pango string from a cf field <f> and 
-    a specific property <p>. '''
-    s='<b>%s</b>'%p
-    if hasattr(f,p):
-        v=getattr(f,p)
-    else: return ''
-    if hasattr(v,'__call__'): v=v()
-    return '%s: %s'%(s,v)
-    
-class fieldMetadata(guiFrame):
-    ''' Provides a frame widget for field metadata, and packs it with content
-    via the set_data method which takes one or more fields in a list. If 
-    multiple fields are provided, show the metadata common to the fields. '''
-    
-    size='small'   # font size for the content
-    
-    def __init__(self,title='Field Metadata',xsize=None,ysize=None):
-        ''' Initialise '''
-        super(fieldMetadata,self).__init__(title=title,xsize=xsize,ysize=ysize)
+            
+class scrolledFrame(guiFrame):
+    ''' Provides a scrolled window inside a frame '''
+    def __init__(self,title=None,xsize=None,ysize=None):
+        ''' Initialise with optional title and size '''
+        super(scrolledFrame,self).__init__(title=title,xsize=xsize,ysize=ysize)
+        # now set up scrolled window    
         self.sw=gtk.ScrolledWindow()
         self.sw.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
         # the following doesn't seem to get honoured, even
@@ -44,43 +33,122 @@ class fieldMetadata(guiFrame):
         # and it seems we do, we might as well have some space around it.
         self.sw.set_border_width(5)
         self.add(self.sw)
-        # put a vbox in the scrolled window for the label etc.
+        # put a vbox in the scrolled window for content
         self.vbox=gtk.VBox()
         self.sw.add_with_viewport(self.vbox)
-        # and tell the set_data method when it's the first time through.
+    def show(self):
+        super(scrolledFrame,self).show_all()    
+        
+def smallLabel(text,size='small'):
+    ''' Convenience method for providing a small multi-line gtk.Label '''
+    string="<span size='%s'>%s</span>"%(size,text)
+    label=gtk.Label(string)
+    label.set_line_wrap(True)
+    label.set_use_markup(True)
+    label.set_justify(gtk.JUSTIFY_LEFT)
+    return label
+    
+################################################################################
+# EVERYTHING ABOVE IS gtk aware, but not cf aware
+# EVERYTHING BELOW is *both* gtk aware and cf aware
+################################################################################    
+    
+def cfkeyvalue(f,p):
+    ''' Utility method for making a pango string from a cf object <f> and 
+    a specific property <p>. '''
+    s='<b>%s</b>'%p
+    if hasattr(f,p):
+        v=getattr(f,p)
+    else: return ''
+    if hasattr(v,'__call__'): v=str(v())
+    return '%s: %s'%(s,v)    
+    
+def cfdimprops(f):
+    ''' Utility method for obtaining dimension properties from a CF field
+    and converting them into a list of pango strings. '''
+    r=[]
+    for p in f.coords():
+        s='<b>%s</b>:\n'%p
+        for k in f.coords()[p].properties:
+            kv=cfkeyvalue(f.coords()[p],k)
+            if kv<>'':s+='     %s\n'%kv
+        s+='     <b>Units: </b>%s'%str(f.coords()[p].data.Units)
+        r.append(s)
+    return r
+            
+class fieldMetadata(scrolledFrame):
+    ''' Provides a frame widget for field metadata, and packs it with content
+    via the set_data method which takes one or more fields in a list. If 
+    multiple fields are provided, show the metadata common to the fields. '''
+    
+    size='small'   # font size for the content
+    
+    def __init__(self,title='Field Metadata',xsize=None,ysize=None):
+        ''' Initialise '''
+        super(fieldMetadata,self).__init__(title=title,xsize=xsize,ysize=ysize)
+        # Tell the set_data method when it's the first time through.
         self.shown=False
         
     def set_data(self,fields):
         ''' Show field metadata information for a specific field.
         If more than one field in fields, show common metadata. '''
-        string="<span size='%s'>"%self.size
         common=[]
         if len(fields)>1:
-            string+='<i>Common Field Metadata</i>\n'
+            string='<i>Common Field Metadata</i>\n'
             # find intersection, don't you love python?
             sets=[set([cfkeyvalue(f,p) for p in f.properties]) for f in fields]
             u=set.intersection(*sets)
         else:
+            string=''
             # just show the field properties
             u=[cfkeyvalue(fields[0],p) for p in fields[0].properties]
         for i in u: 
             if i<>'':string+='%s\n'%i
-        string+='</span>'
-        if self.shown:  self.label.destroy()
+        if self.shown:  
+            self.label.destroy()
+            self.hbox.destroy()  # we don't want it to be the old size
         # now build the label
-        self.label=gtk.Label(string)
-        self.label.set_line_wrap(True)
-        self.label.set_use_markup(True)
-        self.label.set_justify(gtk.JUSTIFY_LEFT)
+        self.label=smallLabel(string)
         # shove it in a box and make sure it doesn't expand.
-        hbox=gtk.HBox()
-        hbox.pack_start(self.label,expand=False,padding=5)
-        self.vbox.pack_start(hbox,expand=False,padding=5)
+        self.hbox=gtk.HBox()
+        self.hbox.pack_start(self.label,expand=False,padding=5)
+        self.vbox.pack_start(self.hbox,expand=False,padding=5)
         self.show()
         self.shown=True
     
-    def show(self):
-        super(fieldMetadata,self).show_all()
+class gridMetadata(scrolledFrame):
+    ''' Shows grid metadata for a field or set of fields '''
+    def __init__(self,title='Grid Metadata',xsize=None,ysize=None):
+        ''' Initialise as an empty vessel which gets populated
+        via the set data method.'''
+        super(gridMetadata,self).__init__(title=title,xsize=xsize,ysize=ysize)
+        self.shown=False
+    def set_data(self,fields):
+        ''' Takes a set of cf fields and extracts their grid information.
+        If their is common information is common, it says so. '''
+        common=[]
+        if len(fields)>1:
+            string='<i>Common Grid Metadata</i>\n'
+            # find intersection, don't you love python?
+            sets=[set(cfdimprops(f))for f in fields]
+            u=set.intersection(*sets)
+        else:
+            string=''
+            # just show the field properties
+            u=cfdimprops(fields[0])
+        for i in u: 
+            if i<>'':string+='%s\n'%i
+        if self.shown:  
+            self.label.destroy()
+            self.hbox.destroy()  # we don't want it to be the old size
+        # now build the label
+        self.label=smallLabel(string)
+        # shove it in a box and make sure it doesn't expand.
+        self.hbox=gtk.HBox()
+        self.hbox.pack_start(self.label,expand=False,padding=5)
+        self.vbox.pack_start(self.hbox,expand=False,padding=5)
+        self.show()
+        self.shown=True
         
 class fieldSelector(guiFrame):
     ''' Provides a widget for data discovery, depends on the CF api
@@ -114,7 +182,7 @@ class fieldSelector(guiFrame):
         
         #The cell renderer is used to display the text in list store.
         self.fieldRenderer = gtk.CellRendererText() 
-        for k,v in (('xpad',25),('size-points',8)):
+        for k,v in (('xpad',10),('size-points',8)):
             self.fieldRenderer.set_property(k,v)
             
         self.columns_are_setup=False
@@ -138,7 +206,6 @@ class fieldSelector(guiFrame):
         # work out how big we are so we can get the right column sizes
         allocation=self.get_allocation()
         xsize=allocation[2]-allocation[0]
-        print xsize
         
         for h in headings:
             
@@ -226,7 +293,7 @@ class QuarterFrame(guiFrame):
     Optional arguments include the xsize and ysize of the overall frame,
     otherwise defaults are used. '''
     # these are the default window ratio splits
-    xsplit=[0.65,0.35]
+    xsplit=[0.6,0.4]
     ysplit=[0.7,0.3]
     def __init__(self,xsize=None,ysize=None):
         ''' Initialise with optional quarter frame size '''
@@ -258,3 +325,99 @@ class QuarterFrame(guiFrame):
     def show(self):
         ''' Show internal widgets '''
         self.show_all()
+        
+def makeDummy(standardname,longname):
+    ''' Returns a dummy cf field object for testing, with
+    standardname <standardname> and variablename <longname> from
+    http://cfpython.bitbucket.org/docs/0.9.8.3/field_creation.html '''
+    #---------------------------------------------------------------------
+    # 1. Create the field's domain items
+    #---------------------------------------------------------------------
+    # Create a grid_latitude dimension coordinate
+    dim0 = cf.DimensionCoordinate(properties={'standard_name': 'grid_latitude'},
+                          data=cf.Data(numpy.arange(10.), 'degrees'))
+
+    # Create a grid_longitude dimension coordinate
+    dim1 = cf.DimensionCoordinate(data=cf.Data(numpy.arange(9.), 'degrees'))
+    dim1.standard_name = 'grid_longitude'
+    
+    # Create a time dimension coordinate (with bounds)
+    bounds = cf.CoordinateBounds(
+    data=cf.Data([0.5, 1.5], cf.Units('days since 2000-1-1', calendar='noleap')))
+    dim2 = cf.DimensionCoordinate(properties=dict(standard_name='time'),
+                                  data=cf.Data(1, cf.Units('days since 2000-1-1',
+                                                           calendar='noleap')),
+                                  bounds=bounds)
+    
+    # Create a longitude auxiliary coordinate
+    aux0 = cf.AuxiliaryCoordinate(data=cf.Data(numpy.arange(90).reshape(10, 9),
+                                               'degrees_north'))
+    aux0.standard_name = 'latitude'
+    
+    # Create a latitude auxiliary coordinate
+    aux1 = cf.AuxiliaryCoordinate(properties=dict(standard_name='longitude'),
+                                  data=cf.Data(numpy.arange(1, 91).reshape(9, 10),
+                                               'degrees_east'))
+    
+    # Create a rotated_latitude_longitude grid mapping transform
+    trans0 = cf.Transform(grid_mapping_name='rotated_latitude_longitude',
+                          grid_north_pole_latitude=38.0,
+                          grid_north_pole_longitude=190.0)
+    
+    # --------------------------------------------------------------------
+    # 2. Create the field's domain from the previously created items
+    # --------------------------------------------------------------------
+    domain = cf.Domain(dim=[dim0, dim1, dim2],
+                       aux=[aux0, aux1],
+                       trans=trans0,
+                       assign_axes={'aux1': ['dim1', 'dim0']})
+    
+    #---------------------------------------------------------------------
+    # 3. Create the field
+    #---------------------------------------------------------------------
+    # Create CF properties
+    properties = {'standard_name': standardname,
+                  'long_name'    : longname,
+                  'cell_methods' : cf.CellMethods('latitude: point')}
+    
+    # Create the field's data array
+    data = cf.Data(numpy.arange(90.).reshape(9, 10), 'm s-1')
+    
+    # Finally, create the field
+    f = cf.Field(properties=properties,
+                 domain=domain,
+                 data=data,
+                 axes=domain.axes(['grid_long', 'grid_lat'], ordered=True))
+                 
+    return f
+    
+class TestCFutilities(unittest.TestCase):
+    ''' Test methods for the CF utilities '''
+    def setUp(self):
+        ''' make some dummy CF data'''
+        self.sname,self.lname='eastward_wind','East Wind'
+        self.f=makeDummy(self.sname,self.lname)
+        
+    def test_cfkeyval(self):
+        ''' test the cfkeyval method '''
+        expecting={'long_name':'<b>long_name</b>: %s'%self.lname,
+                   'standard_name':'<b>standard_name</b>: %s'%self.sname,
+                   'cell_methods':'?'}
+        # currently cf python doesn't return cell_methods in properties
+        # even though I think it should. This test will break when it does,
+        # coz expected will need to be filled out correctly and I haven't
+        # gotten around to that.
+        for p in self.f.properties:
+            self.assertEqual(cfkeyvalue(self.f,p),expecting[p])
+            print p,cfkeyvalue(self.f,p)
+    def test_cfdimprops(self):
+        ''' test the cfdimprops method '''
+        print cfdimprops(self.f)
+        print self.f.coords()
+        
+if __name__=="__main__":
+    unittest.main()
+    
+    
+    
+    
