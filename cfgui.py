@@ -162,9 +162,11 @@ class xconvLike(gw.QuarterFrame):
         self.fieldSelector=gw.fieldSelector(self.selection)
         self.fieldMetadata=gw.fieldMetadata()
         self.gridMetadata=gw.gridMetadata()
+        self.gridSelector=gw.gridSelector()
         self.topLeft.add(self.fieldSelector)
         self.bottomLeft.add(self.fieldMetadata)
         self.bottomRight.add(self.gridMetadata)
+        self.topRight.add(self.gridSelector)
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''
@@ -175,7 +177,8 @@ class xconvLike(gw.QuarterFrame):
         ''' A call to set properties '''
         fields=[self.cf_dataset[i] for i in data]
         self.fieldMetadata.set_data(fields)
-        self.gridMetadata.set_data(fields)    
+        self.gridMetadata.set_data(fields)
+        self.gridSelector.set_data(fields[0])   
             
 def main():
     ''' main loop for the cfgui '''

@@ -1,6 +1,6 @@
 
 import pygtk
-import gtk
+import gtk, gobject, pango
 import cf
 import unittest, numpy
 
@@ -24,6 +24,7 @@ class scrolledFrame(guiFrame):
         super(scrolledFrame,self).__init__(title=title,xsize=xsize,ysize=ysize)
         # now set up scrolled window    
         self.sw=gtk.ScrolledWindow()
+        self.sw.set_border_width(5)
         self.sw.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
         # the following doesn't seem to get honoured, even
         # though if we get it back, it's definitely set shadow_none
@@ -31,7 +32,7 @@ class scrolledFrame(guiFrame):
         # print 'shadow',self.sw.get_shadow_type()
         # if we have to have a frame drawn around the sw, 
         # and it seems we do, we might as well have some space around it.
-        self.sw.set_border_width(5)
+       
         self.add(self.sw)
         # put a vbox in the scrolled window for content
         self.vbox=gtk.VBox()
@@ -39,15 +40,78 @@ class scrolledFrame(guiFrame):
     def show(self):
         super(scrolledFrame,self).show_all()    
         
-def smallLabel(text,size='small'):
+def smallLabel(text,size='small',wrap=True):
     ''' Convenience method for providing a small multi-line gtk.Label '''
     string="<span size='%s'>%s</span>"%(size,text)
     label=gtk.Label(string)
-    label.set_line_wrap(True)
     label.set_use_markup(True)
-    label.set_justify(gtk.JUSTIFY_LEFT)
+    label.set_line_wrap(wrap)
+    if wrap:
+        label.set_justify(gtk.JUSTIFY_LEFT)
     return label
     
+class arrayCombo(gtk.HBox):
+    ''' Returns a labeled array combobox widget which has set_value, get_value 
+    and show methods. '''
+    def __init__(self,vector,label=None,callback=None,initial=None,padding=3):
+        ''' Initialise with a vector to put in the combobox.
+        Optional arguments:
+            label - the combobox label
+            callback - a tuple with a callback to pass the current value to 
+                       after it has been changed and something else that the
+                       callback knows how to interpret, e.g. (callback, target)
+                       will result in a functional call to callback(target,value).
+            initial - is an initial value
+            padding - the typical hbox padding.
+            '''
+        super(arrayCombo,self).__init__()
+        # I think we can afford a copy
+        self.vector=[str(i) for i in vector]
+        self._model=gtk.ListStore(gobject.TYPE_STRING)
+        self._box=gtk.ComboBox(self._model)
+        # following magic sets the dropdown to use scrollbars (and be much faster)
+        style = gtk.rc_parse_string('''
+        style "my-style" { GtkComboBox::appears-as-list = 1 }
+        widget "*.mycombo" style "my-style" ''')
+        self._box.set_name('mycombo')
+        self._box.set_style(style)
+        # now make the font smaller in the combobox
+        txt=gtk.CellRendererText()
+        self._box.pack_start(txt,True)
+        self._box.add_attribute(txt,'text',0)
+        txt.set_property('font','sans 8')
+        # the natural size request seems to be (106,25), but
+        # it could be much smaller given our smaller text
+        self._box.set_size_request(60,20)
+        # populate combobox
+        for v in self.vector:
+            self._model.append([v])
+        # set up
+        if initial is not None: self.set_value(initial)
+        if label is not None:
+            mylabel=smallLabel(label)
+            self.pack_start(mylabel,padding=padding,expand=False)
+        if callback is not None:
+            self.callback=callback
+            self._box.connect('changed',self.mycallback)
+        self.pack_start(self._box,padding=padding,expand=True)
+    def set_value(self,v):
+        ''' Set active value of combobox '''
+        if str(v) not in self.vector:
+            raise ValueError('Attempt to set combobox to non valid value')
+        else:
+            self._box.set_active(self.vector.index(str(v)))
+    def get_value(self):
+        ''' Returns value in combobox '''
+        return float(self._model[self._box.get_active()][0])
+    def mycallback(self,entry):
+        ''' This is the internal component of the optional callback '''
+        r=self.get_value()
+        self.callback[0](self.callback[1],r)  
+    def show(self):
+        super(arrayCombo,self).show_all()
+        #print self._box.size_request()
+
 ################################################################################
 # EVERYTHING ABOVE IS gtk aware, but not cf aware
 # EVERYTHING BELOW is *both* gtk aware and cf aware
@@ -115,6 +179,8 @@ class fieldMetadata(scrolledFrame):
         self.vbox.pack_start(self.hbox,expand=False,padding=5)
         self.show()
         self.shown=True
+        
+
     
 class gridMetadata(scrolledFrame):
     ''' Shows grid metadata for a field or set of fields '''
@@ -159,7 +225,7 @@ class fieldSelector(guiFrame):
         via the set_data method. Needs a selection callback for when
         the selection is changed. '''
         
-        super(fieldSelector,self).__init__(xsize=xsize,ysize=ysize)   
+        super(fieldSelector,self).__init__(title='Field Selector',xsize=xsize,ysize=ysize)   
         
         self.selection_callback=selection_callback
       
@@ -270,6 +336,96 @@ class fieldSelector(guiFrame):
         ''' Show widgets '''
         super(fieldSelector,self).show_all()
         
+class cfGrid(object):
+    ''' This is the grid part of a CF field, basically
+    a convenience API into it. '''
+    def __init__(self,field):
+        ''' Initialise with a field. Provides two dictionaries
+        which are keyed by the grid dimension names:
+            .axes is the axes dictionary, and
+            .drange is a set of min,max tuples for each axis.
+        There must be a cleaner way to do this.
+        # FIXME DAVID
+        '''
+        self.domain=field.domain
+        self.axes={}
+        self.drange={}
+        self.names={}
+        # FIXME, use CF grid information, not this ...
+        self.shortNames={'dim0':'T','dim1':'Z','dim2':'Y','dim3':'X'}
+        for k in self.domain.data_axes():
+            cfdata=field.dim(k)
+            self.axes[k]=cfdata
+            self.drange[k]=min(cfdata),max(cfdata)
+            self.names[k]=self.domain.axis_name(k)
+        
+class gridSelector(guiFrame):
+    ''' Provides a selector for choosing a sub-space in a multi-dimensional field'''
+    def __init__(self):
+        ''' Initialise with an existing CF field '''
+        super(gridSelector,self).__init__(title='Grid Selector')
+       
+        self.vbox=gtk.VBox()
+        self.add(self.vbox)
+        self.shown=False
+        
+    def set_data(self,field):
+        ''' Set data with just one field '''
+        self.grid=cfGrid(field)
+        self._makeGui()
+        self.show()
+        
+    def _makeGui(self):
+        ''' Make the GUI for a specific domain '''
+        if self.shown:
+            self.bpanel.destroy
+            for s in self.sliders: self.sliders[g].destroy()
+            for w in self.buttons: self.buttons[w].destroy()
+        self.buttons={}
+        self.sliders={}
+        self.bpanel=gtk.HBox()
+        self.vbox.pack_start(self.bpanel,expand=False)    
+        for axis in self.grid.axes:
+            self.buttons[axis]=gtk.ToggleButton(self.grid.shortNames[axis])
+            self.buttons[axis].connect('toggled',self.buttonPressed,axis)
+            self.bpanel.pack_start(self.buttons[axis],padding=5,expand=5)
+        self.shown=True
+            
+    def _makeSlider(self,dim):
+        ''' Makes an entry for choosing array max and minima '''
+        maxcombo=arrayCombo(self.grid.axes[dim].array,' Max: ')
+        mincombo=arrayCombo(self.grid.axes[dim].array,' Min: ',
+            callback=(self._linkCallback,maxcombo))
+        bbox=gtk.HBox()
+        bbox.pack_start(mincombo,padding=2)
+        bbox.pack_start(maxcombo,padding=2)
+        vbox=gtk.VBox()
+        label=gtk.Label(self.grid.names[dim])
+        for w in [label,bbox]:
+            vbox.pack_start(w,expand=False)
+        vbox.show_all()
+        return vbox
+    
+    def _linkCallback(self,target,value):
+        ''' Takes a callback from a mincombo, which has been changed to value
+        and updates the maxcombo to this value as an initial condition. '''
+        target.set_value(value)
+    
+    def buttonPressed(self,widget,dim):
+        ''' Activated when a button is pressed '''
+        if dim in self.sliders:
+            self.sliders[dim].destroy()
+            del self.sliders[dim]
+        else:
+            box=self._makeSlider(dim)
+            self.sliders[dim]=box
+            self.vbox.pack_start(box,expand=False)
+        print '%s state %s'%(self.grid.names[dim], ("OFF", "ON")[widget.get_active()])
+            
+    def show(self):
+        ''' Show all widgets '''
+        super(gridSelector,self).show_all()
+            
 class guiInspect(guiFrame): 
     ''' Provides a file inspection widget '''
     def __init__(self,selector):
@@ -411,10 +567,26 @@ class TestCFutilities(unittest.TestCase):
             self.assertEqual(cfkeyvalue(self.f,p),expecting[p])
             print p,cfkeyvalue(self.f,p)
     def test_cfdimprops(self):
-        ''' test the cfdimprops method '''
-        print cfdimprops(self.f)
-        print self.f.coords()
+        ''' test the cfdimprops method doesn't crash '''
+        p=cfdimprops(self.f)
+    def test_gridSelector(self):
+        ''' Test we can build a selector '''
+        gs=gridSelector()
+        gs.set_data(self.f)
+        self.assertEquals(gs.buttons.keys(),self.f.domain.axes())
+    def test_arrayCombo(self):
+        ''' Actually creates and runs a widget, so we turn this off
+        after testing it properly '''
+        win=gtk.Window()
+        vector=numpy.arange(100.)
+        x=arrayCombo(vector)
+        x.set_value(10.)
+        self.assertEqual(x.get_value(),10.)
+        #win.add(x.box)
+        #win.show_all()
+        #gtk.main()
         
+    
 if __name__=="__main__":
     unittest.main()
     
