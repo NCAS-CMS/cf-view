@@ -356,15 +356,14 @@ class cfGrid(object):
         for k in self.domain.data_axes():
             cfdata=field.dim(k)
             self.axes[k]=cfdata
-            self.drange[k]=min(cfdata),max(cfdata)
+            self.drange[k]=min(cfdata.array),max(cfdata.array)
             self.names[k]=self.domain.axis_name(k)
         
 class gridSelector(guiFrame):
     ''' Provides a selector for choosing a sub-space in a multi-dimensional field'''
     def __init__(self):
-        ''' Initialise with an existing CF field '''
+        ''' Constuctor just sets some stuff up '''
         super(gridSelector,self).__init__(title='Grid Selector')
-       
         self.vbox=gtk.VBox()
         self.add(self.vbox)
         self.shown=False
@@ -377,51 +376,38 @@ class gridSelector(guiFrame):
         
     def _makeGui(self):
         ''' Make the GUI for a specific domain '''
-        if self.shown:
-            self.bpanel.destroy
-            for s in self.sliders: self.sliders[g].destroy()
-            for w in self.buttons: self.buttons[w].destroy()
-        self.buttons={}
         self.sliders={}
-        self.bpanel=gtk.HBox()
-        self.vbox.pack_start(self.bpanel,expand=False)    
-        for axis in self.grid.axes:
-            self.buttons[axis]=gtk.ToggleButton(self.grid.shortNames[axis])
-            self.buttons[axis].connect('toggled',self.buttonPressed,axis)
-            self.bpanel.pack_start(self.buttons[axis],padding=5,expand=5)
+        for dim in self.grid.axes:
+            box=self._makeSlider(dim)
+            self.sliders[dim]=box
+            self.vbox.pack_start(box,expand=False)
         self.shown=True
             
     def _makeSlider(self,dim):
         ''' Makes an entry for choosing array max and minima '''
+        print self.grid.drange[dim]
         maxcombo=arrayCombo(self.grid.axes[dim].array,' Max: ')
         mincombo=arrayCombo(self.grid.axes[dim].array,' Min: ',
-            callback=(self._linkCallback,maxcombo))
+                    callback=(self._linkCallback,maxcombo),
+                    initial=self.grid.drange[dim][0])
+        # can't do this one at initial value coz it gets reset by the link
+        maxcombo.set_value(self.grid.drange[dim][1])
+        # all the box and border malarkey to make it look nice
         bbox=gtk.HBox()
         bbox.pack_start(mincombo,padding=2)
         bbox.pack_start(maxcombo,padding=2)
         vbox=gtk.VBox()
-        label=gtk.Label(self.grid.names[dim])
-        for w in [label,bbox]:
-            vbox.pack_start(w,expand=False)
-        vbox.show_all()
-        return vbox
+        vbox.pack_start(bbox,padding=5)
+        frame=gtk.Frame(self.grid.names[dim])
+        frame.set_border_width(5)
+        frame.add(vbox)
+        return frame
     
     def _linkCallback(self,target,value):
         ''' Takes a callback from a mincombo, which has been changed to value
         and updates the maxcombo to this value as an initial condition. '''
         target.set_value(value)
     
-    def buttonPressed(self,widget,dim):
-        ''' Activated when a button is pressed '''
-        if dim in self.sliders:
-            self.sliders[dim].destroy()
-            del self.sliders[dim]
-        else:
-            box=self._makeSlider(dim)
-            self.sliders[dim]=box
-            self.vbox.pack_start(box,expand=False)
-        print '%s state %s'%(self.grid.names[dim], ("OFF", "ON")[widget.get_active()])
-            
     def show(self):
         ''' Show all widgets '''
         super(gridSelector,self).show_all()
