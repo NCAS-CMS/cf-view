@@ -4,6 +4,7 @@ import pygtk
 import gtk
 import cf
 import guiWidgets as gw
+import sys
 
 __version__='0.0.1'
 
@@ -11,7 +12,7 @@ cfgPadding=5
 
 class cfgui:
     ''' Provides the main frame for the cfgui '''
-    def __init__(self):
+    def __init__(self, filename):
         ''' Create main window as a notebook with three panes:
                 Discover
                 Inspect
@@ -36,9 +37,9 @@ class cfgui:
         nb.show_tabs=True
         vbox.pack_start(nb,padding=cfgPadding)
         self.nb=nb
-        for a,p,m in [ ('discover',xconvLike,self.selector),
-                    ('inspect',gw.guiInspect,self.selector),
-                    ('plot',gw.guiPlot,self.selector),
+        for a,p,m in [ ('Select',xconvLike,self.selector),
+                    ('Inspect',gw.guiInspect,self.selector),
+                    ('Gallery',gw.guiGallery,self.selector),
                    ]:
             label=gtk.Label(a)
             w=p(m)
@@ -57,6 +58,9 @@ class cfgui:
         self.set_title(self.default_title)
         
         window.show_all()
+        
+        if filename is not None:
+            self.reset_with(filename)
         
     def selector(self):
         ''' Callback to mediate the various panes. May need to be
@@ -126,9 +130,9 @@ class cfgui:
     def reset_with(self,filename):
         ''' Open dataset filename '''
         data=cf.read(filename)
-        self.discover.set_data(data)
-        self.inspect.reset()
-        self.plot.reset()
+        self.Select.set_data(data)
+        self.Inspect.reset()
+        self.Gallery.reset()
         
     def help_about(self,b):
         ''' Provide an about dialog '''
@@ -215,11 +219,16 @@ class xconvLike(gw.QuarterFrame):
         self.gridSelector.set_data(fields[0]) 
         self.fields=fields
             
-def main():
+def main(filename):
     ''' main loop for the cfgui '''
-    c=cfgui()
+    c=cfgui(filename)
     gtk.main()
     return 0
         
 if __name__=="__main__":
-    main()
+    args=sys.argv
+    if len(args)>2:
+        print 'Usage: cfgui <filename>   (filename is optional)'
+    elif len(args)==2:
+        main(args[1])
+    else: main(None)

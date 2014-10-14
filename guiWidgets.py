@@ -429,10 +429,10 @@ class guiInspect(guiFrame):
         ''' Handle changing the data file '''
         pass
 
-class guiPlot(guiFrame):
-    ''' Provides a file plot widget '''
+class guiGallery(guiFrame):
+    ''' Provides a gallery of plots '''
     def __init__(self,selector):
-        super(guiPlot,self).__init__()
+        super(guiGallery,self).__init__()
     def reset(self):
         ''' Handle changing the data file'''
         pass
