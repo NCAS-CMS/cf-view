@@ -361,9 +361,9 @@ class cfGrid(object):
         
 class gridSelector(guiFrame):
     ''' Provides a selector for choosing a sub-space in a multi-dimensional field'''
-    def __init__(self):
+    def __init__(self,xsize=None,ysize=None):
         ''' Constuctor just sets some stuff up '''
-        super(gridSelector,self).__init__(title='Grid Selector')
+        super(gridSelector,self).__init__(title='Grid Selector',xsize=xsize,ysize=ysize)
         self.vbox=gtk.VBox()
         self.add(self.vbox)
         self.shown=False
@@ -377,6 +377,7 @@ class gridSelector(guiFrame):
     def _makeGui(self):
         ''' Make the GUI for a specific domain '''
         self.sliders={}
+        self.combos={}
         for dim in self.grid.axes:
             box=self._makeSlider(dim)
             self.sliders[dim]=box
@@ -385,11 +386,11 @@ class gridSelector(guiFrame):
             
     def _makeSlider(self,dim):
         ''' Makes an entry for choosing array max and minima '''
-        print self.grid.drange[dim]
         maxcombo=arrayCombo(self.grid.axes[dim].array,' Max: ')
         mincombo=arrayCombo(self.grid.axes[dim].array,' Min: ',
                     callback=(self._linkCallback,maxcombo),
                     initial=self.grid.drange[dim][0])
+        self.combos[dim]=(mincombo,maxcombo)
         # can't do this one at initial value coz it gets reset by the link
         maxcombo.set_value(self.grid.drange[dim][1])
         # all the box and border malarkey to make it look nice
@@ -407,6 +408,14 @@ class gridSelector(guiFrame):
         ''' Takes a callback from a mincombo, which has been changed to value
         and updates the maxcombo to this value as an initial condition. '''
         target.set_value(value)
+        
+    def get_selected(self):
+        ''' Return the combobox selections as they currently stand '''
+        selections={}
+        for dim in self.combos:
+            selections[dim]=(self.combos[dim][0].get_value(),
+                             self.combos[dim][1].get_value())
+        return selections
     
     def show(self):
         ''' Show all widgets '''

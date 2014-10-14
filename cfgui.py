@@ -152,21 +152,53 @@ This is a pre-release version of the NCAS cfgui
         self.w.set_title(title)
 
 class xconvLike(gw.QuarterFrame):
-    ''' Set up an xconv like set of panels with discovery in the top left,
-    file metadata at the bottom, field metadata on the top right, and
-    grid metadata on the bottom right ... which of course is not exactly
-    like xconv. '''
-    def __init__(self,selector=None):
-        ''' Initialise with no arguments '''
+    ''' Set up an xconv like set of panels with 
+            field selection on the top left
+            field metadata on the bottom left
+            grid metadata on the bottom right
+            and a combination of grid selection and actions on the top right
+        which of course isn't like xconv, but is more cf-like ...
+        
+        The action box is passed in ... 
+        '''
+    def __init__(self,actionbox):
+        ''' Initialise with an action box to put in the top corner '''
         super(xconvLike,self).__init__()
         self.fieldSelector=gw.fieldSelector(self.selection)
         self.fieldMetadata=gw.fieldMetadata()
         self.gridMetadata=gw.gridMetadata()
-        self.gridSelector=gw.gridSelector()
+        self.gridSelector=gw.gridSelector(ysize=200)
         self.topLeft.add(self.fieldSelector)
         self.bottomLeft.add(self.fieldMetadata)
         self.bottomRight.add(self.gridMetadata)
-        self.topRight.add(self.gridSelector)
+        self._topRight()
+        
+    def _topRight(self):
+        ''' Combination frame for the top right '''
+        topRv=gtk.VBox()
+        topRv.pack_start(self._actionBox(),padding=2)
+        topRv.pack_start(self.gridSelector,expand=True,fill=True)
+        self.topRight.add(topRv)
+        
+    def _actionBox(self):
+        ''' Provides the buttons and callbacks to the actual actions which 
+        the routine supports. '''
+        actionbox=gw.guiFrame('Actions',ysize=100)
+        vbox=gtk.VBox()
+        self.buttonPanel=gtk.HBox()
+        actionbox.add(vbox)
+        vbox.pack_start(self.buttonPanel,expand=False)
+        chooser=gtk.Button('Choose Plot')
+        chooser.connect('clicked',self._choosePlot)
+        self.buttonPanel.pack_start(chooser,padding=5,expand=False)
+        return actionbox
+        
+    def _choosePlot(self,widget):
+        ''' Given the dimensionality of the plot, offer a set of plot types '''
+        # At this point we need a two dimensional field, if it's not 
+        # two dimensional, raise an error
+        grid=self.gridSelector.get_selected()
+        print grid
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''
@@ -174,11 +206,14 @@ class xconvLike(gw.QuarterFrame):
         self.fieldSelector.set_data(data)
         
     def selection(self,data):
-        ''' A call to set properties '''
+        ''' Provided to fieldSelector as a callback, so that when
+        fields are selected, the metadata and grid selectors are
+        updated. '''
         fields=[self.cf_dataset[i] for i in data]
         self.fieldMetadata.set_data(fields)
         self.gridMetadata.set_data(fields)
-        self.gridSelector.set_data(fields[0])   
+        self.gridSelector.set_data(fields[0]) 
+        self.fields=fields
             
 def main():
     ''' main loop for the cfgui '''
