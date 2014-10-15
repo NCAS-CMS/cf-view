@@ -5,6 +5,7 @@ import gtk
 import cf
 import guiWidgets as gw
 import sys
+import cfplot as cfp
 
 __version__='0.0.1'
 
@@ -187,31 +188,56 @@ class xconvLike(gw.QuarterFrame):
     def _actionBox(self):
         ''' Provides the buttons and callbacks to the actual actions which 
         the routine supports. '''
-        actionbox=gw.guiFrame('Actions',ysize=80)
-        vbox=gtk.VBox()
-        self.buttonPanel=gtk.HBox()
-        actionbox.add(vbox)
-        vbox.pack_start(self.buttonPanel,expand=False)
-        chooser=gtk.Button('Choose Plot')
-        chooser.connect('clicked',self._choosePlot)
-        self.buttonPanel.pack_start(chooser,padding=5,expand=False)
-        return actionbox
+        actionBox=gw.plotChoices(callback=self._simplePlot,ysize=90)
+        actionBox.show()
+        return actionBox
         
-    def _choosePlot(self,widget):
+    def _simplePlot(self,w,data):
         ''' Given the dimensionality of the plot, offer a set of plot types '''
+        print 'simple plot received',data
+        grid=self.gridSelector.get_selected()
+        if grid is None:
+            dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                    gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,
+                    'Please select some data before trying to plot!')
+            dialog.run()
+            dialog.destroy()
+            return
+        # for now let's operatate on the first field.
+        # FIXME What to do if we have more than one field? 
+        sfield=self.fields[0]
+        # first let's do the subspace selection (if any):
+        kwargs={}
+        for d in grid:
+            kwargs[d]=cf.wi(grid[d][0],grid[d][1])
+        sfield=sfield.subspace(**kwargs)
+        # now, do we have to apply any operators?
+        for d in grid:
+            if grid[d][2]<>None:
+                sfield=cf.collapse(sfield,grid[d][2],axes=d)
+        # now we know the shape we can offer plotting options
+        #print grid.keys()
+        #axis_sizes={}
+        #print sfield.axes_sizes()
+        #for a in ['X','Y','Z','T']:
+        #    axis_sizes[a]=sfield.axes_sizes()[sfield.axis.name(a)]
+        #print axis_sizes
         # At this point we need a two dimensional field, if it's not 
         # two dimensional, raise an error
-        grid=self.gridSelector.get_selected()
-        # for now let's operatate on the first field. 
-        # FIXME (handle multiple fields)
-        # FIXME (is there a more elegant way of doing this than looping?)
-        sfield=self.fields[0]
-        print grid
-        print sfield.shape
-        for d in grid:
-            # doesn't work ...
-            sfield=sfield.subspace(d=cf.wi(grid[d][0],grid[d][1]))
-        print sfield.shape
+        dimensionality=0
+        for i in sfield.shape:
+            if i>1: dimensionality+=1
+        if dimensionality<>2:
+            # We currently don't know how to plot it
+            dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                    gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,
+                    'Currently we only know how to plot 2d fields.\n'+
+                    'Please use the grid selector to choose a 2d field.'
+                    )
+            dialog.run()
+            dialog.destroy()
+        else:
+            cfp.con(sfield,title=sfield.file)
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''

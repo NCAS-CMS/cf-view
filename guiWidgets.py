@@ -3,6 +3,7 @@ import pygtk
 import gtk, gobject, pango
 import cf
 import unittest, numpy
+from collections import OrderedDict
 
 
 class guiFrame(gtk.Frame):
@@ -50,6 +51,14 @@ def smallLabel(text,size='small',wrap=True):
         label.set_justify(gtk.JUSTIFY_LEFT)
     return label
     
+def smallButton(text,size='small'):
+    ''' Makes a small button '''
+    text="<span size='small'>%s</span>"%text
+    b=gtk.Button(text)
+    label=b.get_child()
+    label.set_use_markup(True)
+    return b
+    
 class myCombo(gtk.HBox):
     ''' Mixin convenience class for small combo boxes with labels '''
     def __init__(self,content,label=None,initial=None, callback=None,fontSize=8,
@@ -91,18 +100,25 @@ class myCombo(gtk.HBox):
 
 class collapseCombo(myCombo):
     ''' Choose from the available collapse operators '''
-    options=[' ','min','max','mid','sum','mean','s.d.','var']
+    options=OrderedDict([(' ',None),('min','min'),('max','max'),
+                         ('mid','mid_range'),('sum','sum'),('mean','mean'),
+                         ('s.d.','standard_deviation'),('var','variance')])
     def __init__(self,initial='None',callback=None,fontSize='8'):
         ''' Initialise with the current value, a callback to be called if
         the value changes, and if necessary, a font size '''
         super(collapseCombo,self).__init__(
-                self.options,initial=initial,callback=callback,fontSize=fontSize)
+            self.options.keys(),initial=initial,callback=callback,fontSize=fontSize)
         # FIXME. I think I want the size request to be 20, but the
         # problem is that the text on the button disappears. I need
         # to shrink the container button, but I don't know how to do
         # that, yet. (Which would hopefully fix the off-centred text
         # as well.
         self._box.set_size_request(40,22)
+    def get_value(self):
+        ''' Override mixin method so we get the long name, after combobox
+        only shows the short name. '''
+        r=super(collapseCombo,self).get_value()
+        return self.options[r]
     
 class arrayCombo(myCombo):
     ''' Returns a labeled array combobox widget which has set_value, get_value 
@@ -167,14 +183,143 @@ def cfdimprops(f):
     ''' Utility method for obtaining dimension properties from a CF field
     and converting them into a list of pango strings. '''
     r=[]
-    for p in f.coords():
+    
+    for p in ['X','Y','Z','T']:
         s='<b>%s</b>:\n'%p
-        for k in f.coords()[p].properties:
-            kv=cfkeyvalue(f.coords()[p],k)
+        coord=f.coord(p)
+        if coord is None: continue
+        for k in coord.properties:
+            kv=cfkeyvalue(coord,k)
             if kv<>'':s+='     %s\n'%kv
-        s+='     <b>Units: </b>%s'%str(f.coords()[p].data.Units)
+        s+='     <b>Units: </b>%s'%str(f.coord(p).data.Units)
         r.append(s)
     return r
+    
+class plotChoices(guiFrame):
+    ''' Provides a small set of cf-plot aware plot choices '''
+    def __init__(self,callback,xsize=None,ysize=None):
+        ''' Constructor places buttons etc in frame, users interact,
+        and then press one of the two key buttons: simple plot, or normal plot.
+        They can also do advanced configuration via the advanced config button.
+        Caller needs to provide a callback for when one of the two plot
+        buttons is called (and deal with either {} for a simple plot, or 
+        a dictionary of dictionaries with cf plots etup information for the
+        normal plot. 
+        Optional arguements are size hints. '''
+        super(plotChoices,self).__init__(
+            'Configure and Generate Plots',xsize=xsize,ysize=ysize)
+        self.vbox=gtk.VBox()
+        self.row1=gtk.HBox()
+        self.row2=gtk.HBox()
+        self.row3=gtk.HBox()
+        self.row4=gtk.HBox()
+        self.add(self.vbox)
+        self._row1(callback)
+        self._row2()
+        self._row3()
+        self._row4(callback)
+    
+    def getConfig(self):
+        ''' Return all the configuration information in dictionaries
+        suitable for use as arguments for cf plot '''
+        #FIXME
+        return None    
+    
+    def _row1(self,callback):
+        ''' Sets up the basic action buttons '''
+        sp=smallButton('Simple Plot')
+        np=smallButton('Plot (Configured)')
+        hb=smallButton('Help')
+        s1=gtk.VSeparator()
+        s2=gtk.VSeparator()
+        for b in [sp,s1,np,s2,hb]:
+            self.row1.pack_start(b,padding=2)
+        self.vbox.pack_start(self.row1,expand=False,padding=2)
+        self.vbox.pack_start(gtk.HSeparator(),expand=False,padding=2)
+        sp.connect('clicked',callback,{})
+        np.connect('clicked',callback,self.getConfig())
+        hb.connect('clicked',self._help,None)
+    
+    def _row2(self):
+        ''' Lays out the buttons for standard plots '''
+        self.projComboShown=1
+        ptypes=['X-Y','X-Z','Y-Z','X-T','Y-T']
+        nup=['1','2','4','6','9']
+        self.proj=['cyl','moll','npolar','spolar']
+        typCombo=myCombo(ptypes,label='type',initial='X-Y',callback=self._showProj)
+        nupCombo=myCombo(nup,label='n-up',initial='1')
+        self.projCombo=myCombo(self.proj,label='projection',initial='cyl')
+        self.row2.pack_start(nupCombo,expand=True,padding=2)
+        self.row2.pack_start(typCombo,expand=True,padding=2)
+        self.row2.pack_start(self.projCombo,expand=True,padding=2)
+        self.vbox.pack_start(self.row2,expand=False,padding=2)
+    def _row3(self):
+        ''' Lays out the buttons for configuring contours '''
+        contours=['lines','filled','block']
+        labels=['Off','On','On--']
+        self.cbar=['Off','On','On-X','On-Y']
+        self.cbarChoiceShown=1
+        conCombo=myCombo(contours,label='contours',initial='filled',
+                callback=self._showCbar)
+        linCombo=myCombo(labels,label='labels',initial='On')
+        self.cbarCombo=myCombo(self.cbar,label='bar',initial='Off')
+        for w in [conCombo,linCombo,self.cbarCombo]:
+            self.row3.pack_start(w,padding=2)
+        self.vbox.pack_start(self.row3,expand=False,padding=2)
+        
+        extend=['min','max','neither','both']
+        #minc,maxc,nlevs,extend
+        
+    def _row4(self,callback):
+        ''' Lays out axes information'''
+        logv=['Normal','log-x','log-y','log-xy']
+        axeCombo=myCombo(logv,label='axes',initial='Normal')
+        ac=smallButton('Advanced Config')
+        ac.connect('clicked',self._advancedConfig,None)
+        self.row4.pack_start(axeCombo,padding=2,expand=False)
+        self.row4.pack_start(ac,padding=2,expand=True)
+        self.vbox.pack_start(self.row4,expand=False,padding=2)
+        
+    def _showCbar(self,w,value):
+        ''' Callback used to turn off the colour bar choice as appropriate '''
+        if value=='lines' and self.cbarChoiceShown:
+            self.cbarCombo.destroy()
+            self.cbarChoiceShown=0
+        elif not self.cbarChoiceShown:
+            self.cbarCombo=myCombo(self.cbar,initial='Off')
+            self.row3.pack_start(self.cbarCombo,padding=2)
+            self.cbarChoiceShown=1
+            self.cbarCombo.show()
+        
+    def _showProj(self,w,value):
+        ''' Callback used for the typcombo to allow projections for X-Y '''
+        if value=='X-Y' and not self.projComboShown:
+            self.projCombo=myCombo(self.proj,initial='cyl')
+            self.row2.pack_start(self.projCombo,expand=False,padding=2)
+            self.projCombo.show()
+        if value!='X-Y' and self.projComboShown:
+            self.projCombo.destroy()
+            self.projComboShown=0
+            
+    def _help(self,w,data):
+        ''' Show configuration help '''
+        dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                    gtk.MESSAGE_INFO,gtk.BUTTONS_OK,
+                    'Sorry help not yet implemented')
+        dialog.run()
+        dialog.destroy()
+   
+    def _advancedConfig(self,w,data):
+        ''' Generate advanced plot configuration information via a dialog popup '''
+        dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                    gtk.MESSAGE_INFO,gtk.BUTTONS_OK,
+                    'Sorry advanced config not yet implemented')
+        dialog.run()
+        dialog.destroy()
+   
+    def show(self):
+        super(plotChoices,self).show_all()
+    
             
 class fieldMetadata(scrolledFrame):
     ''' Provides a frame widget for field metadata, and packs it with content
@@ -337,11 +482,11 @@ class fieldSelector(guiFrame):
         if hasattr(field,'standard_name'):
             name=field.standard_name
         else: name=field.long_name
-        # FIXME, use CF grid information, not this ...
-        (nx,ny,nz,nt) = (len(field.item('dim3').array), 
-                        len(field.item('dim2').array), 
-                        len(field.item('dim1').array) , 
-                        len(field.item('dim0').array))
+        # FIXME, what happens if X, Y,Z or T are not present?
+        (nx,ny,nz,nt) = (len(field.item('X').array), 
+                        len(field.item('Y').array), 
+                        len(field.item('Z').array) , 
+                        len(field.item('T').array))
         return (index,name,nx,ny,nz,nt)
         
     def set_data(self,data):
@@ -388,6 +533,8 @@ class cfGrid(object):
         self.drange={}
         self.names={}
         # FIXME, use CF grid information, not this ...
+        #order=['X','Y','Z','T']
+        #for k in order ...field.dim[k]
         self.shortNames={'dim0':'T','dim1':'Z','dim2':'Y','dim3':'X'}
         for k in self.domain.data_axes():
             cfdata=field.dim(k)
@@ -459,6 +606,7 @@ class gridSelector(guiFrame):
     def get_selected(self):
         ''' Return the combobox selections as they currently stand '''
         selections={}
+        if not self.shown: return None
         for dim in self.combos:
             selections[dim]=(self.combos[dim][0].get_value(),
                              self.combos[dim][1].get_value(),
