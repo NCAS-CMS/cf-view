@@ -139,10 +139,17 @@ class cfgui:
         ''' Provide an about dialog '''
         m=gtk.AboutDialog()
         m.set_program_name('cfgui')
-        m.set_copyright ( '(c) National Centre for Atmosheric Science')
+        m.set_copyright ( '(c) National Centre for Atmospheric Science')
         m.set_version(__version__)
         m.set_comments('''
 This is a pre-release version of the NCAS cfgui
+
+Credits to:
+    David Hassell - for cf-python
+    Andy Heaps - for cf-plot
+    Mudit Gupta - for the prototype pygtk interface to cf-plot
+    Bryan Lawrence - for the initial version of cfgui
+            
             ''')
         m.run()
         m.destroy()
