@@ -376,6 +376,9 @@ class gridSelector(guiFrame):
         
     def _makeGui(self):
         ''' Make the GUI for a specific domain '''
+        if self.shown:
+            for d in self.sliders:
+                self.sliders[d].destroy()
         self.sliders={}
         self.combos={}
         for dim in self.grid.axes:
