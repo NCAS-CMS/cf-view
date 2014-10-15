@@ -187,7 +187,7 @@ class xconvLike(gw.QuarterFrame):
     def _actionBox(self):
         ''' Provides the buttons and callbacks to the actual actions which 
         the routine supports. '''
-        actionbox=gw.guiFrame('Actions',ysize=100)
+        actionbox=gw.guiFrame('Actions',ysize=80)
         vbox=gtk.VBox()
         self.buttonPanel=gtk.HBox()
         actionbox.add(vbox)
@@ -202,7 +202,16 @@ class xconvLike(gw.QuarterFrame):
         # At this point we need a two dimensional field, if it's not 
         # two dimensional, raise an error
         grid=self.gridSelector.get_selected()
+        # for now let's operatate on the first field. 
+        # FIXME (handle multiple fields)
+        # FIXME (is there a more elegant way of doing this than looping?)
+        sfield=self.fields[0]
         print grid
+        print sfield.shape
+        for d in grid:
+            # doesn't work ...
+            sfield=sfield.subspace(d=cf.wi(grid[d][0],grid[d][1]))
+        print sfield.shape
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''

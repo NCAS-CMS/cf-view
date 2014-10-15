@@ -50,7 +50,61 @@ def smallLabel(text,size='small',wrap=True):
         label.set_justify(gtk.JUSTIFY_LEFT)
     return label
     
-class arrayCombo(gtk.HBox):
+class myCombo(gtk.HBox):
+    ''' Mixin convenience class for small combo boxes with labels '''
+    def __init__(self,content,label=None,initial=None, callback=None,fontSize=8,
+                 padding=2):
+        ''' Initialise with content, label, callback and fontsize '''
+        super(myCombo,self).__init__()
+        self._model=gtk.ListStore(gobject.TYPE_STRING)
+        self._box=gtk.ComboBox(self._model)
+        txt=gtk.CellRendererText()
+        self._box.pack_start(txt,True)
+        self._box.add_attribute(txt,'text',0)
+        txt.set_property('font','sans %s'%fontSize)
+        if label is not None:
+            mylabel=smallLabel(label)
+            self.pack_start(mylabel,padding=padding,expand=False)
+        if callback is not None:
+            self._callback=callback
+            self._box.connect('changed',self.__myComboCallback)
+        self.pack_start(self._box,padding=padding,expand=True) 
+        for item in content:
+            self._model.append([item])
+        self.content=content
+        if initial is not None: self.set_value(initial)
+    def set_value(self,v):
+        ''' Set active value of combobox '''
+        if v not in self.content:
+            raise ValueError('Attempt to set combobox to non valid value')
+        else:
+            self._box.set_active(self.content.index(v))
+    def get_value(self):
+        ''' Returns value in combobox '''
+        return self._model[self._box.get_active()][0]
+    def __myComboCallback(self,w):
+        ''' Return current value of widget as argument to the callback '''
+        self._callback(w,self.get_value())
+    def show(self):
+        super(myCombo,self).show_all()    
+        
+
+class collapseCombo(myCombo):
+    ''' Choose from the available collapse operators '''
+    options=[' ','min','max','mid','sum','mean','s.d.','var']
+    def __init__(self,initial='None',callback=None,fontSize='8'):
+        ''' Initialise with the current value, a callback to be called if
+        the value changes, and if necessary, a font size '''
+        super(collapseCombo,self).__init__(
+                self.options,initial=initial,callback=callback,fontSize=fontSize)
+        # FIXME. I think I want the size request to be 20, but the
+        # problem is that the text on the button disappears. I need
+        # to shrink the container button, but I don't know how to do
+        # that, yet. (Which would hopefully fix the off-centred text
+        # as well.
+        self._box.set_size_request(40,22)
+    
+class arrayCombo(myCombo):
     ''' Returns a labeled array combobox widget which has set_value, get_value 
     and show methods. '''
     def __init__(self,vector,label=None,callback=None,initial=None,padding=3):
@@ -64,53 +118,35 @@ class arrayCombo(gtk.HBox):
             initial - is an initial value
             padding - the typical hbox padding.
             '''
-        super(arrayCombo,self).__init__()
+        self.callback=callback
         # I think we can afford a copy
-        self.vector=[str(i) for i in vector]
-        self._model=gtk.ListStore(gobject.TYPE_STRING)
-        self._box=gtk.ComboBox(self._model)
+        options=[str(i) for i in vector]
+        
+        super(arrayCombo,self).__init__(options,initial=initial,label=label,
+                                        callback=self.__aCcallback)
         # following magic sets the dropdown to use scrollbars (and be much faster)
         style = gtk.rc_parse_string('''
         style "my-style" { GtkComboBox::appears-as-list = 1 }
         widget "*.mycombo" style "my-style" ''')
         self._box.set_name('mycombo')
         self._box.set_style(style)
-        # now make the font smaller in the combobox
-        txt=gtk.CellRendererText()
-        self._box.pack_start(txt,True)
-        self._box.add_attribute(txt,'text',0)
-        txt.set_property('font','sans 8')
+        
         # the natural size request seems to be (106,25), but
         # it could be much smaller given our smaller text
         self._box.set_size_request(60,20)
-        # populate combobox
-        for v in self.vector:
-            self._model.append([v])
-        # set up
-        if initial is not None: self.set_value(initial)
-        if label is not None:
-            mylabel=smallLabel(label)
-            self.pack_start(mylabel,padding=padding,expand=False)
-        if callback is not None:
-            self.callback=callback
-            self._box.connect('changed',self.mycallback)
-        self.pack_start(self._box,padding=padding,expand=True)
+      
     def set_value(self,v):
         ''' Set active value of combobox '''
-        if str(v) not in self.vector:
-            raise ValueError('Attempt to set combobox to non valid value')
-        else:
-            self._box.set_active(self.vector.index(str(v)))
+        # need to override the mixin class to ensure type conversion from float
+        super(arrayCombo,self).set_value(str(v))
     def get_value(self):
         ''' Returns value in combobox '''
-        return float(self._model[self._box.get_active()][0])
-    def mycallback(self,entry):
+        # need to override the mixin class to ensure type conversion to float
+        return float(super(arrayCombo,self).get_value())
+    def __aCcallback(self,entry,value):
         ''' This is the internal component of the optional callback '''
-        r=self.get_value()
-        self.callback[0](self.callback[1],r)  
-    def show(self):
-        super(arrayCombo,self).show_all()
-        #print self._box.size_request()
+        if self.callback is not None:
+            self.callback[0](self.callback[1],value)  
 
 ################################################################################
 # EVERYTHING ABOVE IS gtk aware, but not cf aware
@@ -388,19 +424,27 @@ class gridSelector(guiFrame):
         self.shown=True
             
     def _makeSlider(self,dim):
-        ''' Makes an entry for choosing array max and minima '''
-        maxcombo=arrayCombo(self.grid.axes[dim].array,' Max: ')
-        mincombo=arrayCombo(self.grid.axes[dim].array,' Min: ',
+        ''' Makes an entry for choosing array max and minima and
+        for selecting a collapse operator. Note that the
+        max grid selector slaves from the min grid selector,
+        so users should always use that one first.'''
+        maxcombo=arrayCombo(self.grid.axes[dim].array,'Max:')
+        mincombo=arrayCombo(self.grid.axes[dim].array,'Min:',
                     callback=(self._linkCallback,maxcombo),
                     initial=self.grid.drange[dim][0])
-        self.combos[dim]=(mincombo,maxcombo)
+        colcombo=collapseCombo(initial=' ')
+        self.combos[dim]=(mincombo,maxcombo,colcombo)        
         # can't do this one at initial value coz it gets reset by the link
         maxcombo.set_value(self.grid.drange[dim][1])
         # all the box and border malarkey to make it look nice
-        bbox=gtk.HBox()
-        bbox.pack_start(mincombo,padding=2)
-        bbox.pack_start(maxcombo,padding=2)
         vbox=gtk.VBox()
+        bbox=gtk.HBox()
+        if len(self.grid.axes[dim].array)>1:
+            bbox.pack_start(colcombo,padding=2)
+            bbox.pack_start(mincombo,padding=2)
+            bbox.pack_start(maxcombo,padding=2)
+        else:
+            bbox.pack_start(smallLabel('Value %s'%self.grid.axes[dim].array[0]))
         vbox.pack_start(bbox,padding=5)
         frame=gtk.Frame(self.grid.names[dim])
         frame.set_border_width(5)
@@ -417,7 +461,8 @@ class gridSelector(guiFrame):
         selections={}
         for dim in self.combos:
             selections[dim]=(self.combos[dim][0].get_value(),
-                             self.combos[dim][1].get_value())
+                             self.combos[dim][1].get_value(),
+                             self.combos[dim][2].get_value())
         return selections
     
     def show(self):
@@ -567,11 +612,6 @@ class TestCFutilities(unittest.TestCase):
     def test_cfdimprops(self):
         ''' test the cfdimprops method doesn't crash '''
         p=cfdimprops(self.f)
-    def test_gridSelector(self):
-        ''' Test we can build a selector '''
-        gs=gridSelector()
-        gs.set_data(self.f)
-        self.assertEquals(gs.buttons.keys(),self.f.domain.axes())
     def test_arrayCombo(self):
         ''' Actually creates and runs a widget, so we turn this off
         after testing it properly '''
