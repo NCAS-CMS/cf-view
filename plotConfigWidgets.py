@@ -170,32 +170,103 @@ class plotChoices(gw.guiFrame):
         
 def checkConsistency(field,plotOptions):
     ''' Check consistency between the data chosen and the plot options and
-    generate error messages if appropriate '''
+    generate error messages if appropriate. Return '' if ok! '''
+    fixit='\nPlease use the grid selector to choose a 2d field'
     if plotOptions=={}:
         # simple plot option, we expect a 2d field
-        dimensionality=0
-        for i in field.shape:
-            if i>1: dimensionality+=1
-        if dimensionality<>2:
-            message= 'Currently we only know how to plot 2d fields.\n'+\
-                    'Please use the grid selector to choose a 2d field.'
+        if len(xyshape(field))<>2:
+            message= 'Currently we only know how to plot 2d fields!'+fixit
             return message
+        else: message=''
     else:
-        print 'Consistency not yet implemented'
-        return None
+        # The key thing we need to check is for consistency between
+        # plot options and the shape, so we can work out what to do with
+        # for example, and XY plot which is 6-up.
+        if plotOptions['nup']<>1:
+            multi=True
+        else: multi=False
+        message=plotPossibleWithField(field,plotOptions['con']['ptype'],multi)
+        if message<>'': message+=fixit
+    return message
+        
+def axes_sizes(f):
+    ''' Return the sizes of the X,Y,Z,T arrays in field,f , if that's possible. 
+    This is a temporary method, needed because 0.9.8.1 of cf-python
+    can't do this trivially, 0.9.8.3 can ...'''
+    sizes,results={},{}
+    axes=f.domain.axes()
+    for axis in axes: sizes[axis]=f.dimension_sizes[axis]
+    for axis in ['X','Y','Z','T']:
+        try:
+            results[axis]=sizes[f.axis_name(axis)]
+        except ValueError:
+            results[axis]=None
+    return results
     
-     #print grid.keys()
-        #axis_sizes={}
-        #print sfield.axes_sizes()
-        #for a in ['X','Y','Z','T']:
-        #    axis_sizes[a]=sfield.axes_sizes()[sfield.axis.name(a)]
-        #print axis_sizes
-        # At this point we need a two dimensional field, if it's not 
-        # two dimensional, raise an error
+def xyshape(f):
+    ''' Return the shape of a field as a string, e.g. XY, or XYT '''
+    sizes=axes_sizes(f)
+    shapeString=''
+    for s in sizes:
+        if s>1: shapeString+=s
+    return shapeString
+    
+def plotPossibleWithField(f,ptype,multi=False):
+    ''' For a given field, is a plot of ptype possible?
+            ptype is a string from the plotChoices ptype list
+            (e.g. X-Y, Y-T etc). 
+        One extra dimension can be allowed to be non-singular,
+        but only if multi is true.
+        Returns '' for success, otherwise a string with an error message!
+    '''
+    fs_shape=xyshape(f)
+    nd=len(fs_shape)
+    message=''
+    if nd>3:
+        message='Dimensionality (%s) too great'%nd
+    elif len(nd==3 and not multi):
+        message='Dimensionality (3) not allowed unless multiple plots'
+    elif len(nd<2):
+        messsage='Dimensionality (%s) too small'%nd
+    else:
+        ss=ptype.strip('-')
+        for s in ss:
+            if s not in fs_shape:
+                message='Missing axis %s'%s
+    return message
 
 def getSlicesAndTitles(field,plotOptions):
-    ''' We need to parse the field with plot options to get the right titles
-    and selection metadata for each plot. '''
-    pass
+    ''' Get appropriate title information for each plot, and for multiple
+    plots, extract the slicing information necessary to extract each
+    plot from the field. '''
+    grid=gw.cfGrid(field)
+    # start with common title
+    title=''
+    if plotOptions['nup']==1 or len(xyshape(field))==2:
+        # it's easy, just find the singleton dimension values
+        for dim in grid:
+            if len(self.grid.axes[dim].array)==1:
+                title+=' %s:%s '%(self.grid.names[dim],self.grid.axes[dim].array[0])
+        # just return the title, no subspace argument selector necessary.
+        r=[(title,None),]
+    else:
+        # find the dimension we're stepping through. 
+        # If there's a non-length one, it's that one (and there should be just one
+        # otherwise we'd be in the other half of the if statement, or have failed
+        # the consistency check earlier).
+        r=[]
+        thisTitle=title
+        for dim in grid:
+            if len(self.grid.axes[dim].array)>1: break
+        # how many, minimum of length of field or nup
+        howmany=min(plotOptions['nup'],len(self.grid.axes[dim].array))
+        for i in range(howmany):
+            key,value=self.grid.names[dim],self.grid.axes[dim].array[i]
+            thisTitle+=' %s:%s '%(key,value)
+            r.append((thisTitle,{key:value}))
+    return r
+            
+            
+        
     
     

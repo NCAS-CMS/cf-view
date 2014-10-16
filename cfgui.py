@@ -228,39 +228,58 @@ class xconvLike(gw.QuarterFrame):
             kwargs[d]=cf.wi(grid[d][0],grid[d][1])
         sfield=sfield.subspace(**kwargs)
         # now, do we have to apply any operators?
+        opstring=''
         for d in grid:
             if grid[d][2]<>None:
                 sfield=cf.collapse(sfield,grid[d][2],axes=d)
+                opstring+='%s:%s'%(grid[d][2],d)
+        
         # now we know the shape we can check that the plotting options
         # and data shape are consistent.
         message=pcw.checkConsistency(sfield,plotOptions)
-        if message is not None:
+        if message <>'':
             # We currently don't know how to plot it
             dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
                     gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
             dialog.run()
             dialog.destroy()
+            return
+        
+        # ok we really can plot this thing!
+        
+        # Sort out the basic title
+        if plotOptions['con']['title']=='':
+            title=field.file
+        else: title=plotOptions['con']['title']
+        
+        # Add details of any operators, if any
+        title+=opstring
+        
+        # get more titles, and slicing information for multiple plots
+        tsList=getSlicesAndTitles(field,plotOptions)
+        
+        if plotOptions=={}:
+            title+=tsList[0][0]
+            cfp.con(sfield,title=title)
         else:
-            # we can plot it! Well most of it!
-            if plotOptions=={}:
-                cfp.con(sfield,title=sfield.file)
+            if plotOptions['nup']<>1:
+                cfp.gopen(**plotOption['gopen'])
+            if plotOptions['mapset']['proj']<>'cyl':
+                cfp.mapset(**plotOptions['mapset'])
+            if 'title' not in plotOptions['con']:
+                plotOptions['con']['title']=sfield.file
+            if plotOptions['nup']==1:
+                title+=tsList[0][0]
+                plotOptions['con']['title']=title
+                cfp.con(sfield,**plotOptions['con'])
             else:
-                if plotOptions['nup']<>1:
-                    cfp.gopen(**plotOption['gopen'])
-                if plotOptions['mapset']['proj']<>'cyl':
-                    cfp.mapset(**plotOptions['mapset'])
-                if 'title' not in plotOptions['con']:
-                    plotOptions['con']['title']=sfield.file
-                if plotOptions['nup']==1:
-                    cfp.con(sfield,**plotOptions['con'])
-                else:
-                    i=1
-                    for (subspace,title) in plotOptions['slice']:
-                        cfp.gpos(i)
-                        plotOptions['con']['title']=title
-                        cfp.con(sfield.subspace(**subspace),**plotOptions['con'])
-                        i+=1
-                    cfp.gclose()
+                i=1
+                for (title,slicer) in tsList:
+                    cfp.gpos(i)
+                    plotOptions['con']['title']=title
+                    cfp.con(sfield.subspace(**slicer),**plotOptions['con'])
+                    i+=1
+                cfp.gclose()
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''
