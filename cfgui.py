@@ -246,12 +246,21 @@ class xconvLike(gw.QuarterFrame):
                 cfp.con(sfield,title=sfield.file)
             else:
                 if plotOptions['nup']<>1:
-                    print 'nup not yet supported'
+                    cfp.gopen(**plotOption['gopen'])
                 if plotOptions['mapset']['proj']<>'cyl':
                     cfp.mapset(**plotOptions['mapset'])
                 if 'title' not in plotOptions['con']:
                     plotOptions['con']['title']=sfield.file
-                cfp.con(sfield,**plotOptions['con'])
+                if plotOptions['nup']==1:
+                    cfp.con(sfield,**plotOptions['con'])
+                else:
+                    i=1
+                    for (subspace,title) in plotOptions['slice']:
+                        cfp.gpos(i)
+                        plotOptions['con']['title']=title
+                        cfp.con(sfield.subspace(**subspace),**plotOptions['con'])
+                        i+=1
+                    cfp.gclose()
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''

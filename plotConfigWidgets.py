@@ -126,7 +126,13 @@ class plotChoices(gw.guiFrame):
         (i.e. it implements most of the cf-plot API (more of it
         is implemented via the advanced config.) '''
         config={
-            'nup':self.nupCombo.get_value(),
+            'nup':int(self.nupCombo.get_value()),
+            'gopen':{{   '1':None,
+                        '2':{'rows':2,'columns':1},
+                        '4':{'rows':2,'columns':2},
+                        '6':{'rows':3,'columns':2},
+                        '9':{'rows':3,'columns':3}}[self.nupCombo.get_value()],
+                     },
             'mapset':{
                 'proj':{'cyl':'cyl','moll':'moll','npolar':'npsphere',
                             'spolar':'spsphere'}[self.projCombo.get_value()]
@@ -186,3 +192,10 @@ def checkConsistency(field,plotOptions):
         #print axis_sizes
         # At this point we need a two dimensional field, if it's not 
         # two dimensional, raise an error
+
+def getSlicesAndTitles(field,plotOptions):
+    ''' We need to parse the field with plot options to get the right titles
+    and selection metadata for each plot. '''
+    pass
+    
+    
