@@ -127,12 +127,12 @@ class plotChoices(gw.guiFrame):
         is implemented via the advanced config.) '''
         config={
             'nup':int(self.nupCombo.get_value()),
-            'gopen':{{   '1':None,
-                        '2':{'rows':2,'columns':1},
-                        '4':{'rows':2,'columns':2},
-                        '6':{'rows':3,'columns':2},
-                        '9':{'rows':3,'columns':3}}[self.nupCombo.get_value()],
-                     },
+            'gopen':{
+                'rows':
+                    {'1':None,'2':1,'4':2,'6':2,'9':3}[self.nupCombo.get_value()],
+                'columns':
+                    {'1':None,'2':2,'4':2,'6':3,'9':3}[self.nupCombo.get_value()],
+                    },
             'mapset':{
                 'proj':{'cyl':'cyl','moll':'moll','npolar':'npsphere',
                             'spolar':'spsphere'}[self.projCombo.get_value()]
@@ -191,14 +191,16 @@ def checkConsistency(field,plotOptions):
         
 def axes_sizes(f):
     ''' Return the sizes of the X,Y,Z,T arrays in field,f , if that's possible. 
-    This is a temporary method, needed because 0.9.8.1 of cf-python
+    Much of this is temporary code, needed because 0.9.8.1 of cf-python
     can't do this trivially, 0.9.8.3 can ...'''
     sizes,results={},{}
     axes=f.domain.axes()
-    for axis in axes: sizes[axis]=f.dimension_sizes[axis]
+    # After this next line, we have an array keyed by 'dim'
+    for axis in axes: sizes[axis]=f.domain.dimension_sizes[axis]
+    # We need to know those for the short names. 
     for axis in ['X','Y','Z','T']:
         try:
-            results[axis]=sizes[f.axis_name(axis)]
+            results[axis]=sizes[f.domain.axis(axis)]
         except ValueError:
             results[axis]=None
     return results
@@ -206,30 +208,31 @@ def axes_sizes(f):
 def xyshape(f):
     ''' Return the shape of a field as a string, e.g. XY, or XYT '''
     sizes=axes_sizes(f)
+    print sizes
     shapeString=''
     for s in sizes:
-        if s>1: shapeString+=s
+        if sizes[s]>1: shapeString+=s
+    print shapeString
     return shapeString
     
 def plotPossibleWithField(f,ptype,multi=False):
     ''' For a given field, is a plot of ptype possible?
-            ptype is a string from the plotChoices ptype list
-            (e.g. X-Y, Y-T etc). 
+            ptype is the integer understood by cf-plot.
         One extra dimension can be allowed to be non-singular,
         but only if multi is true.
         Returns '' for success, otherwise a string with an error message!
     '''
+    ss=pconvert={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
     fs_shape=xyshape(f)
     nd=len(fs_shape)
     message=''
     if nd>3:
         message='Dimensionality (%s) too great'%nd
-    elif len(nd==3 and not multi):
+    elif nd==3 and not multi:
         message='Dimensionality (3) not allowed unless multiple plots'
-    elif len(nd<2):
+    elif nd<2:
         messsage='Dimensionality (%s) too small'%nd
     else:
-        ss=ptype.strip('-')
         for s in ss:
             if s not in fs_shape:
                 message='Missing axis %s'%s
@@ -242,11 +245,16 @@ def getSlicesAndTitles(field,plotOptions):
     grid=gw.cfGrid(field)
     # start with common title
     title=''
-    if plotOptions['nup']==1 or len(xyshape(field))==2:
+    simple=False
+    if plotOptions=={}:
+        simple=True
+    else:
+        if plotOptions['nup']==1 or len(xyshape(field))==2: simple=True
+    if simple:
         # it's easy, just find the singleton dimension values
-        for dim in grid:
-            if len(self.grid.axes[dim].array)==1:
-                title+=' %s:%s '%(self.grid.names[dim],self.grid.axes[dim].array[0])
+        for dim in grid.axes:
+            if len(grid.axes[dim].array)==1:
+                title+=' %s:%s '%(grid.names[dim],grid.axes[dim].array[0])
         # just return the title, no subspace argument selector necessary.
         r=[(title,None),]
     else:
@@ -256,12 +264,12 @@ def getSlicesAndTitles(field,plotOptions):
         # the consistency check earlier).
         r=[]
         thisTitle=title
-        for dim in grid:
-            if len(self.grid.axes[dim].array)>1: break
+        for dim in grid.axes:
+            if len(grid.axes[dim].array)>1: break
         # how many, minimum of length of field or nup
-        howmany=min(plotOptions['nup'],len(self.grid.axes[dim].array))
+        howmany=min(plotOptions['nup'],len(grid.axes[dim].array))
         for i in range(howmany):
-            key,value=self.grid.names[dim],self.grid.axes[dim].array[i]
+            key,value=grid.names[dim],grid.axes[dim].array[i]
             thisTitle+=' %s:%s '%(key,value)
             r.append((thisTitle,{key:value}))
     return r

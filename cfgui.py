@@ -238,6 +238,8 @@ class xconvLike(gw.QuarterFrame):
         # and data shape are consistent.
         message=pcw.checkConsistency(sfield,plotOptions)
         if message <>'':
+            print message
+            print pcw.xyshape(sfield)
             # We currently don't know how to plot it
             dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
                     gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
@@ -248,22 +250,26 @@ class xconvLike(gw.QuarterFrame):
         # ok we really can plot this thing!
         
         # Sort out the basic title
-        if plotOptions['con']['title']=='':
-            title=field.file
-        else: title=plotOptions['con']['title']
+        if plotOptions=={}:
+            title=sfield.file
+        else:
+            if 'title' in plotOptions['con']:
+                title=plotOptions['con']['title']
+            else:
+                title=sfield.file
         
         # Add details of any operators, if any
         title+=opstring
         
         # get more titles, and slicing information for multiple plots
-        tsList=getSlicesAndTitles(field,plotOptions)
+        tsList=pcw.getSlicesAndTitles(sfield,plotOptions)
         
         if plotOptions=={}:
             title+=tsList[0][0]
             cfp.con(sfield,title=title)
         else:
             if plotOptions['nup']<>1:
-                cfp.gopen(**plotOption['gopen'])
+                cfp.gopen(**plotOptions['gopen'])
             if plotOptions['mapset']['proj']<>'cyl':
                 cfp.mapset(**plotOptions['mapset'])
             if 'title' not in plotOptions['con']:
@@ -274,6 +280,7 @@ class xconvLike(gw.QuarterFrame):
                 cfp.con(sfield,**plotOptions['con'])
             else:
                 i=1
+                cfp.gopen(**plotOptions['gopen'])
                 for (title,slicer) in tsList:
                     cfp.gpos(i)
                     plotOptions['con']['title']=title
