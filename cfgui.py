@@ -232,14 +232,12 @@ class xconvLike(gw.QuarterFrame):
         for d in grid:
             if grid[d][2]<>None:
                 sfield=cf.collapse(sfield,grid[d][2],axes=d)
-                opstring+='%s:%s'%(grid[d][2],d)
+                opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
         
         # now we know the shape we can check that the plotting options
         # and data shape are consistent.
         message=pcw.checkConsistency(sfield,plotOptions)
         if message <>'':
-            print message
-            print pcw.xyshape(sfield)
             # We currently don't know how to plot it
             dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
                     gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
@@ -257,6 +255,7 @@ class xconvLike(gw.QuarterFrame):
                 title=plotOptions['con']['title']
             else:
                 title=sfield.file
+        title+='\n'
         
         # Add details of any operators, if any
         title+=opstring
@@ -268,6 +267,11 @@ class xconvLike(gw.QuarterFrame):
             title+=tsList[0][0]
             cfp.con(sfield,title=title)
         else:
+            # need to remove the ptype from the contour options, cf-plot
+            # can't cope with cf data, and ptype, unless we expressly give
+            # it x and y ... and we're not.
+            plotOptions['con']['ptype']=None
+            #
             if plotOptions['nup']<>1:
                 cfp.gopen(**plotOptions['gopen'])
             if plotOptions['mapset']['proj']<>'cyl':

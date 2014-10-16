@@ -208,11 +208,9 @@ def axes_sizes(f):
 def xyshape(f):
     ''' Return the shape of a field as a string, e.g. XY, or XYT '''
     sizes=axes_sizes(f)
-    print sizes
     shapeString=''
     for s in sizes:
         if sizes[s]>1: shapeString+=s
-    print shapeString
     return shapeString
     
 def plotPossibleWithField(f,ptype,multi=False):
@@ -222,7 +220,7 @@ def plotPossibleWithField(f,ptype,multi=False):
         but only if multi is true.
         Returns '' for success, otherwise a string with an error message!
     '''
-    ss=pconvert={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
+    ss={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
     fs_shape=xyshape(f)
     nd=len(fs_shape)
     message=''
