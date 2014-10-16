@@ -4,6 +4,7 @@ import pygtk
 import gtk
 import cf
 import guiWidgets as gw
+import plotConfigWidgets as pcw
 import sys
 import cfplot as cfp
 
@@ -195,14 +196,22 @@ class xconvLike(gw.QuarterFrame):
     def _actionBox(self):
         ''' Provides the buttons and callbacks to the actual actions which 
         the routine supports. '''
-        actionBox=gw.plotChoices(callback=self._simplePlot,ysize=90)
+        actionBox=pcw.plotChoices(callback=self._plot,ysize=90)
         actionBox.show()
         return actionBox
         
-    def _simplePlot(self,w,data):
-        ''' Given the dimensionality of the plot, offer a set of plot types '''
-        print 'simple plot received',data
+    def _plot(self,w,plotOptions):
+        ''' Executes a plot given the information returned from the various
+        selectors and configuration widgets. In practice we have
+            - the grid selector telling us about the data slicing,
+            - the field selector telling us about what data to plot, and
+            - the plot choices widget giving us the cf plot arguments.
+        All we have to do here is configure the plot (possibly including
+        dealing with multiple plots on one page). 
+        '''
+        print 'Plot received',plotOptions
         grid=self.gridSelector.get_selected()
+        # check we have some data
         if grid is None:
             dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
                     gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,
@@ -222,29 +231,27 @@ class xconvLike(gw.QuarterFrame):
         for d in grid:
             if grid[d][2]<>None:
                 sfield=cf.collapse(sfield,grid[d][2],axes=d)
-        # now we know the shape we can offer plotting options
-        #print grid.keys()
-        #axis_sizes={}
-        #print sfield.axes_sizes()
-        #for a in ['X','Y','Z','T']:
-        #    axis_sizes[a]=sfield.axes_sizes()[sfield.axis.name(a)]
-        #print axis_sizes
-        # At this point we need a two dimensional field, if it's not 
-        # two dimensional, raise an error
-        dimensionality=0
-        for i in sfield.shape:
-            if i>1: dimensionality+=1
-        if dimensionality<>2:
+        # now we know the shape we can check that the plotting options
+        # and data shape are consistent.
+        message=pcw.checkConsistency(sfield,plotOptions)
+        if message is not None:
             # We currently don't know how to plot it
             dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                    gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,
-                    'Currently we only know how to plot 2d fields.\n'+
-                    'Please use the grid selector to choose a 2d field.'
-                    )
+                    gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
             dialog.run()
             dialog.destroy()
         else:
-            cfp.con(sfield,title=sfield.file)
+            # we can plot it! Well most of it!
+            if plotOptions=={}:
+                cfp.con(sfield,title=sfield.file)
+            else:
+                if plotOptions['nup']<>1:
+                    print 'nup not yet supported'
+                if plotOptions['mapset']['proj']<>'cyl':
+                    cfp.mapset(**plotOptions['mapset'])
+                if 'title' not in plotOptions['con']:
+                    plotOptions['con']['title']=sfield.file
+                cfp.con(sfield,**plotOptions['con'])
         
     def set_data(self,data):
         ''' Set with an open cf dataset object '''
