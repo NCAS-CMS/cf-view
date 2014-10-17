@@ -182,11 +182,10 @@ def checkConsistency(field,plotOptions):
         # The key thing we need to check is for consistency between
         # plot options and the shape, so we can work out what to do with
         # for example, and XY plot which is 6-up.
-        if plotOptions['nup']<>1:
-            multi=True
-        else: multi=False
+        multi=plotOptions['nup']<>'1'
         message=plotPossibleWithField(field,plotOptions['con']['ptype'],multi)
-        if message<>'': message+=fixit
+        if message<>'': 
+            if not multi: message+=fixit
     return message
         
 def axes_sizes(f):
@@ -213,6 +212,10 @@ def xyshape(f):
         if sizes[s]>1: shapeString+=s
     return shapeString
     
+def ptype2string(ptype):
+    ''' Take a plot type understood by cf-plot, and convert to an XYZT string '''
+    return {1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
+    
 def plotPossibleWithField(f,ptype,multi=False):
     ''' For a given field, is a plot of ptype possible?
             ptype is the integer understood by cf-plot.
@@ -220,7 +223,7 @@ def plotPossibleWithField(f,ptype,multi=False):
         but only if multi is true.
         Returns '' for success, otherwise a string with an error message!
     '''
-    ss={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
+    ss=ptype2string(ptype)
     fs_shape=xyshape(f)
     nd=len(fs_shape)
     message=''
@@ -229,11 +232,16 @@ def plotPossibleWithField(f,ptype,multi=False):
     elif nd==3 and not multi:
         message='Dimensionality (3) not allowed unless multiple plots'
     elif nd<2:
-        messsage='Dimensionality (%s) too small'%nd
-    else:
+        message='Dimensionality (%s) too small'%nd
+    elif nd==2 and multi:
+        message='Dimensionality (2) too small for multiple plots'
+    elif nd==3 and multi:
         for s in ss:
             if s not in fs_shape:
                 message='Missing axis %s'%s
+    else:
+        raise ValueError('This should not occur')
+    print multi,nd,ss,ptype,fs_shape,f.shape,message
     return message
 
 def getSlicesAndTitles(field,plotOptions):
@@ -256,20 +264,23 @@ def getSlicesAndTitles(field,plotOptions):
         # just return the title, no subspace argument selector necessary.
         r=[(title,None),]
     else:
-        # find the dimension we're stepping through. 
-        # If there's a non-length one, it's that one (and there should be just one
-        # otherwise we'd be in the other half of the if statement, or have failed
-        # the consistency check earlier).
+        # find the dimension we're stepping through.
+        myplot={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[plotOptions['con']['ptype']]
+        shape=xyshape(field)                                 # eg XYT
+        print shape
+        stepper=shape.strip(myplot)                          # eg T
+        print stepper
+        dim=field.domain.axis(stepper)                       # eg 'dim2'
+        print dim
         r=[]
         thisTitle=title
-        for dim in grid.axes:
-            if len(grid.axes[dim].array)>1: break
         # how many, minimum of length of field or nup
         howmany=min(plotOptions['nup'],len(grid.axes[dim].array))
         for i in range(howmany):
             key,value=grid.names[dim],grid.axes[dim].array[i]
             thisTitle+=' %s:%s '%(key,value)
             r.append((thisTitle,{key:value}))
+        print shape,stepper,dim,key,value
     return r
             
             

@@ -34,12 +34,15 @@ class cfgui:
         menubar=self.get_mainMenu(window)
         vbox.pack_start(menubar,expand=False)
         
+        # script record of what is going on 
+        self.script=script(debug=True)
+        
         # notebook
         nb=gtk.Notebook()
         nb.show_tabs=True
         vbox.pack_start(nb,padding=cfgPadding)
         self.nb=nb
-        for a,p,m in [ ('Select',xconvLike,self.selector),
+        for a,p,m in [ ('Select',xconvLike,self.script),
                     ('Inspect',gw.guiInspect,self.selector),
                     ('Gallery',gw.guiGallery,self.selector),
                    ]:
@@ -135,6 +138,7 @@ class cfgui:
         self.Select.set_data(data)
         self.Inspect.reset()
         self.Gallery.reset()
+        self.script.open(filename)
         
     def help_about(self,b):
         ''' Provide an about dialog '''
@@ -155,7 +159,7 @@ Credits to:
         m.run()
         m.destroy()
         
-    def delete(self,b=None):
+    def delete(self,w=None,b=None):
         ''' Delete menu '''
         gtk.main_quit()
         return False
@@ -172,11 +176,11 @@ class xconvLike(gw.QuarterFrame):
             and a combination of grid selection and actions on the top right
         which of course isn't like xconv, but is more cf-like ...
         
-        The action box is passed in ... 
         '''
-    def __init__(self,actionbox):
-        ''' Initialise with an action box to put in the top corner '''
+    def __init__(self,script):
+        ''' Initialise with the script recorder '''
         super(xconvLike,self).__init__()
+        self.script=script
         self.fieldSelector=gw.fieldSelector(self.selection)
         self.fieldMetadata=gw.fieldMetadata()
         self.gridMetadata=gw.gridMetadata()
@@ -219,20 +223,27 @@ class xconvLike(gw.QuarterFrame):
             dialog.run()
             dialog.destroy()
             return
+       
         # for now let's operatate on the first field.
         # FIXME What to do if we have more than one field? 
         sfield=self.fields[0]
+        self.script.add('sfield=fields[0]')
         # first let's do the subspace selection (if any):
         kwargs={}
+        self.script.add('kwargs={}',hash=True)
         for d in grid:
             kwargs[d]=cf.wi(grid[d][0],grid[d][1])
+            self.script.add("kwargs['%s']=cf.wi(%s,%s)"%(d,grid[d][0],grid[d][1]))
         sfield=sfield.subspace(**kwargs)
+        self.script.add('sfield=sfield.subspace(**kwargs)')
         # now, do we have to apply any operators?
         opstring=''
         for d in grid:
             if grid[d][2]<>None:
                 sfield=cf.collapse(sfield,grid[d][2],axes=d)
                 opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
+                self.script.add(
+                    "sfield=cf.collapse(sfield,'%s',axes='%s')"%(grid[d][2],d))
         
         # now we know the shape we can check that the plotting options
         # and data shape are consistent.
@@ -266,32 +277,46 @@ class xconvLike(gw.QuarterFrame):
         if plotOptions=={}:
             title+=tsList[0][0]
             cfp.con(sfield,title=title)
+            self.script.add("cfp.con(sfield,title='%s')"%title,hash=True)
         else:
             # need to remove the ptype from the contour options, cf-plot
             # can't cope with cf data, and ptype, unless we expressly give
             # it x and y ... and we're not.
             plotOptions['con']['ptype']=None
             #
+            self.script.add('plotOptions=%s'%plotOptions,hash=True)
             if plotOptions['nup']<>1:
                 cfp.gopen(**plotOptions['gopen'])
+                self.script.add("cfp.gopen(**plotOptions['gopen'])")
             if plotOptions['mapset']['proj']<>'cyl':
                 cfp.mapset(**plotOptions['mapset'])
+                self.script.add("cfp.mapset(**plotOptions['mapset'])")
             if 'title' not in plotOptions['con']:
                 plotOptions['con']['title']=sfield.file
+                self.script.add("plotOptions['con']['title']=sfield.file")
             if plotOptions['nup']==1:
                 title+=tsList[0][0]
                 plotOptions['con']['title']=title
+                self.script.add("plotOptions['con']['title']=%s"%title)
+                self.script.add("cfp.con(sfield,**plotOptions['con'])")
                 cfp.con(sfield,**plotOptions['con'])
             else:
                 i=1
+                self.script.add("cfp.gopen(**plotOptions['gopen'])")
                 cfp.gopen(**plotOptions['gopen'])
                 for (title,slicer) in tsList:
+                    self.script.add("cfp.gpos(%s)"%i)
+                    self.script.add("plotOptions['con']['title']=%s"%title)
+                    self.script.add('slicer=%s'%slicer)
+                    self.script.add("cfp.con(sfield.subspace(**slicer),**plotOptions['con'])")
                     cfp.gpos(i)
                     plotOptions['con']['title']=title
                     cfp.con(sfield.subspace(**slicer),**plotOptions['con'])
                     i+=1
+                self.script.add("cfp.gclose()")
                 cfp.gclose()
-        
+        self.script.close('bnl.py')
+
     def set_data(self,data):
         ''' Set with an open cf dataset object '''
         self.cf_dataset=data
@@ -302,10 +327,46 @@ class xconvLike(gw.QuarterFrame):
         fields are selected, the metadata and grid selectors are
         updated. '''
         fields=[self.cf_dataset[i] for i in data]
+        self.script.add('fields=[dataset[i] for i in %s]'%data)
         self.fieldMetadata.set_data(fields)
         self.gridMetadata.set_data(fields)
         self.gridSelector.set_data(fields[0]) 
         self.fields=fields
+        
+class script:
+    ''' Provides a scriptable copy of what the gui is doing '''
+    def __init__(self,debug=True):
+        ''' Construct the file header. If debug, write actions 
+        as we go along. '''
+        self.content='''
+import cf
+import cfplot as cfp
+#
+# script generated by cfgui version %s
+#
+                    '''%__version__
+        if debug: 
+            self.debug=open('debug.py','w')
+            self.debug.write(self.content)
+        else: self.debug=False
+    def open(self,filename):
+        ''' Open a specific file '''
+        content="#\ndataset=cf.read('%s')\n#\n"%filename
+        self.content+=content
+        if self.debug:self.debug.write(content)
+    def add(self,command,hash=False):
+        ''' Add a command to the script, preceded by a hash if hash true '''
+        if hash: self.content+='\n#\n'
+        # we have to parse the command for things that need escaping
+        command=command.replace('\n','\\n')
+        self.content+='%s\n'%command
+        if self.debug:self.debug.write('%s\n'%command)
+    def close(self,output_filename):
+        ''' Save to output_filename '''
+        f=file(output_filename,'w')
+        f.write(self.content)
+        print 'Script written to  %s'%output_filename
+        f.close()
             
 def main(filename):
     ''' main loop for the cfgui '''
