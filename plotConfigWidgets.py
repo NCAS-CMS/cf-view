@@ -195,7 +195,8 @@ def axes_sizes(f):
     sizes,results={},{}
     axes=f.domain.axes()
     # After this next line, we have an array keyed by 'dim'
-    for axis in axes: sizes[axis]=f.domain.dimension_sizes[axis]
+    for axis in axes: sizes[axis]=f.domain.axes_sizes(key=True)[axis]
+
     # We need to know those for the short names. 
     for axis in ['X','Y','Z','T']:
         try:

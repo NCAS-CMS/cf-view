@@ -8,7 +8,7 @@ import plotConfigWidgets as pcw
 import sys
 import cfplot as cfp
 
-__version__='0.0.2'
+__version__='0.1.3'
 
 cfgPadding=5
 
@@ -245,7 +245,8 @@ class xconvLike(gw.QuarterFrame):
         opstring=''
         for d in grid:
             if grid[d][2]<>None:
-                sfield=cf.collapse(sfield,grid[d][2],axes=d)
+                #sfield=cf.collapse(sfield,grid[d][2],axes=d)
+                sfield=sfield.collapse(grid[d][2],axes=d)
                 opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
                 self.script.add(
                     "sfield=cf.collapse(sfield,'%s',axes='%s')"%(grid[d][2],d))
