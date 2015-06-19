@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 import pygtk
 import gtk
@@ -7,8 +7,10 @@ import guiWidgets as gw
 import plotConfigWidgets as pcw
 import sys
 import cfplot as cfp
+import numpy as np
+import matplotlib.pyplot as plt
 
-__version__='0.1.3'
+__version__='0.1.0'
 
 cfgPadding=5
 
@@ -284,47 +286,94 @@ class xconvLike(gw.QuarterFrame):
         #reset cfplot before any plot to clear previous settings
         cfp.reset()
 
-        if plotOptions=={}:
-            title+=tsList[0][0]
-            cfp.con(sfield,title=title)
-            self.script.add("cfp.con(sfield,title='%s')"%title,hash=True)
-        else:
-            # need to remove the ptype from the contour options, cf-plot
-            # can't cope with cf data, and ptype, unless we expressly give
-            # it x and y ... and we're not.
-            plotOptions['con']['ptype']=None
-            #
-            self.script.add('plotOptions=%s'%plotOptions,hash=True)
-            if plotOptions['nup']<>1:
-                cfp.gopen(**plotOptions['gopen'])
-                self.script.add("cfp.gopen(**plotOptions['gopen'])")
-            if plotOptions['mapset']['proj']<>'cyl':               
-                #cfp.mapset(**plotOptions['mapset']['proj'])
-                cfp.mapset(proj=plotOptions['mapset']['proj'])
-                self.script.add("cfp.mapset(proj="+plotOptions['mapset']['proj']+")")
-            if 'title' not in plotOptions['con']:
-                plotOptions['con']['title']=sfield.file
-                self.script.add("plotOptions['con']['title']=sfield.file")
-            if plotOptions['nup']==1:
-                title+=tsList[0][0]
-                plotOptions['con']['title']=title
-                self.script.add("plotOptions['con']['title']=%s"%title)
-                self.script.add("cfp.con(sfield,**plotOptions['con'])")
-                cfp.con(sfield,**plotOptions['con'])
-            else:
-                i=1
-                for (title,slicer) in tsList:
-                    self.script.add("cfp.gpos(%s)"%i)
-                    self.script.add("plotOptions['con']['title']='%s'"%title)
-                    self.script.add('slicer=%s'%slicer)
-                    self.script.add("cfp.con(sfield.subspace(**slicer),**plotOptions['con'])")
-                    cfp.gpos(i)
-                    plotOptions['con']['title']=title
-                    cfp.con(sfield.subspace(**slicer),**plotOptions['con'])
-                    i+=1
-                self.script.add("cfp.gclose()")
-                cfp.gclose()
-        self.script.close('bnl.py')
+        ndim=len(sfield.axes(size=cf.gt(1)))
+
+
+        if ndim < 1 or ndim >2:
+           dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                  gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,
+                  'Please select  1 or 2 dimensional data to plot')
+           dialog.run()
+           dialog.destroy()
+           return
+
+
+        if ndim == 1:
+           #Plot a graph if 1D 
+           xtitle=''                 
+           units='Value'
+           xvals=np.squeeze(sfield.array)
+           title+=tsList[0][0]
+           for mydim in sfield.items():
+              vals=np.squeeze(sfield.item(mydim).array)
+              if np.size(vals) > 1: 
+                 xpts=vals
+                 units='Value'
+                 if hasattr(sfield, 'ncvar'): xtitle=sfield.ncvar
+                 if hasattr(sfield, 'short_name'): xtitle=sfield.short_name 
+                 if hasattr(sfield, 'long_name'): xtitle=sfield.long_name 
+                 if hasattr(sfield, 'standard_name'): xtitle=sfield.standard_name
+                 if hasattr(sfield, 'Units'): units=sfield.Units
+             
+
+
+
+           #Plot graph
+           fig = plt.figure(figsize=(11, 8))
+           ax1 = fig.add_subplot(111)
+           ax1.tick_params(direction='out', which='both')
+           ax1.set_xlabel(xtitle)
+           ax1.set_ylabel(units)
+           ax1.plot(xpts, xvals)
+           ax1.set_title(title)
+           plt.show()
+
+
+        elif ndim == 2:
+        #Contour plot
+           if plotOptions=={}:
+               title+=tsList[0][0]
+               cfp.con(sfield,title=title)
+               self.script.add("cfp.con(sfield,title='%s')"%title,hash=True)
+           else:
+               # need to remove the ptype from the contour options, cf-plot
+               # can't cope with cf data, and ptype, unless we expressly give
+               # it x and y ... and we're not.
+               plotOptions['con']['ptype']=None
+               #
+               self.script.add('plotOptions=%s'%plotOptions,hash=True)
+               if plotOptions['nup']<>1:
+                   cfp.gopen(**plotOptions['gopen'])
+                   self.script.add("cfp.gopen(**plotOptions['gopen'])")
+               if plotOptions['mapset']['proj']<>'cyl':               
+                   #cfp.mapset(**plotOptions['mapset']['proj'])
+                   cfp.mapset(proj=plotOptions['mapset']['proj'])
+                   self.script.add("cfp.mapset(proj="+plotOptions['mapset']['proj']+")")
+               if 'title' not in plotOptions['con']:
+                   plotOptions['con']['title']=sfield.file
+                   self.script.add("plotOptions['con']['title']=sfield.file")
+               if plotOptions['nup']==1:
+                   title+=tsList[0][0]
+                   plotOptions['con']['title']=title
+                   self.script.add("plotOptions['con']['title']=%s"%title)
+                   self.script.add("cfp.con(sfield,**plotOptions['con'])")
+                   cfp.con(sfield,**plotOptions['con'])
+               else:
+                   i=1
+                   for (title,slicer) in tsList:
+                       self.script.add("cfp.gpos(%s)"%i)
+                       self.script.add("plotOptions['con']['title']='%s'"%title)
+                       self.script.add('slicer=%s'%slicer)
+                       self.script.add("cfp.con(sfield.subspace(**slicer),**plotOptions['con'])")
+                       cfp.gpos(i)
+                       plotOptions['con']['title']=title
+                       cfp.con(sfield.subspace(**slicer),**plotOptions['con'])
+                       i+=1
+                   self.script.add("cfp.gclose()")
+                   cfp.gclose()
+           self.script.close('bnl.py')
+
+
 
     def set_data(self,data):
         ''' Set with an open cf dataset object '''

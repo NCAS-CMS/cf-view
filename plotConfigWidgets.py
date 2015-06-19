@@ -171,11 +171,11 @@ class plotChoices(gw.guiFrame):
 def checkConsistency(field,plotOptions):
     ''' Check consistency between the data chosen and the plot options and
     generate error messages if appropriate. Return '' if ok! '''
-    fixit='\nPlease use the grid selector to choose a 2d field'
+    fixit='\nPlease use the grid selector to choose a 1d or 2d field'
     if plotOptions=={}:
         # simple plot option, we expect a 2d field
-        if len(xyshape(field))<>2:
-            message= 'Currently we only know how to plot 2d fields!'+fixit
+        if (len(xyshape(field)) < 1 or len(xyshape(field)) > 2):
+            message= 'cfview can only plot 1D or 2D fileds'+fixit
             return message
         else: message=''
     else:
