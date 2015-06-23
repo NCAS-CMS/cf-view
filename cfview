@@ -301,19 +301,26 @@ class xconvLike(gw.QuarterFrame):
         if ndim == 1:
            #Plot a graph if 1D 
            xtitle=''                 
-           units='Value'
+           yunits='Value'
            xvals=np.squeeze(sfield.array)
            title+=tsList[0][0]
            for mydim in sfield.items():
-              vals=np.squeeze(sfield.item(mydim).array)
+              vals=np.squeeze(sfield.item(mydim).array)                 
               if np.size(vals) > 1: 
                  xpts=vals
                  units='Value'
-                 if hasattr(sfield, 'ncvar'): xtitle=sfield.ncvar
-                 if hasattr(sfield, 'short_name'): xtitle=sfield.short_name 
-                 if hasattr(sfield, 'long_name'): xtitle=sfield.long_name 
-                 if hasattr(sfield, 'standard_name'): xtitle=sfield.standard_name
-                 if hasattr(sfield, 'Units'): units=sfield.Units
+                 #xtitle
+                 xtitle=getattr(sfield.item(mydim), 'standard_name', 'NoName')
+                 if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'long_name', 'NoName')
+                 if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'short_name', 'NoName')
+                 if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'ncvar', 'NoName')
+                 xunits=getattr(sfield.item(mydim), 'units', 'No units')
+                 #ytitle
+                 if hasattr(sfield, 'ncvar'): ytitle=sfield.ncvar
+                 if hasattr(sfield, 'short_name'): ytitle=sfield.short_name 
+                 if hasattr(sfield, 'long_name'): ytitle=sfield.long_name 
+                 if hasattr(sfield, 'standard_name'): ytitle=sfield.standard_name
+                 if hasattr(sfield, 'Units'): yunits=sfield.Units
              
 
 
@@ -322,8 +329,8 @@ class xconvLike(gw.QuarterFrame):
            fig = plt.figure(figsize=(11, 8))
            ax1 = fig.add_subplot(111)
            ax1.tick_params(direction='out', which='both')
-           ax1.set_xlabel(xtitle)
-           ax1.set_ylabel(units)
+           ax1.set_xlabel(str(xtitle)+' ('+str(xunits)+')')
+           ax1.set_ylabel(str(ytitle)+' ('+str(yunits)+')')
            ax1.plot(xpts, xvals)
            ax1.set_title(title)
            plt.show()
