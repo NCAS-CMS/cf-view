@@ -59,12 +59,13 @@ class plotChoices(gw.guiFrame):
         ''' Lays out the buttons for configuring contours '''
         contours=['lines','filled','block']
         labels=['Off','On','On--']
-        self.cbar=['Off','On','On-X','On-Y']
+        self.cbar=['On','Off','On-X','On-Y']
         self.cbarChoiceShown=1
         self.conCombo=gw.myCombo(contours,label='contours',initial='filled',
                 callback=self._showCbar)
         self.linCombo=gw.myCombo(labels,label='labels',initial='On')
-        self.cbarCombo=gw.myCombo(self.cbar,label='bar',initial='Off')
+        self.cbarCombo=gw.myCombo(self.cbar,label='bar',initial='On')
+        #self.cbarCombo=gw.myCombo(self.cbar,label='bar',initial='Off')
         for w in [self.conCombo,self.linCombo,self.cbarCombo]:
             self.row3.pack_start(w,padding=2)
         self.vbox.pack_start(self.row3,expand=False,padding=2)
@@ -145,9 +146,10 @@ class plotChoices(gw.guiFrame):
                 'negative_linestyle':
                     {'On':None,'Off':None,'On--':1}[self.linCombo.get_value()],
                 'colorbar':
-                    {'Off':None,'On':1,'On-X':1,'On-Y':1}[self.cbarCombo.get_value()],
+                    {'On':1,'Off':None,'On-X':1,'On-Y':1}[self.cbarCombo.get_value()],
                 'colorbar_orientation':
-                    {'Off':None,'On':None,'On-X':'horizontal','On-Y':'vertical'}
+                    #{'Off':None,'On':None,'On-X':'horizontal','On-Y':'vertical'}
+                    {'On':'horizontal','Off':None,'On-X':'horizontal','On-Y':'vertical'}
                         [self.cbarCombo.get_value()],
                 'blockfill':
                     {'lines':None,'filled':None,'block':1}[self.conCombo.get_value()],

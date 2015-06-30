@@ -14,6 +14,21 @@ __version__='0.1.0'
 
 cfgPadding=5
 
+#Define a persistent pvars instance to store data across plotting
+class pvars(object):
+   def __init__(self, **kwargs):
+      '''Initialize a new Pvars instance'''
+      for attr, value in kwargs.iteritems():
+         setattr(self, attr, value)
+
+   def __str__(self):
+      '''x.__str__() <==> str(x)'''
+      out = ['%s = %s' % (a, repr(v))]
+      for a, v in self.__dict__.iteritems():
+         return '\n'.join(out)
+
+plotvars=pvars(pos=None, nplots=None)
+
 class cfgui:
     ''' Provides the main frame for the cfgui '''
     def __init__(self, filename):
@@ -153,7 +168,7 @@ This is a pre-release version of the NCAS cfgui
 
 Credits to:
     David Hassell - for cf-python
-    Andy Heaps - for cf-plot
+    Andy Heaps - for cfplot
     Mudit Gupta - for the prototype pygtk interface to cf-plot
     Bryan Lawrence - for the initial version of cfgui
             
@@ -284,9 +299,30 @@ class xconvLike(gw.QuarterFrame):
         tsList=pcw.getSlicesAndTitles(sfield,plotOptions)
 
         #reset cfplot before any plot to clear previous settings
-        cfp.reset()
+        if plotvars.pos is None: cfp.reset()
 
         ndim=len(sfield.axes(size=cf.gt(1)))
+           
+
+        #New section for setting multiple plots
+        if plotOptions != {}:
+           if plotOptions['nup'] > 1 and plotvars.pos is None:
+              print 'In new section for multiple plots'
+              #Set number of plots in gplot from interface nup parameter
+              if plotOptions['nup'] == 2: cfp.gopen(rows=2, columns=1, orientation='portrait')
+              if plotOptions['nup'] == 4: cfp.gopen(rows=2, columns=2)
+              if plotOptions['nup'] == 6: cfp.gopen(rows=3, columns=2)
+              if plotOptions['nup'] == 9: cfp.gopen(rows=3, columns=3)
+              plotvars.pos=0
+              plotvars.nplots=plotOptions['nup']
+              cfp.gpos(pos=1)
+
+        #Set position of plot for multiple plots
+        if plotOptions != {}:   
+           if plotOptions['nup'] > 1 and plotvars.pos is not None:
+              print 'In new section for setting plot position'
+              plotvars.pos=plotvars.pos+1
+              cfp.gpos(pos=plotvars.pos)
 
 
         if ndim < 1 or ndim >2:
@@ -349,35 +385,54 @@ class xconvLike(gw.QuarterFrame):
                plotOptions['con']['ptype']=None
                #
                self.script.add('plotOptions=%s'%plotOptions,hash=True)
-               if plotOptions['nup']<>1:
-                   cfp.gopen(**plotOptions['gopen'])
-                   self.script.add("cfp.gopen(**plotOptions['gopen'])")
+               #if plotOptions['nup']<>1:
+               #    cfp.gopen(**plotOptions['gopen'])
+               #    self.script.add("cfp.gopen(**plotOptions['gopen'])")
                if plotOptions['mapset']['proj']<>'cyl':               
-                   #cfp.mapset(**plotOptions['mapset']['proj'])
                    cfp.mapset(proj=plotOptions['mapset']['proj'])
                    self.script.add("cfp.mapset(proj="+plotOptions['mapset']['proj']+")")
                if 'title' not in plotOptions['con']:
                    plotOptions['con']['title']=sfield.file
                    self.script.add("plotOptions['con']['title']=sfield.file")
-               if plotOptions['nup']==1:
-                   title+=tsList[0][0]
-                   plotOptions['con']['title']=title
-                   self.script.add("plotOptions['con']['title']=%s"%title)
-                   self.script.add("cfp.con(sfield,**plotOptions['con'])")
-                   cfp.con(sfield,**plotOptions['con'])
-               else:
-                   i=1
-                   for (title,slicer) in tsList:
-                       self.script.add("cfp.gpos(%s)"%i)
-                       self.script.add("plotOptions['con']['title']='%s'"%title)
-                       self.script.add('slicer=%s'%slicer)
-                       self.script.add("cfp.con(sfield.subspace(**slicer),**plotOptions['con'])")
-                       cfp.gpos(i)
-                       plotOptions['con']['title']=title
-                       cfp.con(sfield.subspace(**slicer),**plotOptions['con'])
-                       i+=1
-                   self.script.add("cfp.gclose()")
-                   cfp.gclose()
+
+
+               title+=tsList[0][0]
+               plotOptions['con']['title']=title
+               self.script.add("plotOptions['con']['title']=%s"%title)
+               self.script.add("cfp.con(sfield,**plotOptions['con'])")
+               cfp.con(sfield,**plotOptions['con'])
+               
+               #Close and view if multiple plot and is also the last plot
+               if plotvars.nplots is not None:
+                  print 'pos and nplots are ', plotvars.pos, plotvars.nplots
+                  if plotvars.pos == plotvars.nplots:
+                     plotvars.nplots=None
+                     plotvars.pos=None
+                     cfp.gclose()
+
+
+
+               #if plotOptions['nup']==1:
+               #    title+=tsList[0][0]
+               #    plotOptions['con']['title']=title
+               #    self.script.add("plotOptions['con']['title']=%s"%title)
+               #    self.script.add("cfp.con(sfield,**plotOptions['con'])")
+               #    print 'in expected branch'
+               #    cfp.con(sfield,**plotOptions['con'])
+
+               #else:
+               #    i=1
+               #    for (title,slicer) in tsList:
+               #        self.script.add("cfp.gpos(%s)"%i)
+               #        self.script.add("plotOptions['con']['title']='%s'"%title)
+               #        self.script.add('slicer=%s'%slicer)
+               #        self.script.add("cfp.con(sfield.subspace(**slicer),**plotOptions['con'])")
+               #        cfp.gpos(i)
+               #        plotOptions['con']['title']=title
+               #        cfp.con(sfield.subspace(**slicer),**plotOptions['con'])
+               #        i+=1
+               #    self.script.add("cfp.gclose()")
+               #    cfp.gclose()
            self.script.close('bnl.py')
 
 
