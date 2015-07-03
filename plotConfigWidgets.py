@@ -244,7 +244,7 @@ def plotPossibleWithField(f,ptype,multi=False):
                 message='Missing axis %s'%s
     else:
         raise ValueError('This should not occur')
-    print multi,nd,ss,ptype,fs_shape,f.shape,message
+    #print multi,nd,ss,ptype,fs_shape,f.shape,message
     #return message
     return ''
 
@@ -260,6 +260,7 @@ def getSlicesAndTitles(field,plotOptions):
         simple=True
     else:
         if plotOptions['nup']==1 or len(xyshape(field))==2: simple=True
+    simple=True
     if simple:
         # it's easy, just find the singleton dimension values
         for dim in grid.axes:
@@ -267,23 +268,24 @@ def getSlicesAndTitles(field,plotOptions):
                 title+=' %s:%s '%(grid.names[dim],grid.axes[dim].array[0])
         # just return the title, no subspace argument selector necessary.
         r=[(title,None),]
-    else:
-        # find the dimension we're stepping through.
-        myplot={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[plotOptions['con']['ptype']]
-        shape=xyshape(field)                                 # eg XYT
-        stepper=shape.strip(myplot)                          # eg T
-        dim=field.domain.axis(stepper)                       # eg 'dim2'
-        r=[]
-        # how many, minimum of length of field or nup
-        howmany=min(plotOptions['nup'],len(grid.axes[dim].array))
-        for i in range(howmany):
-            thisTitle=title
-            key,value=grid.names[dim],grid.axes[dim].array[i]
-            thisTitle+=' %s:%s '%(key,value)
-            # need to use dim in the next command to avoid possible name ambiguity
-            # in non-cf compliant files.
-            r.append((thisTitle,{dim:value}))
-        print shape,stepper,dim,key,value
+    #else:
+    #    # find the dimension we're stepping through.
+    #    myplot={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[plotOptions['con']['ptype']]
+    #    shape=xyshape(field)                                 # eg XYT
+    #    stepper=shape.strip(myplot)                          # eg T
+    #    dim=field.domain.axis(stepper)                       # eg 'dim2'
+    #    r=[]
+    #    # how many, minimum of length of field or nup
+    #    howmany=min(plotOptions['nup'],len(grid.axes[dim].array))
+    #    #howmany=len(grid.axes[dim].array)
+    #    for i in range(howmany):
+    #        thisTitle=title
+    #        key,value=grid.names[dim],grid.axes[dim].array[i]
+    #        thisTitle+=' %s:%s '%(key,value)
+    #        # need to use dim in the next command to avoid possible name ambiguity
+    #        # in non-cf compliant files.
+    #        r.append((thisTitle,{dim:value}))
+    #    print shape,stepper,dim,key,value
     return r
             
             
