@@ -45,10 +45,12 @@ class plotChoices(gw.guiFrame):
     def _row2(self):
         ''' Lays out the buttons for standard plots '''
         self.projComboShown=1
-        ptypes=['X-Y','X-Z','Y-Z','X-T','Y-T']
+        #ptypes=['X-Y','X-Z','Y-Z','X-T','Y-T']
+        ptypes=['contour', 'vector']
         nup=['1','2','4','6','9']
         self.proj=['cyl','moll','npolar','spolar']
-        self.typCombo=gw.myCombo(ptypes,label='type',initial='X-Y',callback=self._showProj)
+        #self.typCombo=gw.myCombo(ptypes,label='type',initial='X-Y',callback=self._showProj)
+        self.typCombo=gw.myCombo(ptypes,label='type',initial='contour',callback=self._showProj)
         self.nupCombo=gw.myCombo(nup,label='n-up',initial='1')
         self.projCombo=gw.myCombo(self.proj,label='projection',initial='cyl')
         self.row2.pack_start(self.nupCombo,expand=True,padding=2)
@@ -96,11 +98,11 @@ class plotChoices(gw.guiFrame):
         
     def _showProj(self,w,value):
         ''' Callback used for the typcombo to allow projections for X-Y '''
-        if value=='X-Y' and not self.projComboShown:
+        if value=='contour' and not self.projComboShown:
             self.projCombo=gw.myCombo(self.proj,initial='cyl')
             self.row2.pack_start(self.projCombo,expand=False,padding=2)
             self.projCombo.show()
-        if value!='X-Y' and self.projComboShown:
+        if value!='contour' and self.projComboShown:
             self.projCombo.destroy()
             self.projComboShown=0
             
@@ -140,7 +142,8 @@ class plotChoices(gw.guiFrame):
                     },
             'con':{
                 'ptype':
-                    {'X-Y':1,'X-Z':3,'Y-Z':2,'X-T':5,'Y-T':4}[self.typCombo.get_value()],
+                    #{'X-Y':1,'X-Z':3,'Y-Z':2,'X-T':5,'Y-T':4}[self.typCombo.get_value()],
+                    {'contour':1,'vector':2}[self.typCombo.get_value()],
                 'line_labels':
                     {'On':True,'On--':True,'Off':False}[self.linCombo.get_value()],
                 'negative_linestyle':
@@ -174,20 +177,21 @@ def checkConsistency(field,plotOptions):
     ''' Check consistency between the data chosen and the plot options and
     generate error messages if appropriate. Return '' if ok! '''
     fixit='\nPlease use the grid selector to choose a 1d or 2d field'
+    message=''
     if plotOptions=={}:
         # simple plot option, we expect a 2d field
         if (len(xyshape(field)) < 1 or len(xyshape(field)) > 2):
-            message= 'cfview can only plot 1D or 2D fileds'+fixit
+            message= 'cfview can only plot 1D or 2D fields'+fixit
             return message
         else: message=''
-    else:
+    #else:
         # The key thing we need to check is for consistency between
         # plot options and the shape, so we can work out what to do with
         # for example, and XY plot which is 6-up.
-        multi=plotOptions['nup']<>'1'
-        message=plotPossibleWithField(field,plotOptions['con']['ptype'],multi)
-        if message<>'': 
-            if not multi: message+=fixit
+    #    multi=plotOptions['nup']<>'1'
+    #    message=plotPossibleWithField(field,plotOptions['con']['ptype'],multi)
+    #    if message<>'': 
+    #        if not multi: message+=fixit
     return message
         
 def axes_sizes(f):
@@ -215,38 +219,38 @@ def xyshape(f):
         if sizes[s]>1: shapeString+=s
     return shapeString
     
-def ptype2string(ptype):
-    ''' Take a plot type understood by cf-plot, and convert to an XYZT string '''
-    return {1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
+#def ptype2string(ptype):
+#    ''' Take a plot type understood by cf-plot, and convert to an XYZT string '''
+#    return {1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
     
-def plotPossibleWithField(f,ptype,multi=False):
-    ''' For a given field, is a plot of ptype possible?
-            ptype is the integer understood by cf-plot.
-        One extra dimension can be allowed to be non-singular,
-        but only if multi is true.
-        Returns '' for success, otherwise a string with an error message!
-    '''
-    ss=ptype2string(ptype)
-    fs_shape=xyshape(f)
-    nd=len(fs_shape)
-    message=''
-    if nd>3:
-        message='Dimensionality (%s) too great'%nd
-    elif nd==3 and not multi:
-        message='Dimensionality (3) not allowed unless multiple plots'
-    elif nd<2:
-        message='Dimensionality (%s) too small'%nd
-    elif nd==2 and multi:
-        message='Dimensionality (2) too small for multiple plots'
-    elif nd==3 and multi:
-        for s in ss:
-            if s not in fs_shape:
-                message='Missing axis %s'%s
-    else:
-        raise ValueError('This should not occur')
-    #print multi,nd,ss,ptype,fs_shape,f.shape,message
-    #return message
-    return ''
+#def plotPossibleWithField(f,ptype,multi=False):
+#    ''' For a given field, is a plot of ptype possible?
+#            ptype is the integer understood by cf-plot.
+#        One extra dimension can be allowed to be non-singular,
+#        but only if multi is true.
+#        Returns '' for success, otherwise a string with an error message!
+#    '''
+#    ss=ptype2string(ptype)
+#    fs_shape=xyshape(f)
+#    nd=len(fs_shape)
+#    message=''
+#    if nd>3:
+#        message='Dimensionality (%s) too great'%nd
+#    elif nd==3 and not multi:
+#        message='Dimensionality (3) not allowed unless multiple plots'
+#    elif nd<2:
+#        message='Dimensionality (%s) too small'%nd
+#    elif nd==2 and multi:
+#        message='Dimensionality (2) too small for multiple plots'
+#    elif nd==3 and multi:
+#        for s in ss:
+#            if s not in fs_shape:
+#                message='Missing axis %s'%s
+#    else:
+#        raise ValueError('This should not occur')
+#    #print multi,nd,ss,ptype,fs_shape,f.shape,message
+#    #return message
+#    return ''
 
 def getSlicesAndTitles(field,plotOptions):
     ''' Get appropriate title information for each plot, and for multiple
