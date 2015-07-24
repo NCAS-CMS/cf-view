@@ -30,19 +30,24 @@ class pvars(object):
 
 
 
-plotvars=pvars(pos=None, nplots=None, code='', vect_ufield=None, plot_code='')
+plotvars=pvars(pos=0, nplots=1, plot_code='', vect_ufield=None,vect_key_length=5, vect_pts=None, \
+               vect_scale=5, vect_title=None, plot_counter=0\
+               )
 ''' 
    plotvars is a set of persistent variables to store various parameters
    across plotting actions such as multiple plots.
 
    pos=None - current plot position in multiple plot mode 
-   nplots=None - number of plots in multiple plot mode
-   code='' - plot commands used to make the present plot
+   nplots=1 - number of plots in multiple plot mode
+   plot_code='' - plot commands used to make the present plot
    vect_ufield=None - u field for vector plot
    vect_key_length=5 - length of reference vector
    vect_pts=None - number of point to impterpolate to for vectors
    vect_scale=5 - data units per arrow unit length
-   vect_title='' - vector title
+   vect_title='' - vector title 
+   plot_finish=0 - number of plots to make for this type of plot.  
+                   For graph and contour this is set to 1, vector to 2 and contour and vector to 3.
+   plot_counter=0 - present plot number
 '''
 
 
@@ -263,8 +268,6 @@ class xconvLike(gw.QuarterFrame):
         All we have to do here is configure the plot (possibly including
         dealing with multiple plots on one page). 
         '''
-        #print 'Plot received',plotOptions
-        #self.script.add('plotOptions are'+str(plotOptions))
 
         #Define the start of the plotting script 
         script_start='''
@@ -323,16 +326,11 @@ import cfplot as cfp
         # ok we really can plot this thing!
         
         # Sort out the basic title
-        single_plot=0
-        if plotOptions=={}:
-            title=sfield.file
-            single_plot=1
+        if 'title' in plotOptions['con']:
+           title=plotOptions['con']['title']+'\n'
         else:
-            if 'title' in plotOptions['con']:
-                title=plotOptions['con']['title']
-            else:
-                title=sfield.file
-        title+='\n'
+           title=sfield.file+'\n'
+        #title+='\n'
 
         
         # Add details of any operators, if any
@@ -342,41 +340,53 @@ import cfplot as cfp
         tsList=pcw.getSlicesAndTitles(sfield,plotOptions)
 
         #reset cfplot before any plot to clear previous settings
-        if plotvars.pos is None: cfp.reset()
+        if plotvars.pos == 0: cfp.reset()
 
         ndim=len(sfield.axes(size=cf.gt(1)))
-           
-
-        #New section for setting multiple plots
-        if plotOptions != {}:
-           if plotOptions['nup'] > 1 and plotvars.pos is None:
-              #Set number of plots in gplot from interface nup parameter
-              if plotOptions['nup'] == 2: cfp.gopen(rows=2, columns=1, orientation='portrait')
-              if plotOptions['nup'] == 4: cfp.gopen(rows=2, columns=2)
-              if plotOptions['nup'] == 6: cfp.gopen(rows=3, columns=2)
-              if plotOptions['nup'] == 9: cfp.gopen(rows=3, columns=3)
-              plotvars.pos=0
-              plotvars.nplots=plotOptions['nup']
-              cfp.gpos(pos=1)
-
-        #Set position of plot for multiple plots
-        if plotOptions != {}:   
-           if plotOptions['nup'] > 1 and plotvars.pos is not None:
-              if plotOptions['con']['ptype'] == 1:
-                 #advance plot number if a contour plot
-                 plotvars.pos=plotvars.pos+1
-                 cfp.gpos(pos=plotvars.pos)
-              if plotOptions['con']['ptype'] == 2:
-                 #advance plot number if a vector plot and this is the first call
-                 if plotvars.vect_ufield is None:
-                    plotvars.pos=plotvars.pos+1
-                    cfp.gpos(pos=plotvars.pos)
+        plot_type=plotOptions['con']['ptype']
+        if ndim == 1: plot_type=0
 
 
 
+        #Set number of plots to make a complete panel
+        if plot_type == 0 or plot_type == 1:  plotvars.plot_finish=1
+        if plot_type == 2:  plotvars.plot_finish=2
+        if plot_type == 3:  plotvars.plot_finish=3
+
+
+        #Single plot
+        if plotOptions['nup'] == '1': plotvars.nplots=1
+
+
+        #Multiple plots
+        if plotOptions['nup'] != '1' and plotvars.pos == 0:
+           #Set number of plots in gplot from interface nup parameter
+           if plotOptions['nup'] == '2x1': 
+              cfp.gopen(columns=2, rows=1)
+              plotvars.nplots=2
+           if plotOptions['nup'] == '1x2': 
+              cfp.gopen(columns=1, rows=2, orientation='portrait')
+              plotvars.nplots=2
+           if plotOptions['nup'] == '2x2': 
+              cfp.gopen(columns=2, rows=2)
+              plotvars.nplots=4
+           if plotOptions['nup'] == '3x2':
+              cfp.gopen(columns=3, rows=2)
+              plotvars.nplots=6
+           if plotOptions['nup'] == '2x3':
+              cfp.gopen(columns=2, rows=3, orientation='portrait')
+              plotvars.nplots=6
+           if plotOptions['nup'] == '3x3':
+              cfp.gopen(columns=3, rows=3)
+              plotvars.nplots=9
+
+           #Position at first plot
+           plotvars.pos=1
+           cfp.gpos(pos=1)
 
 
 
+        #Error message if data not of right dimensionality
         if ndim < 1 or ndim >2:
            dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,
@@ -386,7 +396,7 @@ import cfplot as cfp
            return
 
 
-        if ndim == 1:
+        if plot_type == 0:
            #Plot a graph if 1D 
            xtitle=''                 
            yunits='Value'
@@ -413,61 +423,29 @@ import cfplot as cfp
 
 
 
-           #Plot the graph
-           if plotOptions != {}:
-              if plotOptions['nup'] == 1:
-                 cfp.gopen()
+           #Open the plot if a single plot
+           if plotvars.nplots == 1:
+              cfp.gopen()
 
+           #Plot the graph
            cfp.plotvars.plot.tick_params(direction='out', which='both')
            cfp.plotvars.plot.set_xlabel(str(xtitle)+' ('+str(xunits)+')')
            cfp.plotvars.plot.set_ylabel(str(ytitle)+' ('+str(yunits)+')')
            cfp.plotvars.plot.plot(xpts, xvals)
            cfp.plotvars.plot.set_title(title)
            
-
-           if plotOptions != {}:
-              if plotOptions['nup'] == 1: 
-                 cfp.gclose()
-
-
-
-
-
-
-
-        if ndim == 2 and plotOptions['con']['ptype'] == 1:
-        #Contour plot
-           if plotOptions=={}:
-               title+=tsList[0][0]
-               cfp.con(sfield,title=title)
-               self.script.add("cfp.con(sfield,title='%s')"%title,hash=True)
+           #Close the plot if a single plot
+           if plotvars.nplots == 1:
+              cfp.gclose()
            else:
-               # need to remove the ptype from the contour options, cf-plot
-               # can't cope with cf data, and ptype, unless we expressly give
-               # it x and y ... and we're not.
-               plotOptions['con']['ptype']=None
-               #
-               self.script.add('plotOptions=%s'%plotOptions,hash=True)
-               #if plotOptions['nup']<>1:
-               #    cfp.gopen(**plotOptions['gopen'])
-               #    self.script.add("cfp.gopen(**plotOptions['gopen'])")
-               if plotOptions['mapset']['proj']<>'cyl':               
-                   cfp.mapset(proj=plotOptions['mapset']['proj'])
-                   self.script.add("cfp.mapset(proj="+plotOptions['mapset']['proj']+")")
-               if 'title' not in plotOptions['con']:
-                   plotOptions['con']['title']=sfield.file
-                   self.script.add("plotOptions['con']['title']=sfield.file")
+              #Move onto next plot
+              plotvars.pos=plotvars.pos+1
+              if plotvars.pos <= plotvars.nplots: cfp.gpos(pos=plotvars.pos)
 
 
-               title+=tsList[0][0]
-               plotOptions['con']['title']=title
-               self.script.add("plotOptions['con']['title']=%s"%title)
-               self.script.add("cfp.con(sfield,**plotOptions['con'])")
-               cfp.con(sfield,**plotOptions['con'])
-               
 
         #vector plot
-        if ndim == 2 and plotOptions['con']['ptype'] == 2:
+        if ndim == 2 and (plot_type == 2 or plot_type == 3):
            fname=''
            units=''
            if hasattr(sfield, 'ncvar'): fname=sfield.ncvar
@@ -476,31 +454,102 @@ import cfplot as cfp
            if hasattr(sfield, 'standard_name'): fname=sfield.standard_name
            if hasattr(sfield, 'Units'): units=str(sfield.Units)
 
-           if plotvars.vect_ufield is None:
-              plotvars.vect_ufield=sfield
-              plotvars.vect_title=sfield.file+' '+fname+'('+units+')'+tsList[0][0]+'\n'
-           else:
+
+           #Work out whether to store the u vector data or to make the vector plot
+           make_vector=0
+           store_vector=0
+           if plot_type == 2 and plotvars.plot_counter == 1:  make_vector=1
+           if plot_type == 2 and plotvars.plot_counter == 0:  store_vector=1
+           if plot_type == 3 and plotvars.plot_counter == 2:  make_vector=1
+           if plot_type == 3 and plotvars.plot_counter == 1:  store_vector=1
+
+              
+           
+           if make_vector == 1:
+              #Make the vector plot
               title=plotvars.vect_title+sfield.file+' '+fname+'('+units+')'+tsList[0][0]
               cfp.vect(u=plotvars.vect_ufield, v=sfield, key_length=10, \
                        scale=100, stride=5, title=title)
+
+              #reset counters and move on to the next plot
               plotvars.vect_ufield=None
+              plotvars.vect_title=''
+              plotvars.pos=plotvars.pos+1
+              if plotvars.pos <= plotvars.nplots: cfp.gpos(pos=plotvars.pos)
+              plotvars.plot_counter=plotvars.plot_counter+1
 
-        #Close and view if multiple plot and is also the last plot
-        #print 'plotvars.nplots is ', plotvars.nplots
-        #print 'plotvars.pos is ', plotvars.pos
-        #print 'plotOptions.con.ptype is ', plotOptions['con']['ptype']
 
-        if plotvars.nplots is not None:
-           if plotvars.pos == plotvars.nplots:
-              if plotOptions['con']['ptype'] != 2:
-                 plotvars.nplots=None
-                 plotvars.pos=None
-                 cfp.gclose()
-              if plotOptions['con']['ptype'] == 2:
-                 if plotvars.vect_ufield is None:
-                    plotvars.nplots=None
-                    plotvars.pos=None
-                    cfp.gclose()
+           if store_vector == 1:
+              #Store u field in plotvars for use next time around
+              plotvars.vect_ufield=sfield
+              plotvars.vect_title=sfield.file+' '+fname+'('+units+')'+tsList[0][0]+'\n'
+              plotvars.plot_counter=plotvars.plot_counter+1
+
+
+
+
+        #Contour plot
+        if ndim == 2 and (plot_type == 1 or plot_type == 3):
+           proceed=1
+           if plot_type == 3 and plotvars.plot_counter > 1: proceed=0
+           if proceed == 1:
+              if plotvars.nplots == 1 and plot_type == 3: cfp.gopen()
+              # need to remove the ptype from the contour options, cf-plot
+              # can't cope with cf data, and ptype, unless we expressly give
+              # it x and y ... and we're not.
+              plotOptions['con']['ptype']=None
+              #
+              self.script.add('plotOptions=%s'%plotOptions,hash=True)
+              if plotOptions['mapset']['proj']<>'cyl':               
+                 cfp.mapset(proj=plotOptions['mapset']['proj'])
+                 self.script.add("cfp.mapset(proj="+plotOptions['mapset']['proj']+")")
+              if 'title' not in plotOptions['con']:
+                 plotOptions['con']['title']=sfield.file
+                 self.script.add("plotOptions['con']['title']=sfield.file")
+
+              title+=tsList[0][0]
+              plotOptions['con']['title']=title
+              self.script.add("plotOptions['con']['title']=%s"%title)
+              self.script.add("cfp.con(sfield,**plotOptions['con'])")
+              cfp.con(sfield,**plotOptions['con'])
+              plotvars.plot_counter=plotvars.plot_counter+1
+              if plot_type == 1:  
+                 plotvars.pos=plotvars.pos+1
+                 if plotvars.pos <= plotvars.nplots: cfp.gpos(pos=plotvars.pos)
+
+
+
+
+
+        #Reset counters if a single plot
+        if plotvars.nplots == 1:
+           plot_reset=0
+           if plot_type == 0 or plot_type == 1:  plot_reset=1
+           if plot_type == 2 and plotvars.plot_counter == 2: plot_reset=1
+           if plot_type == 3 and plotvars.plot_counter == 3: 
+              cfp.gclose()
+              plot_reset=1
+
+           if plot_reset == 1:
+              plotvars.nplots=1
+              plotvars.pos=0
+              plotvars.plot_counter=0
+              plotvars.plot_finish=0
+
+
+        #Reset counter if the last plot of a contour and vector plot
+        if plotvars.nplots > 1 and plot_type == 3 and plotvars.plot_counter == 3:
+           plotvars.plot_counter=0
+
+        #Close and view if multiple plot and it is also the last plot
+        if plotvars.nplots > 1 and plotvars.pos > plotvars.nplots:
+           plotvars.nplots=1
+           plotvars.pos=0
+           plotvars.plot_counter=0
+           plotvars.plot_finish=0
+           cfp.gclose()
+
+
 
 
         #Put code used into global array

@@ -29,16 +29,18 @@ class plotChoices(gw.guiFrame):
     
     def _row1(self,callback):
         ''' Sets up the basic action buttons '''
-        sp=gw.smallButton('Simple Plot')
-        np=gw.smallButton('Plot (Configured)')
+        #sp=gw.smallButton('Simple Plot')
+        #np=gw.smallButton('Plot (Configured)')
+        np=gw.smallButton('Plot')
         hb=gw.smallButton('Help')
         s1=gtk.VSeparator()
         s2=gtk.VSeparator()
-        for b in [sp,s1,np,s2,hb]:
+        #for b in [sp,s1,np,s2,hb]:
+        for b in [np,s2,hb]:
             self.row1.pack_start(b,padding=2)
         self.vbox.pack_start(self.row1,expand=False,padding=2)
         self.vbox.pack_start(gtk.HSeparator(),expand=False,padding=2)
-        sp.connect('clicked',callback,{})
+        #sp.connect('clicked',callback,{})
         np.connect('clicked',self._getConfig,None)
         hb.connect('clicked',self._help,None)
     
@@ -46,8 +48,8 @@ class plotChoices(gw.guiFrame):
         ''' Lays out the buttons for standard plots '''
         self.projComboShown=1
         #ptypes=['X-Y','X-Z','Y-Z','X-T','Y-T']
-        ptypes=['contour', 'vector']
-        nup=['1','2','4','6','9']
+        ptypes=['contour', 'vector', 'contour+vector']
+        nup=['1','2x1', '1x2', '2x2' , '3x2', '2x3','3x3']
         self.proj=['cyl','moll','npolar','spolar']
         #self.typCombo=gw.myCombo(ptypes,label='type',initial='X-Y',callback=self._showProj)
         self.typCombo=gw.myCombo(ptypes,label='type',initial='contour',callback=self._showProj)
@@ -110,7 +112,15 @@ class plotChoices(gw.guiFrame):
         ''' Show configuration help '''
         dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
                     gtk.MESSAGE_INFO,gtk.BUTTONS_OK,
-                    'Sorry help not yet implemented')
+                    'Making vector plots - select u field and then click plot  \
+                                         - select v field and then click plot\
+                     Making contour and vector plots - select contour field and click plot\
+                                         - select u field and then click plot\
+                                         - select v field and then click plot\
+')
+
+
+
         dialog.run()
         dialog.destroy()
    
@@ -129,12 +139,13 @@ class plotChoices(gw.guiFrame):
         (i.e. it implements most of the cf-plot API (more of it
         is implemented via the advanced config.) '''
         config={
-            'nup':int(self.nupCombo.get_value()),
+            #'nup':int(self.nupCombo.get_value()),
+            'nup':self.nupCombo.get_value(),
             'gopen':{
                 'rows':
-                    {'1':None,'2':1,'4':2,'6':2,'9':3}[self.nupCombo.get_value()],
+                    {'1':None, '2x1':1, '1x2':2, '2x2':2, '3x2':2, '2x3':3, '3x3':3}[self.nupCombo.get_value()],
                 'columns':
-                    {'1':None,'2':2,'4':2,'6':3,'9':3}[self.nupCombo.get_value()],
+                    {'1':None, '2x1':2, '1x2':1, '2x2':2, '3x2':3, '2x3':2, '3x3':3}[self.nupCombo.get_value()],
                     },
             'mapset':{
                 'proj':{'cyl':'cyl','moll':'moll','npolar':'npstere',
@@ -143,7 +154,7 @@ class plotChoices(gw.guiFrame):
             'con':{
                 'ptype':
                     #{'X-Y':1,'X-Z':3,'Y-Z':2,'X-T':5,'Y-T':4}[self.typCombo.get_value()],
-                    {'contour':1,'vector':2}[self.typCombo.get_value()],
+                    {'contour':1,'vector':2, 'contour+vector':3}[self.typCombo.get_value()],
                 'line_labels':
                     {'On':True,'On--':True,'Off':False}[self.linCombo.get_value()],
                 'negative_linestyle':
@@ -178,12 +189,12 @@ def checkConsistency(field,plotOptions):
     generate error messages if appropriate. Return '' if ok! '''
     fixit='\nPlease use the grid selector to choose a 1d or 2d field'
     message=''
-    if plotOptions=={}:
-        # simple plot option, we expect a 2d field
-        if (len(xyshape(field)) < 1 or len(xyshape(field)) > 2):
-            message= 'cfview can only plot 1D or 2D fields'+fixit
-            return message
-        else: message=''
+    #if plotOptions=={}:
+    #    # simple plot option, we expect a 2d field
+    #    if (len(xyshape(field)) < 1 or len(xyshape(field)) > 2):
+    #        message= 'cfview can only plot 1D or 2D fields'+fixit
+    #        return message
+    #    else: message=''
     #else:
         # The key thing we need to check is for consistency between
         # plot options and the shape, so we can work out what to do with

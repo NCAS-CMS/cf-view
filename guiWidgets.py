@@ -100,7 +100,7 @@ class myCombo(gtk.HBox):
 
 class collapseCombo(myCombo):
     ''' Choose from the available collapse operators '''
-    options=OrderedDict([(' ',None),('min','min'),('max','max'),
+    options=OrderedDict([('range',None),('min','min'),('max','max'),
                          ('mid','mid_range'),('sum','sum'),('mean','mean'),
                          ('s.d.','standard_deviation'),('var','variance')])
     def __init__(self,initial='None',callback=None,fontSize='8'):
@@ -457,7 +457,7 @@ class gridSelector(guiFrame):
         mincombo=arrayCombo(self.grid.axes[dim].array,'Min:',
                     callback=(self._linkCallback,maxcombo),
                     initial=self.grid.drange[dim][0])
-        colcombo=collapseCombo(initial=' ')
+        colcombo=collapseCombo(initial='range')
         self.combos[dim]=(mincombo,maxcombo,colcombo)        
         # can't do this one at initial value coz it gets reset by the link
         maxcombo.set_value(self.grid.drange[dim][1])
