@@ -10,7 +10,7 @@ import cfplot as cfp
 import numpy as np
 import matplotlib.pyplot as plt
 
-__version__='0.3.1'
+__version__='0.4.0'
 
 cfgPadding=5
 
@@ -130,7 +130,11 @@ class cfview:
                 </menu>
                 <menu action="View">
                     <menuitem action="Code"/>
+                    <separator/>
+                    <menuitem action="Data"/>
                 </menu>
+
+
                 <menu action="Help">
                     <menuitem action="About"/>
                 </menu>
@@ -155,6 +159,8 @@ class cfview:
                 ('View',None,'_View'),
                 ('Code',gtk.STOCK_OPEN,'Code', None,
                 'View plot code',code_show),
+                ('Data',gtk.STOCK_OPEN,'Data', None,
+                'View data',self.data_view),
                 ('Help',None,'_Help'),
                 ('About',gtk.STOCK_HELP,'About', None,
                 'About cfview',self.help_about),
@@ -201,6 +207,60 @@ class cfview:
             f.write(plotvars.code)
             f.close()
         chooser.destroy()
+
+    def data_view(self,w):
+        ''' View selected data including any subsets or transforms'''
+        print 'In data viewing section'
+        sfield=self.fields[0]       
+        grid=self.gridSelector.get_selected()
+        
+        #Apply any subsetting
+        subset_counter=0
+        subset_string=''
+        for d in grid:
+            #Check if field is subsetted by the user
+            dmin=np.min(sfield.item(d).array)
+            dmax=np.max(sfield.item(d).array)
+            tol=abs((dmin-int(dmin))/1e3)
+            axis_name=getattr(sfield.item(d), 'standard_name', d)
+            if len(sfield.item(d).array) == 1: subset_string=subset_string+\
+               ' '+axis_name+':'+str(grid[d][0])+' '
+
+            if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
+               subset_counter=subset_counter+1
+               if (abs(grid[d][1]-grid[d][0]) <= tol):
+                  #Single value
+                  code="sfield=sfield.subspace(%s=%s)"%(axis_name,grid[d][0])
+                  subset_string=subset_string+' '+axis_name+':'+str(grid[d][0])+' '
+               else:
+                  #Range of values
+                  code="sfield=sfield.subspace(%s=cf.wi(%s,%s))"%(axis_name,grid[d][0],grid[d][1])
+
+               exec(code)
+               if subset_counter == 1: plotvars.code=plotvars.code+'#Subspace the data\n'
+               plotvars.code=plotvars.code+code+'\n'
+
+            
+
+        if subset_counter > 0: plotvars.code=plotvars.code+'\n'
+
+
+        # Apply any operators
+        opstring=' '
+        op_counter=0
+        for d in grid:
+            if grid[d][2]<>None:
+                op_counter=op_counter+1
+                axis_name=getattr(sfield.item(d), 'standard_name', d)
+                code="sfield=sfield.collapse('%s',axes='%s')"%(grid[d][2],axis_name)
+                exec(code)
+                if op_counter == 1: plotvars.code=plotvars.code+'#Apply operators\n'
+                plotvars.code=plotvars.code+code+'\n'
+                opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
+
+
+        print sfield
+
         
     def reset_with(self,filename):
         ''' Open dataset filename '''
@@ -224,7 +284,7 @@ This is a pre-release version of NCAS cfview
 Credits to:
     David Hassell - for cf-python
     Andy Heaps - for cfplot
-    Mudit Gupta - for the prototype pygtk interface to cfplot
+    Mudit Gupta - for the prototype pygtk interface to cf-python/cfplot
     Bryan Lawrence - for the initial version of cfview
             
             ''')
@@ -373,11 +433,10 @@ class xconvLike(gw.QuarterFrame):
         #self.script.add('sfield=sfield.subspace(**kwargs)')
 
 
-        #New code
+        #Check if field is subsetted by the user
         subset_counter=0
         subset_string=''
         for d in grid:
-            #Check if field is subsetted by the user
             dmin=np.min(sfield.item(d).array)
             dmax=np.max(sfield.item(d).array)
             tol=abs((dmin-int(dmin))/1e3)
@@ -404,22 +463,25 @@ class xconvLike(gw.QuarterFrame):
         if subset_counter > 0: plotvars.code=plotvars.code+'\n'
 
 
-        # now, do we have to apply any operators?
+        #Do we have to apply any operators?
+        #Apply these all together to sfield as if longitude and latiude are meaned at the same
+        #time this is a global area weighted mean.  If applied individually it is a linear mean in
+        #longitude followed by a linear mean in latitude.
         opstring=' '
         op_counter=0
         for d in grid:
             if grid[d][2]<>None:
                 op_counter=op_counter+1
+                if op_counter > 1: opstring=opstring+' '
                 axis_name=getattr(sfield.item(d), 'standard_name', d)
-                code="sfield=sfield.collapse('%s',axes='%s')"%(grid[d][2],axis_name)
-                exec(code)
-                if op_counter == 1: plotvars.code=plotvars.code+'#Apply operators\n'
-                plotvars.code=plotvars.code+code+'\n'
-                opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
+                opstring+='%s: %s'%(axis_name,grid[d][2])
 
-        
-        if op_counter > 0: plotvars.code=plotvars.code+'\n'
-
+        if op_counter >0 :
+           code="sfield=sfield.collapse('"+opstring+"')"
+           plotvars.code=plotvars.code+'#Apply operators\n'
+           plotvars.code=plotvars.code+code+'\n\n'
+           exec(code)
+ 
 
 
 
