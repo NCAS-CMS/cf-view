@@ -59,6 +59,7 @@ class plotChoices(gw.guiFrame):
         self.row2.pack_start(self.typCombo,expand=True,padding=2)
         self.row2.pack_start(self.projCombo,expand=True,padding=2)
         self.vbox.pack_start(self.row2,expand=False,padding=2)
+
     def _row3(self):
         ''' Lays out the buttons for configuring contours '''
         contours=['lines','filled','block']

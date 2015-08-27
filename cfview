@@ -9,8 +9,9 @@ import sys
 import cfplot as cfp
 import numpy as np
 import matplotlib.pyplot as plt
+import pango 
 
-__version__='0.4.0'
+__version__='0.4.1'
 
 cfgPadding=5
 
@@ -30,7 +31,7 @@ class pvars(object):
 
 plotvars=pvars(pos=0, nplots=1, code='', vect_ufield=None,vect_key_length=5, vect_pts=None, \
                vect_scale=5, vect_title=None, plot_counter=0, title='', field_selected='',\
-               file_selected=''\
+               file_selected='', data=None\
                )
 ''' 
    plotvars is a set of persistent variables to store various parameters
@@ -160,7 +161,7 @@ class cfview:
                 ('Code',gtk.STOCK_OPEN,'Code', None,
                 'View plot code',code_show),
                 ('Data',gtk.STOCK_OPEN,'Data', None,
-                'View data',self.data_view),
+                'View data',data_show),
                 ('Help',None,'_Help'),
                 ('About',gtk.STOCK_HELP,'About', None,
                 'About cfview',self.help_about),
@@ -208,41 +209,11 @@ class cfview:
             f.close()
         chooser.destroy()
 
-    def data_view(self,w):
-        ''' View selected data including any subsets or transforms'''
-        print 'In data viewing section'
-        sfield=self.fields[0]       
-        grid=self.gridSelector.get_selected()
-        
-        #Apply any subsetting
-        subset_counter=0
-        subset_string=''
-        for d in grid:
-            #Check if field is subsetted by the user
-            dmin=np.min(sfield.item(d).array)
-            dmax=np.max(sfield.item(d).array)
-            tol=abs((dmin-int(dmin))/1e3)
-            axis_name=getattr(sfield.item(d), 'standard_name', d)
-            if len(sfield.item(d).array) == 1: subset_string=subset_string+\
-               ' '+axis_name+':'+str(grid[d][0])+' '
 
-            if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
-               subset_counter=subset_counter+1
-               if (abs(grid[d][1]-grid[d][0]) <= tol):
-                  #Single value
-                  code="sfield=sfield.subspace(%s=%s)"%(axis_name,grid[d][0])
-                  subset_string=subset_string+' '+axis_name+':'+str(grid[d][0])+' '
-               else:
-                  #Range of values
-                  code="sfield=sfield.subspace(%s=cf.wi(%s,%s))"%(axis_name,grid[d][0],grid[d][1])
 
-               exec(code)
-               if subset_counter == 1: plotvars.code=plotvars.code+'#Subspace the data\n'
-               plotvars.code=plotvars.code+code+'\n'
+       
 
-            
-
-        if subset_counter > 0: plotvars.code=plotvars.code+'\n'
+           
 
 
         # Apply any operators
@@ -464,7 +435,7 @@ class xconvLike(gw.QuarterFrame):
 
 
         #Do we have to apply any operators?
-        #Apply these all together to sfield as if longitude and latiude are meaned at the same
+        #Apply these all together to sfield as if longitude and latitude are meaned at the same
         #time this is a global area weighted mean.  If applied individually it is a linear mean in
         #longitude followed by a linear mean in latitude.
         opstring=' '
@@ -483,7 +454,7 @@ class xconvLike(gw.QuarterFrame):
            exec(code)
  
 
-
+        plotvars.data=sfield
 
         #Error message if data not of right dimensionality
         ndim=len(sfield.axes(size=cf.gt(1)))
@@ -700,6 +671,8 @@ class xconvLike(gw.QuarterFrame):
               if plotOptions['con']['colorbar_orientation']=='vertical': \
                  code=code+",colorbar_orientation='vertical'"
               if plotOptions['con']['colorbar'] is None: code=code+",colorbar=None"
+              if plotOptions['con']['xlog'] is True: code=code+", xlog=1"
+              if plotOptions['con']['ylog'] is True: code=code+", ylog=1"
               code=code+')'
 
               #old command
@@ -872,8 +845,183 @@ class code_show:
         window.show()
 
 
+class data_show:
+    def close_application(self, widget):
+        widget.destroy()
+
 
             
+    def __init__(self, widget):
+        ''' View selected data including any subsets or transforms'''
+
+        sfield=plotvars.data     
+
+
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_resizable(True)  
+        window.connect("destroy", self.close_application)
+        window.set_title("cfview - data as selected")
+        window.set_border_width(0)
+        window.set_size_request(700, 900)
+
+        box1 = gtk.VBox(False, 0)
+        window.add(box1)
+        box1.show()
+
+        box2 = gtk.VBox(False, 10)
+        box2.set_border_width(10)        
+        box1.pack_start(box2, True, True, 0)
+        box2.show()
+
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        textview = gtk.TextView()
+        textbuffer = textview.get_buffer()
+        sw.add(textview)
+        sw.show()
+        textview.show()
+
+        box2.pack_start(sw)
+        
+        #Create tags using pango
+        h_tag = textbuffer.create_tag( "h", size_points=12, weight=pango.WEIGHT_BOLD) 
+        b_tag = textbuffer.create_tag( "b", size_points=10, weight=pango.WEIGHT_BOLD) 
+        #Use courier font for data tables
+        t_tag = textbuffer.create_tag( "t", size_points=10, font="Courier") 
+        tb_tag = textbuffer.create_tag( "tb", size_points=10, font="Courier", weight=pango.WEIGHT_BOLD) 
+
+        #Set size of tabs
+        tab_size=14
+
+        #Summary text
+        lineno=0
+        for line in str(sfield).splitlines():
+           if lineno <1:
+              position = textbuffer.get_end_iter()
+              textbuffer.insert_with_tags(position, line+'\n', b_tag) 
+           else:
+              colon_pos=line.find(":")
+              position = textbuffer.get_end_iter()
+              textbuffer.insert_with_tags(position, line[0:colon_pos], b_tag)
+              position = textbuffer.get_end_iter()
+              textbuffer.insert(position,line[colon_pos:] +'\n') 
+           lineno=lineno+1
+
+
+        #Field properties
+        position = textbuffer.get_end_iter()
+        textbuffer.insert_with_tags( position,'\n\nProperties\n__________\n' , b_tag) 
+        for item in sfield.properties:
+           position = textbuffer.get_end_iter()
+           textbuffer.insert_with_tags( position, str(item)+':   ', b_tag) 
+           position = textbuffer.get_end_iter()
+           textbuffer.insert( position, str(sfield.properties[item])+'\n') 
+
+        position = textbuffer.get_end_iter()
+        textbuffer.insert( position, '\n\n') 
+
+
+        #Field data
+        position = textbuffer.get_end_iter()
+        textbuffer.insert_with_tags(position, 'Data\n____\n\n', b_tag) 
+
+        data=np.squeeze(sfield.array)
+        if hasattr(sfield, 'ncvar'): fname=sfield.ncvar
+        if hasattr(sfield, 'short_name'): fname=sfield.short_name 
+        if hasattr(sfield, 'long_name'): fname=sfield.long_name 
+        if hasattr(sfield, 'standard_name'): fname=sfield.standard_name
+
+        #Find max string length
+        #smax=len(max(xpts.astype('str'), key=len))+len(max(data.astype('str'), key=len))+4
+
+        #1D data
+        if np.ndim(data) == 1:
+           for mydim in sfield.items():
+              dimdata=sfield.item(mydim).array
+              if np.size(dimdata) == np.size(data):
+                  xpts=dimdata
+                  xname=''
+                  if hasattr(sfield.item(mydim), 'ncvar'): xname=sfield.item(mydim).ncvar
+                  if hasattr(sfield.item(mydim), 'short_name'): xname=sfield.item(mydim).short_name 
+                  if hasattr(sfield.item(mydim), 'long_name'): xname=sfield.item(mydim).long_name 
+                  if hasattr(sfield.item(mydim), 'standard_name'): xname=sfield.item(mydim).standard_name
+
+
+           #Write out data
+           position = textbuffer.get_end_iter()
+           mystr=(xname+'\t'+fname+'\n').expandtabs(tab_size)
+           textbuffer.insert_with_tags(position, mystr, tb_tag) 
+        
+           for count in np.arange(np.size(data)):
+              mystr=(str(xpts[count])+'\t'+str(data[count])+'\n')
+              mystr=mystr.expandtabs(tab_size)
+              position = textbuffer.get_end_iter()
+              textbuffer.insert_with_tags( position, mystr, t_tag)
+
+        #2D data
+        if np.ndim(data) == 2:
+           data_shape=np.squeeze(np.shape(data))
+           for mydim in sfield.items():
+              dimdata=sfield.item(mydim).array
+              if np.size(dimdata) == data_shape[1]:
+                  xpts=dimdata
+                  xname=''
+                  if hasattr(sfield.item(mydim), 'ncvar'): xname=sfield.item(mydim).ncvar
+                  if hasattr(sfield.item(mydim), 'short_name'): xname=sfield.item(mydim).short_name 
+                  if hasattr(sfield.item(mydim), 'long_name'): xname=sfield.item(mydim).long_name 
+                  if hasattr(sfield.item(mydim), 'standard_name'): xname=sfield.item(mydim).standard_name
+              if np.size(dimdata) == data_shape[0]:
+                  ypts=dimdata
+                  yname=''
+                  if hasattr(sfield.item(mydim), 'ncvar'): yname=sfield.item(mydim).ncvar
+                  if hasattr(sfield.item(mydim), 'short_name'): yname=sfield.item(mydim).short_name 
+                  if hasattr(sfield.item(mydim), 'long_name'): yname=sfield.item(mydim).long_name 
+                  if hasattr(sfield.item(mydim), 'standard_name'): yname=sfield.item(mydim).standard_name
+
+
+           #Write out data
+           mystr=' \t'+str(xpts[0])
+           for i in np.arange(np.size(xpts)-1): mystr=mystr+'\t'+str(xpts[i+1])
+           mystr=mystr.expandtabs(tab_size)
+           position = textbuffer.get_end_iter()
+           textbuffer.insert_with_tags(position, mystr+'\n', tb_tag) 
+           for iy in np.arange(np.size(ypts)):
+              mystr=(str(ypts[iy])+'\t').expandtabs(tab_size)
+              textbuffer.insert_with_tags(position, mystr, tb_tag)
+              mystr=''
+              for ix in np.arange(np.size(xpts)):
+                 if ix == 0: mystr=mystr+str(data[iy,ix])
+                 if ix > 0: mystr=mystr+'\t'+str(data[iy,ix])
+              mystr=mystr.expandtabs(tab_size)
+              position = textbuffer.get_end_iter()
+              textbuffer.insert_with_tags(position, mystr+'\n', t_tag) 
+
+
+
+        textbuffer.insert( position, '\n\n\n') 
+
+        hbox = gtk.HButtonBox()
+        hbox.set_size_request(200,100)
+        box2.pack_start(hbox, False, False, 0)
+        box2.set_size_request(200,100)
+        hbox.show()
+
+        vbox = gtk.VBox()
+        vbox.show()
+        hbox.pack_start(vbox, False, False, 0)
+        
+
+        button = gtk.Button("close")        
+        button.set_size_request(200,100)
+        button.connect("clicked", self.close_application)
+        box2.pack_start(button, True, True, 0)
+        button.set_flags(gtk.CAN_DEFAULT)
+        button.grab_default()
+        button.show()
+        window.show()
+
+
+
 def main(filename):
     ''' main loop for cfview '''
     c=cfview(filename)
