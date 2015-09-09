@@ -442,13 +442,25 @@ class gridSelector(guiFrame):
                 self.sliders[d].destroy()
         self.sliders={}
         self.combos={}
-        for dim in self.grid.axes:
-            box=self._makeSlider(dim)
-            self.sliders[dim]=box
-            self.vbox.pack_start(box,expand=False)
+
+        #counter to display two ranges of values in the sliders with the rest being
+        #set to the first value of the range
+        #Display the axes in the order X, Y, Z, T
+        dcount=0
+        for axis in 'X', 'Y', 'Z', 'T':
+           for dim in self.grid.axes:
+              com='res=self.grid.axes[dim].'+axis
+              exec(com)
+              if res is True:
+                 if len(self.grid.axes[dim].array) > 1: dcount = dcount + 1
+                 box=self._makeSlider(dim, dcount)
+                 self.sliders[dim]=box
+                 self.vbox.pack_start(box,expand=False)
         self.shown=True
             
-    def _makeSlider(self,dim):
+
+
+    def _makeSlider(self,dim, dcount):
         ''' Makes an entry for choosing array max and minima and
         for selecting a collapse operator. Note that the
         max grid selector slaves from the min grid selector,
@@ -461,6 +473,9 @@ class gridSelector(guiFrame):
         self.combos[dim]=(mincombo,maxcombo,colcombo)        
         # can't do this one at initial value coz it gets reset by the link
         maxcombo.set_value(self.grid.drange[dim][1])
+        if dcount > 2:
+           mincombo.set_value(self.grid.drange[dim][1])
+           maxcombo.set_value(self.grid.drange[dim][1])
         # all the box and border malarkey to make it look nice
         vbox=gtk.VBox()
         bbox=gtk.HBox()
