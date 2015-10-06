@@ -83,7 +83,8 @@ class plotChoices(gw.guiFrame):
         logv=['Normal','log-x','log-y','log-xy']
         self.axeCombo=gw.myCombo(logv,label='axes',initial='Normal')
         ac=gw.smallButton('Advanced Config')
-        ac.connect('clicked',self._advancedConfig,None)
+        #ac.connect('clicked',self._advancedConfig,None)
+        ac.connect('clicked', AdvancedConfig)
         self.row4.pack_start(self.axeCombo,padding=2,expand=False)
         self.row4.pack_start(ac,padding=2,expand=True)
         self.vbox.pack_start(self.row4,expand=False,padding=2)
@@ -125,6 +126,7 @@ class plotChoices(gw.guiFrame):
         dialog.run()
         dialog.destroy()
    
+
     def _advancedConfig(self,w,data):
         ''' Generate advanced plot configuration information via a dialog popup '''
         dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
@@ -132,6 +134,13 @@ class plotChoices(gw.guiFrame):
                     'Sorry advanced config not yet implemented')
         dialog.run()
         dialog.destroy()
+
+
+
+
+
+
+
         
     def _getConfig(self,w,d):
         ''' Return all the configuration information in dictionaries
@@ -304,7 +313,61 @@ def getSlicesAndTitles(field,plotOptions):
     #    print shape,stepper,dim,key,value
     return r
             
-            
+      
+
+
+    
+       
+class AdvancedConfig:
+    ''' Generate advanced plot configuration information via a dialog popup '''
+
+    def close_application(self, widget):
+        self.advanced_window.destroy()
+
+    def __init__(self, widget):
+        # create a new window
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_usize(200, 100)
+        window.set_title("Advanced Config")
+
+        vbox = gtk.VBox(gtk.FALSE, 0)
+        window.add(vbox)
+        vbox.show()
+
+                                  
+        #Levels - minimum entry
+        levs_min = gtk.Entry(10)
+        levs_min.set_text(plotvars.levs_min)
+        levs_min.show()
+
+        hbox_levs_min = gtk.HBox()
+        label_min=gtk.Label("Minimum:")
+        label_min.show()
+        hbox_levs_min.pack_start(label_min)
+        hbox_levs_min.pack_end(levs_min)
+        hbox_levs_min.show()
+        vbox.add(hbox_levs_min)
         
+
+
+
+        box2 = gtk.VBox(False, 10)
+        box2.set_border_width(10)
+        box2.show()
+        vbox.pack_end(box2, False, True, 0)
+
+
+
+        button = gtk.Button("close")
+        button.connect("clicked", self.close_application)
+        box2.pack_start(button, True, True, 0)
+        button.set_flags(gtk.CAN_DEFAULT)
+        button.grab_default()
+        button.show()
+
+        self.advanced_window=window
+        self.advanced_window.show()
+
     
-    
+
+

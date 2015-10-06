@@ -84,7 +84,11 @@ class myCombo(gtk.HBox):
         if initial is not None: self.set_value(initial)
     def set_value(self,v):
         ''' Set active value of combobox '''
-        if v not in self.content:
+        #print 'self.content is ', self.content
+        #print 'v is ', v
+        if v not in self.content:   
+            print 'self.content is ', self.content
+            print 'v is ', v
             raise ValueError('Attempt to set combobox to non valid value')
         else:
             self._box.set_active(self.content.index(v))
@@ -154,7 +158,17 @@ class arrayCombo(myCombo):
     def set_value(self,v):
         ''' Set active value of combobox '''
         # need to override the mixin class to ensure type conversion from float
+        print 'combo v is', v, type(v)
+        #if type(v) is numpy.float32: 
+        #    print 'Passing float', str(float(v))
+        #    super(arrayCombo,self).set_value(str(float(v)))
+        #else: 
+        #    print 'passing non float', str(v)
+        #    super(arrayCombo,self).set_value(str(v))
+
         super(arrayCombo,self).set_value(str(v))
+
+
     def get_value(self):
         ''' Returns value in combobox '''
         # need to override the mixin class to ensure type conversion to float
@@ -375,6 +389,7 @@ class fieldSelector(guiFrame):
         # loop over fields
         i=0
         for field in data:
+            print i, field
             self.fieldStore.append(self.cf_field_to_columns(i,field))
             i+=1
        
