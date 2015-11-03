@@ -1,18 +1,23 @@
 #!/usr/bin/env python2.7
 
+#Imports section
 import pygtk
 import gtk
 import cf
 import sys
 import cfplot as cfp
-import numpy as np
 import matplotlib.pyplot as plt
 import gtk, gobject, pango
 import unittest, numpy
 from collections import OrderedDict
+from distutils.version import StrictVersion
+import numpy as np
+numpy_version_min='1.8.1'
+numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use cfplot,\n found numpy '+np.__version__ +'\n'
+if numpy.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.5.2'
+__version__='0.6.1'
 
 cfgPadding=5
 
@@ -58,7 +63,19 @@ plotvars=pvars(pos=0, nplots=1, code='', vect_ufield=None,vect_key_length=5, vec
                levs_manual=None, levs_extend_lower=True, levs_extend_upper=True\
                )
 
+def str_convert(val=None):
+    '''
+    Converts floats to correctly formatted strings 
+    This is to get around floats such as 1496205.0
+    becoming 1.4962e+06
+    ''' 
+    if val is None:  raise ValueError('str_convert - no input value')
 
+    conv=str("%10.4F"%(val))
+    print 'In str_convert - returning ', conv
+
+    return conv
+    
 
 class guiFrame(gtk.Frame):
     ''' Mixin to simplify framesetup with size and label '''
@@ -134,18 +151,24 @@ class myCombo(gtk.HBox):
         self.pack_start(self._box,padding=padding,expand=True) 
         for item in content:
             self._model.append([item])
+        #print 'ajh - myCombo - setting self.content to ', content, type(content)
+        #if type(content) is float: print 'ajh - myCombo - float is ', float(content)
         self.content=content
         if initial is not None: self.set_value(initial)
     def set_value(self,v):
         ''' Set active value of combobox '''
-        #print 'self.content is ', self.content
-        #print 'v is ', v
-        if v not in self.content:   
-            print 'self.content is ', self.content
-            print 'v is ', v
+        if v not in self.content:  
+
+            #print 'ajh -self.content is ', self.content, type(self.content)
+            #print 'ajh - v is ', v, type(v)        
+
             raise ValueError('Attempt to set combobox to non valid value')
         else:
+            #print 'ajh - myCombo - setting val to ', v
             self._box.set_active(self.content.index(v))
+     
+
+
     def get_value(self):
         ''' Returns value in combobox '''
         return self._model[self._box.get_active()][0]
@@ -194,8 +217,9 @@ class arrayCombo(myCombo):
             '''
         self.callback=callback
         # I think we can afford a copy
-        options=[str(i) for i in vector]
-        
+        #options=[str(i) for i in vector]
+        options=[str(float(i)) for i in vector]
+
         super(arrayCombo,self).__init__(options,initial=initial,label=label,
                                         callback=self.__aCcallback)
         # following magic sets the dropdown to use scrollbars (and be much faster)
@@ -212,20 +236,37 @@ class arrayCombo(myCombo):
     def set_value(self,v):
         ''' Set active value of combobox '''
         # need to override the mixin class to ensure type conversion from float
-        #print 'combo v is', v, type(v)
-        #if type(v) is numpy.float32: 
-        #    print 'Passing float', str(float(v))
-        #    super(arrayCombo,self).set_value(str(float(v)))
-        #else: 
-        #    print 'passing non float', str(v)
-        #    super(arrayCombo,self).set_value(str(v))
 
-        super(arrayCombo,self).set_value(str(v))
+        #super(arrayCombo,self).set_value(str(float(v)))
+        #if type(v) is float or type(v) is numpy.float32:
+        if type(v) is float:
+            #print 'ajh1 set_value - setting ', str(float(v)), type(v)
+            super(arrayCombo,self).set_value(str(float(v)))
+        elif type(v) is numpy.float32:
+            #print 'ajh2 set_value - setting ', str(float(v)), type(v)
+            super(arrayCombo,self).set_value(str(float(v)))
+        else:
+            #print 'ajh3 set_value - setting ', str(v), type(v)
+            super(arrayCombo,self).set_value(str(v))
+
+
+
+        #if type(v) is float:
+        #    val=str("%10.4F"%(v))
+        #    print 'set_value val is ', val
+
+            #print 'Passing ',  str(val), ' to set_value'
+            #super(arrayCombo,self).set_value(str_convert(v))
+            #super(arrayCombo,self).set_value(str(v))
+        #else:
+        #    super(arrayCombo,self).set_value(str(v))
 
 
     def get_value(self):
         ''' Returns value in combobox '''
         # need to override the mixin class to ensure type conversion to float
+        #print 'calling get_value', float(super(arrayCombo,self).get_value())
+        #print 'ajh - arrayCombo - get_value is ', float(super(arrayCombo,self).get_value())
         return float(super(arrayCombo,self).get_value())
     def __aCcallback(self,entry,value):
         ''' This is the internal component of the optional callback '''
@@ -501,6 +542,7 @@ class gridSelector(guiFrame):
     def set_data(self,field):
         ''' Set data with just one field '''
         self.grid=cfGrid(field)
+        #print "self.grid.axes['T'].array[0] is", self.grid.axes['dim0'].array[0]
         self._makeGui()
         self.show()
         
@@ -534,10 +576,14 @@ class gridSelector(guiFrame):
         for selecting a collapse operator. Note that the
         max grid selector slaves from the min grid selector,
         so users should always use that one first.'''
+        #print ' ajh - calling array_Combo with ', self.grid.axes[dim].array, 'and initial value of ',float(self.grid.drange[dim][0])
         maxcombo=arrayCombo(self.grid.axes[dim].array,'Max:')
         mincombo=arrayCombo(self.grid.axes[dim].array,'Min:',
                     callback=(self._linkCallback,maxcombo),
-                    initial=self.grid.drange[dim][0])
+                    initial=float(self.grid.drange[dim][0]))
+                    #initial=self.grid.drange[dim][0])
+
+
         colcombo=collapseCombo(initial='range')
         self.combos[dim]=(mincombo,maxcombo,colcombo)        
         # can't do this one at initial value coz it gets reset by the link
@@ -553,7 +599,11 @@ class gridSelector(guiFrame):
             bbox.pack_start(mincombo,padding=2)
             bbox.pack_start(maxcombo,padding=2)
         else:
-            bbox.pack_start(smallLabel('Value %s'%self.grid.axes[dim].array[0]))
+            #print 'ajh - _makeSlider - single value of grid is ', self.grid.axes[dim].array[0]
+            #print 'ajh - _makeSlider - values are ', self.grid.axes[dim].array[0], float(self.grid.axes[dim].array[0])
+            #bbox.pack_start(smallLabel('Value %s'%self.grid.axes[dim].array[0]))
+            bbox.pack_start(smallLabel('Value %s'%float(self.grid.axes[dim].array[0])))
+
         vbox.pack_start(bbox,padding=5)
         frame=gtk.Frame(self.grid.names[dim])
         frame.set_border_width(5)
