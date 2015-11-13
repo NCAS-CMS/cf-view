@@ -4,20 +4,22 @@
 import pygtk
 import gtk
 import cf
+import numpy as np
 import sys
 import cfplot as cfp
 import matplotlib.pyplot as plt
 import gtk, gobject, pango
-import unittest, numpy
+import unittest
 from collections import OrderedDict
 from distutils.version import StrictVersion
-import numpy as np
+
+#Check numpy version is okay
 numpy_version_min='1.8.1'
 numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use cfplot,\n found numpy '+np.__version__ +'\n'
-if numpy.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
+if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.6.1'
+__version__='0.6.10'
 
 cfgPadding=5
 
@@ -63,18 +65,6 @@ plotvars=pvars(pos=0, nplots=1, code='', vect_ufield=None,vect_key_length=5, vec
                levs_manual=None, levs_extend_lower=True, levs_extend_upper=True\
                )
 
-def str_convert(val=None):
-    '''
-    Converts floats to correctly formatted strings 
-    This is to get around floats such as 1496205.0
-    becoming 1.4962e+06
-    ''' 
-    if val is None:  raise ValueError('str_convert - no input value')
-
-    conv=str("%10.4F"%(val))
-    print 'In str_convert - returning ', conv
-
-    return conv
     
 
 class guiFrame(gtk.Frame):
@@ -114,7 +104,8 @@ class scrolledFrame(guiFrame):
         
 def smallLabel(text,size='small',wrap=True):
     ''' Convenience method for providing a small multi-line gtk.Label '''
-    string="<span size='%s'>%s</span>"%(size,text)
+    #Change any & characters in the text as these cause an error in 
+    string="<span size='%s'>%s</span>"%(size,text.replace('&', 'and'))
     label=gtk.Label(string)
     label.set_use_markup(True)
     label.set_line_wrap(wrap)
@@ -151,6 +142,7 @@ class myCombo(gtk.HBox):
         self.pack_start(self._box,padding=padding,expand=True) 
         for item in content:
             self._model.append([item])
+
         #print 'ajh - myCombo - setting self.content to ', content, type(content)
         #if type(content) is float: print 'ajh - myCombo - float is ', float(content)
         self.content=content
@@ -159,8 +151,8 @@ class myCombo(gtk.HBox):
         ''' Set active value of combobox '''
         if v not in self.content:  
 
-            #print 'ajh -self.content is ', self.content, type(self.content)
-            #print 'ajh - v is ', v, type(v)        
+            print 'ajh -self.content is ', self.content, type(self.content)
+            print 'ajh - v is ', v, type(v)        
 
             raise ValueError('Attempt to set combobox to non valid value')
         else:
@@ -217,12 +209,13 @@ class arrayCombo(myCombo):
             '''
         self.callback=callback
         # I think we can afford a copy
-        #options=[str(i) for i in vector]
-        options=[str(float(i)) for i in vector]
+        # convert to strings retaining the full precision of the data
+        options=[repr(i) for i in vector]
+
 
         super(arrayCombo,self).__init__(options,initial=initial,label=label,
                                         callback=self.__aCcallback)
-        # following magic sets the dropdown to use scrollbars (and be much faster)
+        # following magic sets the dropdown to use scrollbars (and is much faster)
         style = gtk.rc_parse_string('''
         style "my-style" { GtkComboBox::appears-as-list = 1 }
         widget "*.mycombo" style "my-style" ''')
@@ -236,38 +229,32 @@ class arrayCombo(myCombo):
     def set_value(self,v):
         ''' Set active value of combobox '''
         # need to override the mixin class to ensure type conversion from float
+        # take account of three different types of float that are input
+        # 
 
-        #super(arrayCombo,self).set_value(str(float(v)))
-        #if type(v) is float or type(v) is numpy.float32:
-        if type(v) is float:
-            #print 'ajh1 set_value - setting ', str(float(v)), type(v)
-            super(arrayCombo,self).set_value(str(float(v)))
-        elif type(v) is numpy.float32:
-            #print 'ajh2 set_value - setting ', str(float(v)), type(v)
-            super(arrayCombo,self).set_value(str(float(v)))
+        #print 'ajh - set_value passed is ', v, type(v), repr(v)
+
+        if type(v) is float or type(v) is np.float32 \
+           or type(v) is np.float64:
+            super(arrayCombo,self).set_value(repr(v))
         else:
-            #print 'ajh3 set_value - setting ', str(v), type(v)
             super(arrayCombo,self).set_value(str(v))
-
-
-
-        #if type(v) is float:
-        #    val=str("%10.4F"%(v))
-        #    print 'set_value val is ', val
-
-            #print 'Passing ',  str(val), ' to set_value'
-            #super(arrayCombo,self).set_value(str_convert(v))
-            #super(arrayCombo,self).set_value(str(v))
-        #else:
-        #    super(arrayCombo,self).set_value(str(v))
 
 
     def get_value(self):
         ''' Returns value in combobox '''
-        # need to override the mixin class to ensure type conversion to float
-        #print 'calling get_value', float(super(arrayCombo,self).get_value())
-        #print 'ajh - arrayCombo - get_value is ', float(super(arrayCombo,self).get_value())
-        return float(super(arrayCombo,self).get_value())
+        # Need to override the mixin class to ensure type conversion to float.
+        # Convert numbers with a lot of decimal places to a np.float64 so 
+        # that full precision is retained else return a float.
+
+        
+        ndecs=super(arrayCombo,self).get_value()[::-1].find('.')
+        if ndecs < 8:
+            return np.float(super(arrayCombo,self).get_value())
+        else:
+            return np.float64(super(arrayCombo,self).get_value())
+
+
     def __aCcallback(self,entry,value):
         ''' This is the internal component of the optional callback '''
         if self.callback is not None:
@@ -321,28 +308,31 @@ class fieldMetadata(scrolledFrame):
         ''' Show field metadata information for a specific field.
         If more than one field in fields, show common metadata. '''
         common=[]
+
         if len(fields)>1:
             string='<i>Common Field Metadata</i>\n'
             # find intersection, don't you love python?
             sets=[set([cfkeyvalue(f,p) for p in f.properties]) for f in fields]
             u=set.intersection(*sets)
-        else:
+        elif len(fields) == 1:
             string=''
             # just show the field properties
             u=[cfkeyvalue(fields[0],p) for p in fields[0].properties]
-        for i in u: 
-            if i<>'':string+='%s\n'%i
-        if self.shown:  
-            self.label.destroy()
-            self.hbox.destroy()  # we don't want it to be the old size
-        # now build the label
-        self.label=smallLabel(string)
-        # shove it in a box and make sure it doesn't expand.
-        self.hbox=gtk.HBox()
-        self.hbox.pack_start(self.label,expand=False,padding=5)
-        self.vbox.pack_start(self.hbox,expand=False,padding=5)
-        self.show()
-        self.shown=True
+
+        if len(fields) >0:
+            for i in u: 
+                 if i<>'':string+='%s\n'%i
+            if self.shown:  
+                self.label.destroy()
+                self.hbox.destroy()  # we don't want it to be the old size
+            # now build the label
+            self.label=smallLabel(string)
+            # shove it in a box and make sure it doesn't expand.
+            self.hbox=gtk.HBox()
+            self.hbox.pack_start(self.label,expand=False,padding=5)
+            self.vbox.pack_start(self.hbox,expand=False,padding=5)
+            self.show()
+            self.shown=True
         
 
     
@@ -362,23 +352,25 @@ class gridMetadata(scrolledFrame):
             # find intersection, don't you love python?
             sets=[set(cfdimprops(f))for f in fields]
             u=set.intersection(*sets)
-        else:
+        elif len(fields) ==1:
             string=''
             # just show the field properties
             u=cfdimprops(fields[0])
-        for i in u: 
-            if i<>'':string+='%s\n'%i
-        if self.shown:  
-            self.label.destroy()
-            self.hbox.destroy()  # we don't want it to be the old size
-        # now build the label
-        self.label=smallLabel(string)
-        # shove it in a box and make sure it doesn't expand.
-        self.hbox=gtk.HBox()
-        self.hbox.pack_start(self.label,expand=False,padding=5)
-        self.vbox.pack_start(self.hbox,expand=False,padding=5)
-        self.show()
-        self.shown=True
+
+        if len(fields) > 0:
+            for i in u: 
+                if i<>'':string+='%s\n'%i
+            if self.shown:  
+                self.label.destroy()
+                self.hbox.destroy()  # we don't want it to be the old size
+            # now build the label
+            self.label=smallLabel(string)
+            # shove it in a box and make sure it doesn't expand.
+            self.hbox=gtk.HBox()
+            self.hbox.pack_start(self.label,expand=False,padding=5)
+            self.vbox.pack_start(self.hbox,expand=False,padding=5)
+            self.show()
+            self.shown=True
         
 class fieldSelector(guiFrame):
     ''' Provides a widget for data discovery, depends on the CF api
@@ -461,15 +453,39 @@ class fieldSelector(guiFrame):
         self.columns_are_setup=True
     
     def cf_field_to_columns(self,index,field):
-        ''' Given a CF field, convert to list store data structure '''
-        if hasattr(field,'standard_name'):
-            name=field.standard_name
-        else: name=field.long_name
-        # FIXME, what happens if X, Y,Z or T are not present?
-        (nx,ny,nz,nt) = (len(field.item('X').array), 
-                        len(field.item('Y').array), 
-                        len(field.item('Z').array) , 
-                        len(field.item('T').array))
+        ''' Given a CF field, convert to list store data structure ''' 
+
+        name='Unknown' #Catchall 
+        if hasattr(field, 'id'): name=field.id
+        if hasattr(field, 'ncvar'): name=field.ncvar
+        if hasattr(field, 'short_name'): name=field.short_name 
+        if hasattr(field, 'long_name'): name=field.long_name 
+        if hasattr(field, 'standard_name'): name=field.standard_name
+
+        nx=0
+        ny=0
+        nz=0
+        nt=0
+        #if field.coord('X') is not None: nx=len(field.item('X').array)
+        #if field.coord('Y') is not None: ny=len(field.item('Y').array)
+        #if field.coord('T') is not None: nt=len(field.item('T').array)
+
+        #There can be multiple matches for a dimension.  In this case 
+        #if len(field.items('Z')) == 1: 
+        #    nz=len(field.item('Z').array)
+        #elif len(field.items('Z')) > 1: 
+
+        #There can be multiple matches for a dimension as in a Z that has a match and
+        #also a Z that has a dimension.  
+        for k, v  in field.items('X').iteritems():
+            if v.isdimension is True: nx=len(field.item(k).array)
+        for k, v  in field.items('Y').iteritems():
+            if v.isdimension is True: ny=len(field.item(k).array)
+        for k, v  in field.items('Z').iteritems():
+            if v.isdimension is True: nz=len(field.item(k).array)
+        for k, v  in field.items('T').iteritems():
+            if v.isdimension is True: nt=len(field.item(k).array)
+
         return (index,name,nx,ny,nz,nt)
         
     def set_data(self,data):
@@ -484,7 +500,6 @@ class fieldSelector(guiFrame):
         # loop over fields
         i=0
         for field in data:
-            #print i, field
             self.fieldStore.append(self.cf_field_to_columns(i,field))
             i+=1
        
@@ -498,8 +513,9 @@ class fieldSelector(guiFrame):
         # at this point pathlist is a list of tuples that looks like
         # [((6,),(7,), ...]
         # These indices are the field indexes in the file!
-        indices=[i[0] for i in pathlist]
-        self.selection_callback(indices)
+        if len(pathlist) > 0:
+            indices=[i[0] for i in pathlist]
+            self.selection_callback(indices)
     
     def show(self):
         ''' Show widgets '''
@@ -516,6 +532,7 @@ class cfGrid(object):
         There must be a cleaner way to do this.
         # FIXME DAVID
         '''
+
         self.domain=field.domain
         self.axes={}
         self.drange={}
@@ -524,11 +541,25 @@ class cfGrid(object):
         #order=['X','Y','Z','T']
         #for k in order ...field.dim[k]
         self.shortNames={'dim0':'T','dim1':'Z','dim2':'Y','dim3':'X'}
-        for k in self.domain.data_axes():
-            cfdata=field.dim(k)
-            self.axes[k]=cfdata
-            self.drange[k]=min(cfdata.array),max(cfdata.array)
-            self.names[k]=self.domain.axis_name(k)
+
+        for axis in ['X','Y','Z','T']:
+            if field.domain.axis(axis) is not None:  
+                k=field.domain.axis(axis)
+                cfdata=field.dim(k)
+                self.axes[k]=cfdata
+                self.drange[k]=min(cfdata.array),max(cfdata.array)
+                self.names[k]=self.domain.axis_name(k)
+
+        #Original code
+        #for k in self.domain.data_axes():
+        #    cfdata=field.dim(k)
+        #    self.axes[k]=cfdata
+        #    self.drange[k]=min(cfdata.array),max(cfdata.array)
+        #    self.names[k]=self.domain.axis_name(k)
+
+
+
+
         
 class gridSelector(guiFrame):
     ''' Provides a selector for choosing a sub-space in a multi-dimensional field'''
@@ -542,7 +573,6 @@ class gridSelector(guiFrame):
     def set_data(self,field):
         ''' Set data with just one field '''
         self.grid=cfGrid(field)
-        #print "self.grid.axes['T'].array[0] is", self.grid.axes['dim0'].array[0]
         self._makeGui()
         self.show()
         
@@ -554,8 +584,8 @@ class gridSelector(guiFrame):
         self.sliders={}
         self.combos={}
 
-        #counter to display two ranges of values in the sliders with the rest being
-        #set to the first value of the range
+        #counter to display two ranges of values in the sliders.  Futher ranges are set
+        #to be the first value of the range
         #Display the axes in the order X, Y, Z, T
         dcount=0
         for axis in 'X', 'Y', 'Z', 'T':
@@ -567,6 +597,7 @@ class gridSelector(guiFrame):
                  box=self._makeSlider(dim, dcount)
                  self.sliders[dim]=box
                  self.vbox.pack_start(box,expand=False)
+
         self.shown=True
             
 
@@ -576,33 +607,44 @@ class gridSelector(guiFrame):
         for selecting a collapse operator. Note that the
         max grid selector slaves from the min grid selector,
         so users should always use that one first.'''
-        #print ' ajh - calling array_Combo with ', self.grid.axes[dim].array, 'and initial value of ',float(self.grid.drange[dim][0])
         maxcombo=arrayCombo(self.grid.axes[dim].array,'Max:')
         mincombo=arrayCombo(self.grid.axes[dim].array,'Min:',
                     callback=(self._linkCallback,maxcombo),
-                    initial=float(self.grid.drange[dim][0]))
-                    #initial=self.grid.drange[dim][0])
-
+                    initial=self.grid.drange[dim][0])
 
         colcombo=collapseCombo(initial='range')
         self.combos[dim]=(mincombo,maxcombo,colcombo)        
         # can't do this one at initial value coz it gets reset by the link
         maxcombo.set_value(self.grid.drange[dim][1])
+
         if dcount > 2:
-           mincombo.set_value(self.grid.drange[dim][1])
-           maxcombo.set_value(self.grid.drange[dim][1])
+            #After the first two ranges set additional ranges to be the first value of the field.
+            #If the axis is a pressure of height coordinate set it to be the maximim value of
+            #the field i.e. that nearest the ground. 
+         
+            mincombo.set_value(self.grid.drange[dim][0])
+            maxcombo.set_value(self.grid.drange[dim][0])
+
+            height_units=['millibar', 'mbar', 'decibar', 'atmosphere', 'atm', 'pascal','Pa', 'hPa',\
+                 'meter', 'metre', 'm', 'kilometer', 'kilometre', 'km']
+            if hasattr(self.grid.axes[dim], 'Units'):
+                if str(self.grid.axes[dim].Units) in height_units:
+                    mincombo.set_value(max(self.grid.drange[dim]))
+                    maxcombo.set_value(max(self.grid.drange[dim]))
+
+
+
+
         # all the box and border malarkey to make it look nice
         vbox=gtk.VBox()
         bbox=gtk.HBox()
+
         if len(self.grid.axes[dim].array)>1:
             bbox.pack_start(colcombo,padding=2)
             bbox.pack_start(mincombo,padding=2)
             bbox.pack_start(maxcombo,padding=2)
         else:
-            #print 'ajh - _makeSlider - single value of grid is ', self.grid.axes[dim].array[0]
-            #print 'ajh - _makeSlider - values are ', self.grid.axes[dim].array[0], float(self.grid.axes[dim].array[0])
-            #bbox.pack_start(smallLabel('Value %s'%self.grid.axes[dim].array[0]))
-            bbox.pack_start(smallLabel('Value %s'%float(self.grid.axes[dim].array[0])))
+            bbox.pack_start(smallLabel('Value %s'%repr(self.grid.axes[dim].array[0])))
 
         vbox.pack_start(bbox,padding=5)
         frame=gtk.Frame(self.grid.names[dim])
@@ -694,10 +736,10 @@ def makeDummy(standardname,longname):
     #---------------------------------------------------------------------
     # Create a grid_latitude dimension coordinate
     dim0 = cf.DimensionCoordinate(properties={'standard_name': 'grid_latitude'},
-                          data=cf.Data(numpy.arange(10.), 'degrees'))
+                          data=cf.Data(np.arange(10.), 'degrees'))
 
     # Create a grid_longitude dimension coordinate
-    dim1 = cf.DimensionCoordinate(data=cf.Data(numpy.arange(9.), 'degrees'))
+    dim1 = cf.DimensionCoordinate(data=cf.Data(np.arange(9.), 'degrees'))
     dim1.standard_name = 'grid_longitude'
     
     # Create a time dimension coordinate (with bounds)
@@ -709,13 +751,13 @@ def makeDummy(standardname,longname):
                                   bounds=bounds)
     
     # Create a longitude auxiliary coordinate
-    aux0 = cf.AuxiliaryCoordinate(data=cf.Data(numpy.arange(90).reshape(10, 9),
+    aux0 = cf.AuxiliaryCoordinate(data=cf.Data(np.arange(90).reshape(10, 9),
                                                'degrees_north'))
     aux0.standard_name = 'latitude'
     
     # Create a latitude auxiliary coordinate
     aux1 = cf.AuxiliaryCoordinate(properties=dict(standard_name='longitude'),
-                                  data=cf.Data(numpy.arange(1, 91).reshape(9, 10),
+                                  data=cf.Data(np.arange(1, 91).reshape(9, 10),
                                                'degrees_east'))
     
     # Create a rotated_latitude_longitude grid mapping transform
@@ -740,7 +782,7 @@ def makeDummy(standardname,longname):
                   'cell_methods' : cf.CellMethods('latitude: point')}
     
     # Create the field's data array
-    data = cf.Data(numpy.arange(90.).reshape(9, 10), 'm s-1')
+    data = cf.Data(np.arange(90.).reshape(9, 10), 'm s-1')
     
     # Finally, create the field
     f = cf.Field(properties=properties,
@@ -776,7 +818,7 @@ class TestCFutilities(unittest.TestCase):
         ''' Actually creates and runs a widget, so we turn this off
         after testing it properly '''
         win=gtk.Window()
-        vector=numpy.arange(100.)
+        vector=np.arange(100.)
         x=arrayCombo(vector)
         x.set_value(10.)
         self.assertEqual(x.get_value(),10.)
@@ -971,6 +1013,12 @@ class cfview:
         self.Select.set_data(data)
         self.Inspect.reset()
         self.Gallery.reset()
+        #Reset any existing data
+        self.domain={}
+        self.axes={}
+        self.drange={}
+        self.names={}
+
         #self.script.open(filename)
         #self.script.start()
         plotvars.plot_code=''
@@ -1144,20 +1192,29 @@ class xconvLike(QuarterFrame):
             dmin=np.min(sfield.item(d).array)
             dmax=np.max(sfield.item(d).array)
             tol=abs((dmin-int(dmin))/1e3)
+
             axis_name=getattr(sfield.item(d), 'standard_name', d)
+
             if len(sfield.item(d).array) == 1: subset_string=subset_string+\
                ' '+axis_name+':'+str(grid[d][0])+' '
+
+            #Take account of multiple axes with almost the same name
+            #by adding the 'exact' keyword to the subset
+            naxes=len(sfield.items(axis_name))
+            exact_str=''
+            if naxes > 1: exact_str="'exact',"
+
 
             if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
                subset_counter=subset_counter+1
                if (abs(grid[d][1]-grid[d][0]) <= tol):
                   #Single value
-                  code="sfield=sfield.subspace(%s=%s)"%(axis_name,grid[d][0])
-                  subset_string=subset_string+' '+axis_name+':'+str(grid[d][0])+' '
+                  code="sfield=sfield.subspace(%s%s=%s)"%(exact_str,axis_name,repr(grid[d][0]))
+                  subset_string=subset_string+' '+axis_name+':'+repr(grid[d][0])+' '
                else:
                   #Range of values
-                  code="sfield=sfield.subspace(%s=cf.wi(%s,%s))"%(axis_name,grid[d][0],grid[d][1])
-
+                  code="sfield=sfield.subspace(%s%s=cf.wi(%s,%s))"%(exact_str,axis_name,repr(grid[d][0]),repr(grid[d][1]))
+               
                exec(code)
                if subset_counter == 1: plotvars.code=plotvars.code+'#Subspace the data\n'
                plotvars.code=plotvars.code+code+'\n'
@@ -1231,15 +1288,6 @@ class xconvLike(QuarterFrame):
 
 
          
-
-
-
-
-
-
-
-        #Set title
-        #plotvars.title=opstring+subset_string
  
         if plot_type == 0:
            #Plot a graph if 1D            
@@ -1269,6 +1317,7 @@ class xconvLike(QuarterFrame):
                  if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'ncvar', 'NoName')
                  xunits=getattr(sfield.item(mydim), 'units', 'No units')
                  #ytitle
+                 if hasattr(sfield, 'id'): ytitle=sfield.id
                  if hasattr(sfield, 'ncvar'): ytitle=sfield.ncvar
                  if hasattr(sfield, 'short_name'): ytitle=sfield.short_name 
                  if hasattr(sfield, 'long_name'): ytitle=sfield.long_name 
@@ -1341,8 +1390,6 @@ class xconvLike(QuarterFrame):
               #Make the vector plot
               plotvars.title=plotvars.title+plotvars.vect_title+sfield.file+' '+fname+'('+units+')'+\
                              opstring+subset_string
-              #plotvars.title='ajh'+'\\n'+'ajh'
-              print 'plotvars.title is ', plotvars.title
               
               ufield=plotvars.vect_ufield
               vfield=sfield
@@ -1922,7 +1969,7 @@ class plotChoices(guiFrame):
         self.vbox.pack_start(self.row3,expand=False,padding=2)
         
         extend=['min','max','neither','both']
-        #minc,maxc,nlevs,extend
+
         
     def _row4(self,callback):
         ''' Lays out axes information'''
@@ -2072,10 +2119,18 @@ def axes_sizes(f):
 
     # We need to know those for the short names. 
     for axis in ['X','Y','Z','T']:
-        try:
-            results[axis]=sizes[f.domain.axis(axis)]
-        except ValueError:
-            results[axis]=None
+        if f.domain.axis(axis) is not None:
+            try:
+                results[axis]=sizes[f.domain.axis(axis)]
+            except ValueError:
+                results[axis]=None
+
+    #for axis in ['X','Y','Z','T']:
+    #    try:
+    #        results[axis]=sizes[f.domain.axis(axis)]
+    #    except ValueError:
+    #        results[axis]=None
+
     return results
     
 def xyshape(f):
