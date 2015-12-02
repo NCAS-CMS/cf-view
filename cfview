@@ -19,7 +19,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.6.10'
+__version__='0.6.11'
 
 cfgPadding=5
 
