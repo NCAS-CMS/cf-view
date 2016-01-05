@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/panfs/jasmin/users/andy/anaconda2/bin/python
 
 #Imports section
 import pygtk
@@ -19,7 +19,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.6.11'
+__version__='0.6.12'
 
 cfgPadding=5
 
@@ -1291,90 +1291,77 @@ class xconvLike(QuarterFrame):
  
         if plot_type == 0:
            #Plot a graph if 1D            
-           #plotvars.code=plotvars.code+'#Select data for plot\n'
-           #code='import numpy as np'
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #xtitle=''                 
-           #yunits='Value'
-           #code="xvals=np.squeeze(sfield.array)"
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #plotvars.title=sfield.file+opstring+subset_string
-           #for mydim in sfield.items():
-           #   vals=np.squeeze(sfield.item(mydim).array)                 
-           #   if np.size(vals) > 1: 
-           #      xpts=vals
-           #      #code="xpts=np.squeeze(sfield.item('%s').array)"%mydim
-           #      axis_name=getattr(sfield.item(mydim), 'standard_name', mydim)
-           #      code="xpts=np.squeeze(sfield.item('%s').array)"%axis_name
-           #      plotvars.code=plotvars.code+code+'\n'
-           #      units='Value'
-           #      #xtitle
-           #      xtitle=getattr(sfield.item(mydim), 'standard_name', 'NoName')
-           #      if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'long_name', 'NoName')
-           #      if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'short_name', 'NoName')
-           #      if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'ncvar', 'NoName')
-           #      xunits=getattr(sfield.item(mydim), 'units', 'No units')
-           #      #ytitle
-           #      if hasattr(sfield, 'id'): ytitle=sfield.id
-           #      if hasattr(sfield, 'ncvar'): ytitle=sfield.ncvar
-           #      if hasattr(sfield, 'short_name'): ytitle=sfield.short_name 
-           #      if hasattr(sfield, 'long_name'): ytitle=sfield.long_name 
-           #      if hasattr(sfield, 'standard_name'): ytitle=sfield.standard_name
-           #      if hasattr(sfield, 'Units'): yunits=sfield.Units
+           plotvars.code=plotvars.code+'#Select data for plot\n'
+           code='import numpy as np'
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
+           xtitle=''                 
+           yunits='Value'
+           code="xvals=np.squeeze(sfield.array)"
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
+           plotvars.title=sfield.file+opstring+subset_string
+           for mydim in sfield.items():
+              vals=np.squeeze(sfield.item(mydim).array)                 
+              if np.size(vals) > 1: 
+                 xpts=vals
+                 #code="xpts=np.squeeze(sfield.item('%s').array)"%mydim
+                 axis_name=getattr(sfield.item(mydim), 'standard_name', mydim)
+                 code="xpts=np.squeeze(sfield.item('%s').array)"%axis_name
+                 plotvars.code=plotvars.code+code+'\n'
+                 units='Value'
+                 #xtitle
+                 xtitle=getattr(sfield.item(mydim), 'standard_name', 'NoName')
+                 if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'long_name', 'NoName')
+                 if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'short_name', 'NoName')
+                 if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'ncvar', 'NoName')
+                 xunits=getattr(sfield.item(mydim), 'units', 'No units')
+                 #ytitle
+                 if hasattr(sfield, 'id'): ytitle=sfield.id
+                 if hasattr(sfield, 'ncvar'): ytitle=sfield.ncvar
+                 if hasattr(sfield, 'short_name'): ytitle=sfield.short_name 
+                 if hasattr(sfield, 'long_name'): ytitle=sfield.long_name 
+                 if hasattr(sfield, 'standard_name'): ytitle=sfield.standard_name
+                 if hasattr(sfield, 'Units'): yunits=sfield.Units
              
 
            plotvars.code=plotvars.code+'\n#Make a graph plot\n'
 
-           code="cfp.lineplot(sfield)"
-           exec(code)
-           plotvars.code=plotvars.code+code+'\n'
-
            #Open the plot if a single plot
-           #if plotvars.nplots == 1:
-           #   code="cfp.gopen()"
-           #   exec("\n"+code)
-           #   plotvars.code=plotvars.code+code+'\n'
+           if plotvars.nplots == 1:
+              code="cfp.gopen()"
+              exec("\n"+code)
+              plotvars.code=plotvars.code+code+'\n'
 
            #Plot the graph
-           #code="cfp.plotvars.plot.tick_params(direction='out', which='both')"
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.set_xlabel('%s(%s)')"%(xtitle,xunits)
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.set_ylabel('%s(%s)')"%(ytitle,yunits)
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.plot(xpts, xvals)"
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.set_title('%s')"%plotvars.title
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
+           code="cfp.plotvars.plot.tick_params(direction='out', which='both')"
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
+           code="cfp.plotvars.plot.set_xlabel('%s(%s)')"%(xtitle,xunits)
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
+           code="cfp.plotvars.plot.set_ylabel('%s(%s)')"%(ytitle,yunits)
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
+           code="cfp.plotvars.plot.plot(xpts, xvals)"
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
+           code="cfp.plotvars.plot.set_title('%s')"%plotvars.title
+           exec(code)
+           plotvars.code=plotvars.code+code+'\n'
            #Close the plot if a single plot
-           if plotvars.nplots != 1:
+           if plotvars.nplots == 1:
+              code="cfp.gclose()"
+              exec(code)
+              plotvars.code=plotvars.code+code+'\n'
+           else:
+              #Move onto next plot
               plotvars.pos=plotvars.pos+1
               if plotvars.pos <= plotvars.nplots: 
                  code="cfp.gpos(pos=%s)"%plotvars.pos
                  exec(code)
                  plotvars.code=plotvars.code+'\n#Move to next plot position\n'
                  plotvars.code=plotvars.code+code+'\n\n'
-
-
-
-           #   code="cfp.gclose()"
-           #   exec(code)
-           #   plotvars.code=plotvars.code+code+'\n'
-           #else:
-           #   #Move onto next plot
-           #   plotvars.pos=plotvars.pos+1
-           #   if plotvars.pos <= plotvars.nplots: 
-           #      code="cfp.gpos(pos=%s)"%plotvars.pos
-           #      exec(code)
-           #      plotvars.code=plotvars.code+'\n#Move to next plot position\n'
-           #      plotvars.code=plotvars.code+code+'\n\n'
 
 
 
