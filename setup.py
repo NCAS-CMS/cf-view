@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 from distutils.command.build import build
 
-version      = '0.6.12'
+version      = '0.7.1'
 packages     = ['cf']
 
 
@@ -14,9 +14,9 @@ setup(name = "cfview",
       description  = "GUI for viewing CF files",
       author       = "Andy Heaps",
       maintainer   = "Andy Heaps",
-      maintainer_email  = "a.j.heaps@reading.ac.uk",
-      author_email = "a.j.heaps@reading.ac.uk",
-      url          = "http://climate.ncas.ac.uk/~andy/cfview_sphinx/_build/html/#",
+      maintainer_email  = "andy.heaps@ncas.ac.uk",
+      author_email = "andy.heaps@ncas.ac.uk",
+      url          = "http://ajheaps.github.io/cf-view",
       download_url = "https://github.com/ajheaps/CF-View",
       platforms    = ["Linux"],
       keywords     = ['cf','netcdf','data','science',

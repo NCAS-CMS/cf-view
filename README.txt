@@ -1,15 +1,15 @@
 A graphical interface to select and contour data from NetCDF, Met Office PP and fields files.
 
-=====
-cfview
-=====
+=======
+cf-view
+=======
 
-cfview is a GUI to view contour/vector plots of climate data.  
+cf-view is a GUI to view contour, vector and line plots of climate data.  
 
 
 Documentation
 =============
-Please refer to the cfview homepage http://climate.ncas.ac.uk/~andy/cfview_sphinx/_build/html
+Please refer to the cf-view homepage http://ajheaps.github.io/cf-view
 
 
 
