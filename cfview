@@ -19,7 +19,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.6.11'
+__version__='0.8.1'
 
 cfgPadding=5
 
@@ -43,9 +43,11 @@ class pvars(object):
       title='' - title for plot
       field_selected='' - field selected from currently loaded data
       file_selected='' - file currently selected
-      levs_min='' - user selected minimim level
-      levs_max='' - user selected maximim level
-      levs_step='' - user selected level step
+      levs_set=False - user has set levels - min, max, step
+      levs_manual_set=False - user has set manual levels
+      levs_min='0' - user selected minimim level
+      levs_max='0' - user selected maximim level
+      levs_step='0' - user selected level step
    '''
    def __init__(self, **kwargs):
       '''Initialize a new Pvars instance'''
@@ -61,8 +63,9 @@ class pvars(object):
 
 plotvars=pvars(pos=0, nplots=1, code='', vect_ufield=None,vect_key_length=5, vect_pts=None, \
                vect_scale=5, vect_title=None, plot_counter=0, title='', field_selected='',\
-               file_selected='', data=None, levs_min='1', levs_max='12', levs_step='2',\
-               levs_manual=None, levs_extend_lower=True, levs_extend_upper=True\
+               file_selected='', data=None, levs_set=False, levs_manual_set=False,\
+               levs_min='0', levs_max='0', levs_step='0',levs_manual='', \
+               levs_extend_lower=True, levs_extend_upper=True\
                )
 
     
@@ -909,7 +912,17 @@ class cfview:
                     <separator/>
                     <menuitem action="Data"/>
                 </menu>
-
+                <menu action="Configure">
+                    <menuitem action="Contour levels"/>
+                    <separator/>
+                    <menuitem action="Map settings"/>
+                    <separator/>
+                    <menuitem action="Color scales"/>
+                    <separator/>
+                    <menuitem action="Vectors"/>
+                    <separator/>
+                    <menuitem action="Reset all"/>
+                </menu>
 
                 <menu action="Help">
                     <menuitem action="About"/>
@@ -937,12 +950,22 @@ class cfview:
                 'View plot code', code_show),
                 ('Data',gtk.STOCK_OPEN,'Data', None,
                 'View data',data_show),
+                ('Configure',None,'_Configure'),
+                ('Contour levels',gtk.STOCK_OPEN,'Contour levels', None,
+                'Set contour levels', Config_contour_levels),
+                ('Map settings',gtk.STOCK_OPEN,'Map settings', None,
+                'Map settings', config_map_settings),
+                ('Color scales',gtk.STOCK_OPEN,'Color scales', None,
+                'Color scales', config_color_scales),
+                ('Vectors',gtk.STOCK_OPEN,'Vectors', None,
+                'Vectors', config_vectors),
+                ('Reset all',gtk.STOCK_OPEN,'Reset all', None,
+                'Reset all', config_reset_all),
                 ('Help',None,'_Help'),
                 ('About',gtk.STOCK_HELP,'About', None,
                 'About cfview',self.help_about),
                 ])
 
-        
         uimanager.insert_action_group(actiongroup, 0)
         uimanager.add_ui_from_string(ui)
         
@@ -1455,6 +1478,106 @@ class xconvLike(QuarterFrame):
 
               plotvars.title=sfield.file+opstring+subset_string
               
+              #Set levels if set in contour_levels
+              #Reset levels to automatic
+              exec('cfp.levs()')
+
+              if plotvars.levs_set is True:
+                  #Check inputs are numbers
+                  message=''
+                  for val in ['plotvars.levs_min', 'plotvars.levs_max', 'plotvars.levs_step']:
+                      exec('myval='+val)
+                      try:
+                         float(myval)
+                      except ValueError:
+                         message=message+val+'='+str(myval)+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+                  #Check min < max and step > 0
+                  if  float(plotvars.levs_min) >= float(plotvars.levs_max) or float(plotvars.levs_step) <= 0:
+                      message='Levels must be set so that the \n minimum < maximum and step >0.'
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+ 
+                  code="cfp.levs(min="+plotvars.levs_min+", max="+plotvars.levs_max+", step="+plotvars.levs_step
+
+
+              if plotvars.levs_manual_set is True:
+                  #Check inputs are numbers
+                  message=''
+                  for val in plotvars.levs_manual.split():
+                      try:
+                         float(val)
+                      except ValueError:
+                         message=message+val+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+                  #Check levels are ascending
+                  message=''
+                  levs=plotvars.levs_manual.split()
+                  nvals=np.size(plotvars.levs_manual.split())
+                  count=0
+                  for i in np.arange(nvals-1):
+                      if float(levs[i+1]) - float(levs[i]) <= 0:
+                          message=message+'Levels are not ascending '+ levs[i]+' '+levs[i+1]+'\n'
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+ 
+                  code="cfp.levs(manual=["
+                  nvals=np.size(plotvars.levs_manual.split())
+                  count=0
+                  for val in plotvars.levs_manual.split():
+                      code=code+val
+                      if count < nvals-1: code=code+','
+                      count=count+1
+                  code=code+']' 
+
+              #Add on colour bar extensions if specified
+              if plotvars.levs_set is False and plotvars.levs_manual_set is False: 
+                  if  plotvars.levs_extend_lower is False or plotvars.levs_extend_upper is False:
+                      code='cfp.levs('
+              if plotvars.levs_set is True or plotvars.levs_manual_set is True: 
+                  if  plotvars.levs_extend_lower is False or plotvars.levs_extend_upper is False:
+                      code=code+','
+              if plotvars.levs_set is False or plotvars.levs_manual_set is False: 
+                  if plotvars.levs_extend_lower is False and plotvars.levs_extend_upper is True:
+                      code=code+"extend='max'"
+                  if plotvars.levs_extend_lower is True and plotvars.levs_extend_upper is False:
+                      code=code+"extend='min'"
+                  if plotvars.levs_extend_lower is False and plotvars.levs_extend_upper is False:
+                      code=code+"extend='neither'"
+                  code=code+")"
+
+
+              if code[:8] == 'cfp.levs':
+                   exec(code)
+                   plotvars.code=plotvars.code+'#Set levels\n'
+                   plotvars.code=plotvars.code+code+'\n\n'
+
+            
+
               
               #Assemble contour command from plotOptions
               code="cfp.con(sfield"
@@ -1471,8 +1594,6 @@ class xconvLike(QuarterFrame):
               if plotOptions['con']['ylog'] is True: code=code+", ylog=1"
               code=code+')'
 
-              #old command
-              #code="cfp.con(sfield,**plotOptions['con'])"
               
               exec(code)
               plotvars.code=plotvars.code+'#Make contour plot\n'
@@ -1988,11 +2109,10 @@ class plotChoices(guiFrame):
         ''' Lays out axes information'''
         logv=['Normal','log-x','log-y','log-xy']
         self.axeCombo=myCombo(logv,label='axes',initial='Normal')
-        ac=smallButton('Advanced Config')
-        #ac.connect('clicked',self._advancedConfig,None)
-        ac.connect('clicked', AdvancedConfig)
+        #ac=smallButton('Advanced Config')
+        #ac.connect('clicked', AdvancedConfig)
         self.row4.pack_start(self.axeCombo,padding=2,expand=False)
-        self.row4.pack_start(ac,padding=2,expand=True)
+        #self.row4.pack_start(ac,padding=2,expand=True)
         self.vbox.pack_start(self.row4,expand=False,padding=2)
         
     def _showCbar(self,w,value):
@@ -2227,109 +2347,344 @@ def getSlicesAndTitles(field,plotOptions):
     #    print shape,stepper,dim,key,value
     return r
             
-      
+             
+
+class Config_contour_levels:
+    ''' Set contour levels via a dialog popup '''
+
+    def close_application(self, widget, data=None):
+        self.levels_window.destroy()
+
+    def automatic_set(self, widget):
+        if self.toggle_automatic.get_active():
+            self.toggle_levs_set.set_active(False)
+            self.toggle_levs_manual_set.set_active(False)
+            self.levels_hbox.set_sensitive(False)
+            self.levels_hbox2.set_sensitive(False)
+            plotvars.levs_set=False
+            plotvars.levs_manual_set=False
+            plotvars.levs_extend_lower=True
+            plotvars.levs_extend_upper=True
+            self.toggle_lower.set_active(True)
+            self.toggle_upper.set_active(True)
+
+    def levs_set(self, widget):
+        if self.toggle_levs_set.get_active():
+            plotvars.levs_set=True
+            plotvars.levs_manual_set=False
+            self.levels_hbox.set_sensitive(True);
+            self.levels_hbox2.set_sensitive(False);
+            self.toggle_levs_manual_set.set_active(False)
+            self.toggle_automatic.set_active(False)
+        else:
+            plotvars.levs_set=False
+            plotvars.levs_manual_set=False
+            self.levels_hbox.set_sensitive(False)
+            self.toggle_automatic.set_active(True)
 
 
-    
-       
-class AdvancedConfig:
-    ''' Generate advanced plot configuration information via a dialog popup '''
+    def levs_manual_set(self, widget):
+        if self.toggle_levs_manual_set.get_active():
+            plotvars.levs_manual_set=True
+            plotvars.levs=False
+            self.levels_hbox.set_sensitive(False)
+            self.levels_hbox2.set_sensitive(True)
+            self.toggle_levs_set.set_active(False)
+            self.toggle_automatic.set_active(False)
+        else:
+            plotvars.levs_set=False
+            plotvars.levs_manual_set=False
+            self.levels_hbox2.set_sensitive(False);
+            self.toggle_automatic.set_active(True)
 
-    def close_application(self, widget):
-        self.advanced_window.destroy()
 
-    def set_vals(self, widget):
-        print 'set_vals'
-        plotvars.levs_min=levs_min.get_Entry()
-        plotvars.levs_max=levs_max.get_Entry()
-        plotvars.levs_step=levs_step.get_Entry()
+    def lower_set(self, widget):
+        if self.toggle_lower.get_active():
+            plotvars.levs_extend_lower=True
+        else:
+            plotvars.levs_extend_lower=False
+
+
+    def upper_set(self, widget):
+        if self.toggle_upper.get_active():
+            plotvars.levs_extend_upper=True
+        else:
+            plotvars.levs_extend_upper=False
+
+
+    def set_levs_min(self, widget):
+        plotvars.levs_min=self.levs_min.get_text()
+
+    def set_levs_max(self, widget):
+        plotvars.levs_max=self.levs_max.get_text()
+
+    def set_levs_step(self, widget):
+        plotvars.levs_step=self.levs_step.get_text()
+
+    def set_levs_manual(self, widget):
+        plotvars.levs_manual=self.levs_manual.get_text()
+
+    def levs_reset(self, widget):
+
+        self.toggle_levs_set.set_active(False)
+        self.toggle_levs_manual_set.set_active(False)
+        self.levels_hbox.set_sensitive(False)
+        self.levels_hbox2.set_sensitive(False)
+        plotvars.levs_set=False
+        plotvars.levs_manual_set=False
+        plotvars.levs_extend_lower=True
+        plotvars.levs_extend_upper=True
+        self.toggle_lower.set_active(True)
+        self.toggle_upper.set_active(True)
+        plotvars.levs_min=''
+        plotvars.levs_max=''
+        plotvars.levs_step=''
+        self.levs_min.set_text('')
+        self.levs_max.set_text('')
+        self.levs_step.set_text('')
+        plotvars.levs_manual=''
+        self.levs_manual.set_text('')
+
+
+
 
     def __init__(self, widget):
         # create a new window
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_usize(500, 400)
-        window.set_title("Advanced Config")
+        window.set_title("Contour levels")
+
 
         vbox = gtk.VBox(gtk.FALSE, 0)
         window.add(vbox)
         vbox.show()
-        
 
-        #Levels entry section
-        levels_box=gtk.VBox()
-        levels_box.show()
-        separator = gtk.HSeparator()
-        separator.show()
-        levels_box.pack_start(separator)
-        levels_label=gtk.Label("Levels") 
-        levels_label.show()
-        levels_box.pack_end(levels_label)
-        vbox.add(levels_box)
+
+
+        ######################################
+        #Master check box for automatic levels
+        ######################################
+
+        toggle_automatic = gtk.CheckButton("Automatic levels")
+        vbox.add(toggle_automatic)
+        toggle_automatic.show()
+        toggle_automatic.set_active(True)
+
+        separator1 = gtk.HSeparator()
+        vbox.add(separator1)
+        separator1.show()
+
+
+
+
+        #####################
+        #Evenly spaced levels
+        #####################
+        levels_manual_box=gtk.VBox()
+        levels_manual_box.show()
+
+        #Tick box for min, max, step input
+        toggle_levs_set = gtk.CheckButton("Evenly spaced levels")
+        toggle_levs_set.set_active(False)
+        vbox.add(toggle_levs_set)
+        toggle_levs_set.show()
+
+        # levels_hbox - horizontal box for evenly spaced levels
         levels_hbox=gtk.HBox()
         levels_hbox.show()
         vbox.add(levels_hbox)
-                                  
-        #Levels - minimum entry
-        levs_min = gtk.Entry()
-        #levs_min.set_max_length(5)
-        levs_min.set_text(plotvars.levs_min)
-        levs_min.show()
-        levs_label_min=gtk.Label("Minimum:")
-        levs_label_min.show()
-        levels_hbox.pack_start(levs_label_min)
-        levels_hbox.pack_end(levs_min)
-
-        #Levels - maximum entry
-        levs_max = gtk.Entry()
-        levs_max.set_text(plotvars.levs_max)
-        levs_max.show()
-        levs_label_max=gtk.Label("Maximum:")
-        levs_label_max.show()
-        levels_hbox.pack_end(levs_label_max)
-        levels_hbox.pack_end(levs_max)
-
-
-        #Levels - step entry
-        levs_step = gtk.Entry()
-        levs_step.set_text(plotvars.levs_step)
-        levs_step.show()
-        levs_label_step=gtk.Label("Step:")
-        levs_label_step.show()
-        levels_hbox.pack_end(levs_label_step)
-        levels_hbox.pack_end(levs_step)
-
         separator2 = gtk.HSeparator()
+        vbox.add(separator2)
         separator2.show()
-        levels_box.pack_end(separator2)
+                            
+        #Levels - set up labels and inputs
+        levs_label_min=gtk.Label("Min:")
+        levs_min = gtk.Entry()
+        levs_min.set_width_chars(8)
+        levs_min.set_text(plotvars.levs_min)
+        levs_label_max=gtk.Label("Max:")
+        levs_max = gtk.Entry()
+        levs_max.set_width_chars(8)
+        levs_max.set_text(plotvars.levs_max)
+        levs_label_step=gtk.Label("Step:")
+        levs_step = gtk.Entry()
+        levs_step.set_width_chars(8)
+        levs_step.set_text(plotvars.levs_step)
 
 
+        #Pack the widgets
+        levels_hbox.pack_start(levs_label_min)
+        levels_hbox.pack_start(levs_min)
+        levels_hbox.pack_start(levs_label_max)
+        levels_hbox.pack_start(levs_max)
+        levels_hbox.pack_start(levs_label_step)
+        levels_hbox.pack_start(levs_step)
+        levels_hbox.set_sensitive(False)
 
-        box2 = gtk.VBox(False, 10)
+        #Show the widgets
+        levs_label_min.show()
+        levs_min.show()
+        levs_label_max.show()
+        levs_max.show()
+        levs_label_step.show()
+        levs_step.show()
+
+
+        #######################
+        #Unevenly spaced levels
+        #######################
+        #Tick box for manual input
+        vbox.add(levels_manual_box)
+        toggle_levs_manual_set = gtk.CheckButton("Unevenly spaced levels")
+        toggle_levs_manual_set.set_active(False)
+
+
+        # hbox2 - box for unevenly spaced levels
+        levels_hbox2=gtk.HBox()
+        levels_hbox2.show()
+        vbox.add(levels_hbox2)
+        levs_label_manual=gtk.Label("Ascending values separated by spaces")
+        levs_manual = gtk.Entry()
+        levs_manual.set_width_chars(8)
+        levs_manual.set_text(plotvars.levs_manual)
+
+        separator3 = gtk.HSeparator()
+        vbox.add(separator3)
+        separator3.show()
+
+        levels_manual_box.pack_start(toggle_levs_manual_set, True, True, 0)
+        toggle_levs_manual_set.set_active(False)
+        levels_hbox2.pack_start(levs_label_manual)
+        levels_hbox2.pack_start(levs_manual)
+        levels_hbox2.set_sensitive(False);
+
+
+        #Show the widgets
+        levs_label_min.show()
+        levs_min.show()
+        levs_label_max.show()
+        levs_max.show()
+        levs_label_step.show()
+        levs_step.show()
+
+        toggle_levs_manual_set.show()
+        levs_label_manual.show()
+        levs_manual.show()
+        toggle_levs_manual_set.show()
+
+
+        ###########################
+        #Colorbar extension toggles
+        ###########################
+
+        extension_text=gtk.Label("Colorbar extensions - extend contours to cover all the data")
+        extension_text.show()
+        vbox.add(extension_text)
+
+        hbox3=gtk.HBox()
+        hbox3.show()
+        vbox.add(hbox3)
+        separator4 = gtk.HSeparator()
+        vbox.add(separator4)
+        separator4.show()
+
+        toggle_lower = gtk.CheckButton("Lower")
+        toggle_lower.show()
+        toggle_lower.set_active(True)
+
+        toggle_upper = gtk.CheckButton("Upper")
+        toggle_upper.show()
+        toggle_upper.set_active(True)
+
+        hbox3.pack_start(toggle_lower)
+        hbox3.pack_start(toggle_upper)
+
+
+        #######################################
+        #Box to contain reset and close buttons
+        #######################################
+        box2 = gtk.HBox(False, 10)
         box2.set_border_width(10)
         box2.show()
         vbox.pack_end(box2, False, True, 0)
 
+        button_reset = gtk.Button("reset")
+        button_reset.connect("clicked", self.levs_reset)
+        box2.pack_start(button_reset, True, True, 0)
+        button_reset.set_flags(gtk.CAN_DEFAULT)
+        button_reset.grab_default()
+        button_reset.show()
 
-
-        button = gtk.Button("close")
-        button.connect("clicked", self.close_application)
-        box2.pack_start(button, True, True, 0)
-        button.set_flags(gtk.CAN_DEFAULT)
-        button.grab_default()
-        button.show()
-
-        button1 = gtk.Button(label="Set levels")
-        button1.show()
-        button1.connect("clicked", self.set_vals)
-        box2.pack_start(button1, True, True, 0)
-
-
-        self.advanced_window=window
-        self.advanced_window.show()
+        button_close = gtk.Button("close")
+        button_close.connect("clicked", self.close_application)
+        box2.pack_start(button_close, True, True, 0)
+        button_close.set_flags(gtk.CAN_DEFAULT)
+        button_close.grab_default()
+        button_close.show()
 
 
 
-    
+        ####################
+        #Connect the widgets
+        ####################
+        toggle_automatic.connect("toggled", self.automatic_set)
+        toggle_levs_set.connect("toggled", self.levs_set)
+        toggle_levs_manual_set.connect("toggled", self.levs_manual_set)
+        toggle_lower.connect("toggled", self.lower_set)
+        toggle_upper.connect("toggled", self.upper_set)
+
+        levs_min.connect("changed", self.set_levs_min)
+        levs_max.connect("changed", self.set_levs_max)
+        levs_step.connect("changed", self.set_levs_step)
+        levs_manual.connect("changed", self.set_levs_manual)
+
+
+        ###############################
+        #Populate self with the widgets
+        ###############################
+        self.toggle_automatic=toggle_automatic
+        self.toggle_levs_set=toggle_levs_set
+        self.toggle_levs_manual_set=toggle_levs_manual_set
+        self.toggle_lower=toggle_lower
+        self.toggle_upper=toggle_upper
+
+        self.levs_min=levs_min
+        self.levs_max=levs_max
+        self.levs_step=levs_step
+        self.levs_manual=levs_manual
+        self.levels_hbox=levels_hbox
+        self.levels_hbox2=levels_hbox2
+        self.levels_window=window
+        self.levels_window.show()
+
+
+             
+class config_map_settings:
+    ''' Configure contour levels via a dialog popup '''
+    print 'In config_map_settings'
+
+class config_color_scales:
+    ''' Configure color scales via a dialog popup '''
+    print 'In config_color_settings'
+
+class config_vectors:
+    ''' Configure vectors via a dialog popup '''
+    print 'In config_vectors'
+
+class config_reset_all:
+    ''' Reset all the configuration settings back to the defaults '''
+
+    def __init__(self, nodata):
+        plotvars.levs_min='0'
+        plotvars.levs_max='0'
+        plotvars.levs_step='0'
+        plotvars.levs_set=False
+        plotvars.levs_manual_set=False
+        plotvars.levs_manual=''
+        plotvars.levs_extend_lower=True
+        plotvars.levs_extend_upper=True
+
+
 
 def main(filename):
     ''' main loop for cfview '''

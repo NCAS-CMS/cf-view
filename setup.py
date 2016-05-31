@@ -1,14 +1,14 @@
 from distutils.core import setup, Extension
 from distutils.command.build import build
 
-version      = '0.7.1'
+version      = '0.8.0'
 packages     = ['cf']
 
 
 
 
 
-setup(name = "cfview",
+setup(name = "cf-view",
       long_description = 'GUI for viewing CF files',
       version      = version,
       description  = "GUI for viewing CF files",
