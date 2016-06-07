@@ -19,7 +19,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.8.1'
+__version__='0.8.2'
 
 cfgPadding=5
 
@@ -48,6 +48,10 @@ class pvars(object):
       levs_min='0' - user selected minimim level
       levs_max='0' - user selected maximim level
       levs_step='0' - user selected level step
+      resolution='c' - map resolution
+      continent_thickness='1.5' - Thickness of the drawn continents
+      continent_color='k' - (black) colour of the drawn continents
+      proj='cyl' - map mprjection, default=cylindrical projection
    '''
    def __init__(self, **kwargs):
       '''Initialize a new Pvars instance'''
@@ -65,7 +69,10 @@ plotvars=pvars(pos=0, nplots=1, code='', vect_ufield=None,vect_key_length=5, vec
                vect_scale=5, vect_title=None, plot_counter=0, title='', field_selected='',\
                file_selected='', data=None, levs_set=False, levs_manual_set=False,\
                levs_min='0', levs_max='0', levs_step='0',levs_manual='', \
-               levs_extend_lower=True, levs_extend_upper=True\
+               levs_extend_lower=True, levs_extend_upper=True,
+               proj='cyl', lonmin='-180', lonmax='180', latmin='-90', latmax='90',\
+               boundinglat='0', lon_0='0',
+               resolution='c', continent_thickness='1.5', continent_color='k'\
                )
 
     
@@ -954,13 +961,13 @@ class cfview:
                 ('Contour levels',gtk.STOCK_OPEN,'Contour levels', None,
                 'Set contour levels', Config_contour_levels),
                 ('Map settings',gtk.STOCK_OPEN,'Map settings', None,
-                'Map settings', config_map_settings),
+                'Map settings', Config_map_settings),
                 ('Color scales',gtk.STOCK_OPEN,'Color scales', None,
-                'Color scales', config_color_scales),
+                'Color scales', Config_color_scales),
                 ('Vectors',gtk.STOCK_OPEN,'Vectors', None,
-                'Vectors', config_vectors),
+                'Vectors', Config_vectors),
                 ('Reset all',gtk.STOCK_OPEN,'Reset all', None,
-                'Reset all', config_reset_all),
+                'Reset all', Config_reset_all),
                 ('Help',None,'_Help'),
                 ('About',gtk.STOCK_HELP,'About', None,
                 'About cfview',self.help_about),
@@ -1577,8 +1584,114 @@ class xconvLike(QuarterFrame):
                    plotvars.code=plotvars.code+code+'\n\n'
 
             
+              #Map settings
+              code=''
+              #Set the cylindrical map limits if changed
+              if plotvars.proj == 'cyl':
+                  code=''
+                  if plotvars.lonmin != '-180' or plotvars.lonmax != '180' or plotvars.latmin != '-90' \
+                      or plotvars.latmax != '90':
+                       #Check inputs are numbers
+                       message=''
+                       for val in ['plotvars.lonmin', 'plotvars.lonmax', 'plotvars.latmin', 'plotvars.latmax']:
+                           exec('myval='+val)
+                           try:
+                               float(myval)
+                           except ValueError:
+                               message=message+val[9:]+'='+str(myval)+ ' is not a valid number\n'
 
+                       if message != '':
+                           dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                           gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                           dialog.run()
+                           dialog.destroy()
+                           return
+
+
+                       #Check lonmin < lonmax and latmin < latmax
+                       if  float(plotvars.lonmin) >= float(plotvars.lonmax) or float(plotvars.latmin) >= float(plotvars.latmax):
+                           message='lonmin must be < lonmax and latmin must be < latmax.'
+                           dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                           gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                           dialog.run()
+                           dialog.destroy()
+                           return
+ 
+                       code="cfp.mapset(lonmin="+plotvars.lonmin+", lonmax="+plotvars.lonmax\
+                            +", latmin="+plotvars.latmin+", latmax="+plotvars.latmax
+
+
+              #Polar plot if selected
+              if plotvars.proj == 'npstere' or plotvars.proj == 'spstere': 
+                  #Check inputs are numbers
+                  message=''
+                  if plotvars.lon_0 != '0' or plotvars.boundinglat != '0':
+                      for val in ['plotvars.lon_0', 'plotvars.boundinglat']:
+                           exec('myval='+val)
+                           try:
+                               float(myval)
+                           except ValueError:
+                               message=message+val[9:]+'='+str(myval)+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+                  code="cfp.mapset(proj='"+plotvars.proj+"'"
+                  if plotvars.lon_0 != '0': code=code+', lon_0='+plotvars.lon_0
+                  if plotvars.boundinglat != '0': code=code+', boundinglat='+plotvars.boundinglat
+
+              #Change resolution if requested
+              if plotvars.resolution !='c':
+                  if code == '': 
+                      code="cfp.mapset(resolution='"+plotvars.resolution+"'"
+                  else:
+                      code=code+",resolution='"+plotvars.resolution+"'"
               
+              #Run code if changes have been made    
+              if code != '':
+                  code=code+')'
+                  exec(code)
+                  plotvars.code=plotvars.code+'#Set map projection and limits\n'
+                  plotvars.code=plotvars.code+code+'\n\n'
+
+
+              #Set continent thickness and colour if required
+              if plotvars.continent_thickness != '1.5' or plotvars.continent_color != 'k':
+                  #Check continent_thinckness is a valid number
+                  message=''
+                  if plotvars.continent_thickness != '1.5':
+                      exec('myval='+plotvars.continent_thickness)
+                      try:
+                          float(myval)
+                      except ValueError:
+                          message='continent_thickness='+plotvars.continent_thickness+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+                  #Generate cf-plot setvars command as required
+                  code='cfp.setvars('
+                  if plotvars.continent_thickness != '1.5': code=code+"continent_thickness='"+plotvars.continent_thickness+"',"
+                  if plotvars.continent_color != 'k': code=code+"continent_color='"+plotvars.continent_color+"'"
+                  code=code+')'
+                  exec(code)
+                  plotvars.code=plotvars.code+'#Set continent attributes\n'
+                  plotvars.code=plotvars.code+code+'\n\n'
+
+
+
+
+
+
+
               #Assemble contour command from plotOptions
               code="cfp.con(sfield"
               if plotOptions['con']['blockfill']==1:code=code+",blockfill=1"
@@ -2658,20 +2771,514 @@ class Config_contour_levels:
         self.levels_window.show()
 
 
-             
-class config_map_settings:
-    ''' Configure contour levels via a dialog popup '''
-    print 'In config_map_settings'
+###########################
+#Map settings configuration
+###########################    
+class Config_map_settings:
+    ''' Configure amp settings via a dialog popup '''
 
-class config_color_scales:
+    def close_application(self, widget, data=None):
+        self.map_window.destroy()
+
+
+    def cylin(self, widget):
+        if self.toggle_cylin.get_active():
+            plotvars.proj='cyl'
+            self.cylin_hbox1.set_sensitive(True)
+            self.cylin_hbox2.set_sensitive(True)
+            self.toggle_north_pole.set_active(False)
+            self.toggle_south_pole.set_active(False)
+            self.polar_hbox1.set_sensitive(False)
+            self.polar_hbox2.set_sensitive(False)
+            self.toggle_mollweide.set_active(False)
+
+
+    def set_lonmin(self, widget):
+        plotvars.lonmin=self.lonmin.get_text()
+
+    def set_lonmax(self, widget):
+        plotvars.lonmax=self.lonmax.get_text()
+
+    def set_latmin(self, widget):
+        plotvars.latmin=self.latmin.get_text()
+
+    def set_latmax(self, widget):
+        plotvars.latmax=self.latmax.get_text()
+
+
+
+
+    def north_pole(self, widget):
+        if self.toggle_north_pole.get_active():
+            plotvars.proj='npstere'
+            self.toggle_south_pole.set_active(False)
+            self.toggle_cylin.set_active(False)
+            self.cylin_hbox1.set_sensitive(False)
+            self.cylin_hbox2.set_sensitive(False)
+            self.polar_hbox1.set_sensitive(True)
+            self.polar_hbox2.set_sensitive(True)
+            self.toggle_mollweide.set_active(False)
+
+    def south_pole(self, widget):
+        if self.toggle_south_pole.get_active():
+            plotvars.proj='spstere'
+            self.toggle_north_pole.set_active(False)
+            self.toggle_cylin.set_active(False)
+            self.cylin_hbox1.set_sensitive(False)
+            self.cylin_hbox2.set_sensitive(False)
+            self.polar_hbox1.set_sensitive(True)
+            self.polar_hbox2.set_sensitive(True)
+            self.toggle_mollweide.set_active(False)
+
+
+    def set_boundinglat(self, widget):
+        plotvars.boundinglat=self.boundinglat.get_text()
+
+    def set_lon_0(self, widget):
+        plotvars.lon_0=self.lon_0.get_text()
+
+
+    def mollweide(self, widget):
+        if self.toggle_mollweide.get_active():
+            plotvars.proj='moll'
+            self.toggle_north_pole.set_active(False)
+            self.toggle_south_pole.set_active(False)
+            self.toggle_cylin.set_active(False)
+            self.cylin_hbox1.set_sensitive(False)
+            self.cylin_hbox2.set_sensitive(False)
+            self.polar_hbox1.set_sensitive(False)
+            self.polar_hbox2.set_sensitive(False)
+
+
+    def crude_set(self, widget):
+        if self.toggle_crude.get_active():
+            plotvars.resolution='c'
+            self.toggle_low.set_active(False)
+            self.toggle_intermediate.set_active(False)
+            self.toggle_full.set_active(False)
+            self.toggle_high.set_active(False)
+            self.toggle_none.set_active(False)
+
+
+    def low_set(self, widget):
+        if self.toggle_low.get_active():
+            plotvars.resolution='l'
+            self.toggle_crude.set_active(False)
+            self.toggle_intermediate.set_active(False)
+            self.toggle_full.set_active(False)
+            self.toggle_high.set_active(False)
+            self.toggle_none.set_active(False)
+
+    def intermediate_set(self, widget):
+        if self.toggle_intermediate.get_active():
+            plotvars.resolution='i'
+            self.toggle_crude.set_active(False)
+            self.toggle_low.set_active(False)
+            self.toggle_full.set_active(False)
+            self.toggle_high.set_active(False)
+            self.toggle_none.set_active(False)
+
+    def high_set(self, widget):
+        if self.toggle_high.get_active():
+            plotvars.resolution='h'
+            self.toggle_crude.set_active(False)
+            self.toggle_low.set_active(False)
+            self.toggle_intermediate.set_active(False)
+            self.toggle_full.set_active(False)
+            self.toggle_none.set_active(False)
+
+    def full_set(self, widget):
+        if self.toggle_full.get_active():
+            plotvars.resolution='f'
+            self.toggle_crude.set_active(False)
+            self.toggle_low.set_active(False)
+            self.toggle_intermediate.set_active(False)
+            self.toggle_high.set_active(False)
+            self.toggle_none.set_active(False)
+
+    def none_set(self, widget):
+        if self.toggle_none.get_active():
+            plotvars.resolution='n'
+            self.toggle_crude.set_active(False)
+            self.toggle_low.set_active(False)
+            self.toggle_intermediate.set_active(False)
+            self.toggle_high.set_active(False)
+            self.toggle_full.set_active(False)
+
+    def set_thickness(self, widget):
+        plotvars.continent_thickness=self.continent_thickness.get_text()
+
+
+    def set_color(self, widget):
+        plotvars.continent_color=self.continent_color.get_text()
+
+
+    def map_reset(self, widget):
+        self.toggle_cylin.set_active(True)
+        self.cylin_hbox1.set_sensitive(True)
+        self.cylin_hbox2.set_sensitive(True)
+        plotvars.proj='cyl'
+        plotvars.lonmin='-180'
+        plotvars.lonmax='180'
+        plotvars.latmin='-90'
+        plotvars.latmax='90'
+        self.toggle_north_pole.set_active(False)
+        self.toggle_south_pole.set_active(False)
+        self.toggle_mollweide.set_active(False)
+        self.polar_hbox1.set_sensitive(False)
+        self.polar_hbox2.set_sensitive(False)
+        self.lonmin.set_text('-180')
+        self.lonmax.set_text('180')
+        self.latmin.set_text('-90')
+        self.latmax.set_text('90')
+        plotvars.boundinglat='0'
+        plotvars.lon_0='0'
+        self.boundinglat.set_text('0')
+        self.lon_0.set_text('0')
+
+        self.toggle_crude.set_active(True)
+        self.toggle_low.set_active(False)
+        self.toggle_intermediate.set_active(False)
+        self.toggle_high.set_active(False)
+        self.toggle_full.set_active(False)
+        self.toggle_none.set_active(False)
+        plotvars.continent_color='k'
+        self.continent_color.set_text('k')
+        plotvars.continent_thickness='1.5'
+        self.continent_thickness.set_text('1.5')
+
+
+
+    def __init__(self, widget):
+        # create a new window
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_usize(500, 500)
+        window.set_title("Map options")
+
+
+        vbox = gtk.VBox(gtk.FALSE, 0)
+        window.add(vbox)
+        vbox.show()
+
+
+
+
+        #######################
+        #Cylindrical projection
+        #######################
+        #Tick box for min, max, step input
+        toggle_cylin = gtk.CheckButton("Cylindrical projection")
+        toggle_cylin.set_active(True)
+        vbox.add(toggle_cylin)
+        toggle_cylin.show()
+
+        # cylin_hbox1 and cylin_hbox2 - horizontal boxes for plot limits
+        cylin_hbox1=gtk.HBox()
+        cylin_hbox1.show()
+        vbox.add(cylin_hbox1)
+        cylin_hbox2=gtk.HBox()
+        cylin_hbox2.show()
+        vbox.add(cylin_hbox2)
+        separator1 = gtk.HSeparator()
+        vbox.add(separator1)
+        separator1.show()
+                            
+        #Levels - set up labels and inputs
+        lonmin_label=gtk.Label("Lonmin:")
+        lonmin = gtk.Entry()
+        lonmin.set_width_chars(8)
+        lonmin.set_text(plotvars.lonmin)
+        lonmax_label=gtk.Label("Lonmax:")
+        lonmax = gtk.Entry()
+        lonmax.set_width_chars(8)
+        lonmax.set_text(plotvars.lonmax)
+        latmin_label=gtk.Label("Latmin:")
+        latmin = gtk.Entry()
+        latmin.set_width_chars(8)
+        latmin.set_text(plotvars.latmin)
+        latmax_label=gtk.Label("Latmax:")
+        latmax = gtk.Entry()
+        latmax.set_width_chars(8)
+        latmax.set_text(plotvars.latmax)
+
+
+        #Pack the widgets
+        cylin_hbox1.pack_start(lonmin_label)
+        cylin_hbox1.pack_start(lonmin)
+        cylin_hbox1.pack_start(lonmax_label)
+        cylin_hbox1.pack_start(lonmax)
+        cylin_hbox1.set_sensitive(True)
+        cylin_hbox2.pack_start(latmin_label)
+        cylin_hbox2.pack_start(latmin)
+        cylin_hbox2.pack_start(latmax_label)
+        cylin_hbox2.pack_start(latmax)
+        cylin_hbox2.set_sensitive(True)
+
+
+
+        #Show the widgets
+        lonmin_label.show()
+        lonmin.show()
+        lonmax_label.show()
+        lonmax.show()
+        latmin_label.show()
+        latmin.show()
+        latmax_label.show()
+        latmax.show()
+
+
+
+
+        ###############################
+        #Polar stereographic projection
+        ###############################
+        polar_label=gtk.Label("Polar stereographic projection")
+        polar_label.show()
+        vbox.add(polar_label)
+
+
+        #Tick box for north and south poles
+        toggle_north_pole = gtk.CheckButton("North Pole")
+        toggle_north_pole.set_active(False)
+        vbox.add(toggle_north_pole)
+        toggle_north_pole.show()
+
+        toggle_south_pole = gtk.CheckButton("South Pole")
+        toggle_south_pole.set_active(False)
+        vbox.add(toggle_south_pole)
+        toggle_south_pole.show()
+
+                  
+        #polar_hbox1 and polar_hbox2 - horizontal boxes for plot limits
+        polar_hbox1=gtk.HBox()
+        polar_hbox1.show()
+        vbox.add(polar_hbox1)
+        polar_hbox2=gtk.HBox()
+        polar_hbox2.show()
+        vbox.add(polar_hbox2)
+        polar_hbox1.set_sensitive(False)
+        polar_hbox2.set_sensitive(False)
+
+        #Bounding latitude and centre of plot - set up labels and inputs        
+        boundinglat_label=gtk.Label("Bounding latitude - edge of the viewable latitudes:")
+        boundinglat = gtk.Entry()
+        boundinglat.set_width_chars(8)
+        boundinglat.set_text(plotvars.boundinglat)
+        polar_hbox1.pack_start(boundinglat_label)
+        polar_hbox1.pack_start(boundinglat)
+        lon_0_label=gtk.Label("Centre of map domain:")
+        lon_0 = gtk.Entry()
+        lon_0.set_width_chars(8)
+        lon_0.set_text(plotvars.lon_0)
+        polar_hbox2.pack_start(lon_0_label)
+        polar_hbox2.pack_start(lon_0)
+
+        separator2 = gtk.HSeparator()
+        vbox.add(separator2)
+        separator2.show()
+
+        #Show the widgets
+        boundinglat_label.show()
+        boundinglat.show()
+        lon_0_label.show()
+        lon_0.show()
+
+
+        #####################
+        #Mollweide projection
+        #####################
+        #Tick box 
+        toggle_mollweide = gtk.CheckButton("Mollweide projection")
+        toggle_mollweide.set_active(False)
+        vbox.add(toggle_mollweide)
+        toggle_mollweide.show()
+
+        separator3 = gtk.HSeparator()
+        vbox.add(separator3)
+        separator3.show()
+
+
+        ###############
+        #Map resolution
+        ###############
+        resolution_label=gtk.Label("Map resolution")
+        resolution_label.show()
+        vbox.add(resolution_label)
+
+        #resolution_hbox1 and resolution_hbox2 - horizontal boxes for resolution setting
+        resolution_hbox1=gtk.HBox()
+        resolution_hbox1.show()
+        vbox.add(resolution_hbox1)
+        resolution_hbox2=gtk.HBox()
+        resolution_hbox2.show()
+        vbox.add(resolution_hbox2)
+
+        toggle_crude = gtk.CheckButton("Crude")
+        toggle_crude.set_active(True)
+        toggle_crude.show()
+        resolution_hbox1.pack_start(toggle_crude)
+
+        toggle_low = gtk.CheckButton("Low")
+        toggle_low.set_active(False)
+        toggle_low.show()
+        resolution_hbox1.pack_start(toggle_low)
+
+        toggle_intermediate = gtk.CheckButton("Intermediate")
+        toggle_intermediate.set_active(False)
+        toggle_intermediate.show()
+        resolution_hbox1.pack_start(toggle_intermediate)
+
+        toggle_high = gtk.CheckButton("High")
+        toggle_high.set_active(False)
+        toggle_high.show()
+        resolution_hbox2.pack_start(toggle_high)
+
+        toggle_full = gtk.CheckButton("Full")
+        toggle_full.set_active(False)
+        toggle_full.show()
+        resolution_hbox2.pack_start(toggle_full)
+
+
+        toggle_none = gtk.CheckButton("None")
+        toggle_none.set_active(False)
+        toggle_none.show()
+        resolution_hbox2.pack_start(toggle_none)
+
+        separator4 = gtk.HSeparator()
+        vbox.add(separator4)
+        separator4.show()
+
+
+        ###############################
+        #Continent colour and thickness
+        ###############################
+        #continent_hbox1 and continent_hbox2 - horizontal boxes for continent settings
+        continent_hbox1=gtk.HBox()
+        continent_hbox1.show()
+        vbox.add(continent_hbox1)
+        continent_hbox2=gtk.HBox()
+        continent_hbox2.show()
+        vbox.add(continent_hbox2)
+
+        #Entry label and text
+        continent_thickness_label=gtk.Label("Continent thickness:")
+        continent_thickness = gtk.Entry()
+        continent_thickness.set_width_chars(8)
+        continent_thickness.set_text(plotvars.continent_thickness)
+        continent_hbox1.pack_start(continent_thickness_label)
+        continent_hbox1.pack_start(continent_thickness)
+
+        continent_color_label=gtk.Label("Continent color:")
+        continent_color = gtk.Entry()
+        continent_color.set_width_chars(8)
+        continent_color.set_text(plotvars.continent_color)
+        continent_hbox2.pack_start(continent_color_label)
+        continent_hbox2.pack_start(continent_color)
+
+
+        #Show the widgets
+        continent_thickness_label.show()
+        continent_thickness.show()
+        continent_color_label.show()
+        continent_color.show()
+
+
+
+
+        #######################################
+        #Box to contain reset and close buttons
+        #######################################
+        box2 = gtk.HBox(False, 10)
+        box2.set_border_width(10)
+        box2.show()
+        vbox.pack_end(box2, False, True, 0)
+
+        button_reset = gtk.Button("reset")
+        button_reset.connect("clicked", self.map_reset)
+        box2.pack_start(button_reset, True, True, 0)
+        button_reset.set_flags(gtk.CAN_DEFAULT)
+        button_reset.grab_default()
+        button_reset.show()
+
+        button_close = gtk.Button("close")
+        button_close.connect("clicked", self.close_application)
+        box2.pack_start(button_close, True, True, 0)
+        button_close.set_flags(gtk.CAN_DEFAULT)
+        button_close.grab_default()
+        button_close.show()
+
+
+
+        ####################
+        #Connect the widgets
+        ####################
+        toggle_cylin.connect("toggled", self.cylin)
+        lonmin.connect("changed", self.set_lonmin)
+        lonmax.connect("changed", self.set_lonmax)
+        latmin.connect("changed", self.set_latmin)
+        latmax.connect("changed", self.set_latmax)
+        boundinglat.connect("changed", self.set_boundinglat)
+        lon_0.connect("changed", self.set_lon_0)
+
+        toggle_north_pole.connect("toggled", self.north_pole)
+        toggle_south_pole.connect("toggled", self.south_pole)
+        toggle_mollweide.connect("toggled", self.mollweide)
+
+        toggle_crude.connect("toggled", self.crude_set)
+        toggle_low.connect("toggled", self.low_set)
+        toggle_intermediate.connect("toggled", self.intermediate_set)
+        toggle_full.connect("toggled", self.full_set)
+        toggle_high.connect("toggled", self.high_set)
+        toggle_none.connect("toggled", self.none_set)
+
+        continent_thickness.connect("changed", self.set_thickness)
+        continent_color.connect("changed", self.set_color)
+
+
+        ###############################
+        #Populate self with the widgets
+        ###############################
+        self.toggle_cylin=toggle_cylin
+        self.toggle_north_pole=toggle_north_pole
+        self.toggle_south_pole=toggle_south_pole
+        self.toggle_mollweide=toggle_mollweide
+        self.toggle_crude=toggle_crude
+        self.toggle_low=toggle_low
+        self.toggle_intermediate=toggle_intermediate
+        self.toggle_full=toggle_full
+        self.toggle_high=toggle_high
+        self.toggle_none=toggle_none
+
+        self.lonmin=lonmin
+        self.lonmax=lonmax
+        self.latmin=latmin
+        self.latmax=latmax
+        self.boundinglat=boundinglat
+        self.lon_0=lon_0
+        self.cylin_hbox1=cylin_hbox1
+        self.cylin_hbox2=cylin_hbox2
+        self.polar_hbox1=polar_hbox1
+        self.polar_hbox2=polar_hbox2
+
+        self.continent_thickness=continent_thickness
+        self.continent_color=continent_color
+
+        self.map_window=window
+        self.map_window.show()
+
+
+
+
+
+class Config_color_scales:
     ''' Configure color scales via a dialog popup '''
     print 'In config_color_settings'
 
-class config_vectors:
+class Config_vectors:
     ''' Configure vectors via a dialog popup '''
     print 'In config_vectors'
 
-class config_reset_all:
+class Config_reset_all:
     ''' Reset all the configuration settings back to the defaults '''
 
     def __init__(self, nodata):
