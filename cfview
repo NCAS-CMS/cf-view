@@ -12,6 +12,7 @@ import gtk, gobject, pango
 import unittest
 from collections import OrderedDict
 from distutils.version import StrictVersion
+from subprocess import call
 
 #Check numpy version is okay
 numpy_version_min='1.8.1'
@@ -19,7 +20,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.8.2'
+__version__='0.9.0'
 
 cfgPadding=5
 
@@ -28,15 +29,10 @@ class pvars(object):
    ''' 
       plotvars is a set of persistent variables to store various parameters
       across plotting actions such as multiple plots.
-
+      
       pos=None - current plot position in multiple plot mode 
       nplots=1 - number of plots in multiple plot mode
       code='' - Python and cfplot commands used to make the present plot
-      vect_ufield=None - u field for vector plot
-      vect_key_length=5 - length of reference vector
-      vect_pts=None - number of point to impterpolate to for vectors
-      vect_scale=5 - data units per arrow unit length
-      vect_title='' - vector title 
       plot_finish=0 - number of plots to make for this type of plot.  
                       For graph and contour this is set to 1, vector to 2 and contour and vector to 3.
       plot_counter=0 - present plot number
@@ -50,8 +46,23 @@ class pvars(object):
       levs_step='0' - user selected level step
       resolution='c' - map resolution
       continent_thickness='1.5' - Thickness of the drawn continents
-      continent_color='k' - (black) colour of the drawn continents
-      proj='cyl' - map mprjection, default=cylindrical projection
+      continent_color='black' - colour of the drawn continents
+      proj='cyl' - map projection, default=cylindrical projection
+      vect_auto_set=True - auto vectors set
+      vect_stride_set=False - vect stride set
+      vect_pts_set=False - vector intepolation set
+      vect_ufield=''
+      vect_length='10' - vector length
+      vect_scale='100' - vector scale
+      vect_stride='1' - vector stride between points
+      vect_pts='30' - interpolate tho this number of vectors
+      cscale_auto_set=True - automatic colour scale
+      cscale_reverse_set=False - reverse colour scale
+      cscale_ncols='' - number of colours to interpolate to
+      cscale_white='' - set these colour indicies to white
+      cscale_above='' - number of colours above the midpoint of the scale
+      cscale_below='' - number of colours above the midpoint of the scale
+      cscale='viridis' - default colour scale
    '''
    def __init__(self, **kwargs):
       '''Initialize a new Pvars instance'''
@@ -65,17 +76,43 @@ class pvars(object):
          return '\n'.join(out)
 
 
-plotvars=pvars(pos=0, nplots=1, code='', vect_ufield=None,vect_key_length=5, vect_pts=None, \
-               vect_scale=5, vect_title=None, plot_counter=0, title='', field_selected='',\
+plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selected='',\
                file_selected='', data=None, levs_set=False, levs_manual_set=False,\
                levs_min='0', levs_max='0', levs_step='0',levs_manual='', \
                levs_extend_lower=True, levs_extend_upper=True,
                proj='cyl', lonmin='-180', lonmax='180', latmin='-90', latmax='90',\
                boundinglat='0', lon_0='0',
-               resolution='c', continent_thickness='1.5', continent_color='k'\
+               resolution='c', continent_thickness='1.5', continent_color='black',\
+               vect_ufield='', vect_auto_set=True, vect_length='10', vect_scale='100',\
+               vect_stride='1', vect_pts='30', vect_stride_set=False,vect_pts_set=False,\
+               cscale_auto_set=True, cscale_reverse_set=False, cscale_white='',\
+               cscale_ncols='', cscale_above='', cscale_below='',cscale='viridis'\
                )
 
-    
+cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
+'mch_default', 'perc2_9lev', 'percent_11lev', 'precip2_15lev', 'precip2_17lev', 'precip3_16lev',
+'precip4_11lev', 'precip4_diff_19lev', 'precip_11lev', 'precip_diff_12lev', 'precip_diff_1lev', 'rh_19lev',
+'spread_15lev', 'amwg', 'amwg_blueyellowred', 'BlueDarkRed18', 'BlueDarkOrange18', 'BlueGreen14', 'BrownBlue12',
+'Cat12', 'cmp_flux', 'cosam12', 'cosam', 'GHRSST_anomaly', 'GreenMagenta16',
+'nrl_sirkes', 'nrl_sirkes_nowhite','prcp_1', 'prcp_2',
+'prcp_3', 'radar', 'radar_1', 'seaice_1', 'seaice_2', 'so4_21',
+'StepSeq25', 'sunshine_9lev', 'sunshine_diff_12lev', 'temp_19lev', 'temp_diff_18lev', 'temp_diff_1lev',
+'topo_15lev', 'wgne15', 'wind_17lev', 'amwg256', 'BkBlAqGrYeOrReViWh200', 'BlAqGrYeOrRe', 'BlAqGrYeOrReVi200',
+'BlGrYeOrReVi200', 'BlRe', 'BlueRed', 'BlueRedGray', 'BlueWhiteOrangeRed', 'BlueYellowRed', 'BlWhRe', 'cmp_b2r',
+'cmp_haxby', 'detail', 'extrema', 'GrayWhiteGray', 'GreenYellow', 'helix', 'helix1', 'hotres', 'matlab_hot',
+'matlab_hsv', 'matlab_jet', 'matlab_lines', 'ncl_default', 'ncview_default', 'OceanLakeLandSnow', 'rainbow',
+'rainbow_white_gray', 'rainbow_white', 'rainbow_gray', 'tbr_240_300', 'tbr_stdev_0_30', 'tbr_var_0_500',
+'tbrAvg1', 'tbrStd1', 'tbrVar1', 'thelix', 'ViBlGrWhYeOrRe', 'wh_bl_gr_ye_re', 'WhBlGrYeRe', 'WhBlReWh',
+'WhiteBlue', 'WhiteBlueGreenYellowRed', 'WhiteGreen', 'WhiteYellowOrangeRed', 'WhViBlGrYeOrRe', 'WhViBlGrYeOrReWh',
+'wxpEnIR', '3gauss', '3saw', 'posneg_2', 'posneg_1',
+'os250kmetres', 'wiki_1_0_2', 'wiki_1_0_3', 'wiki_2_0',
+'wiki_2_0_reduced', 'arctic', 'scale1', 'scale2', 'scale3', 'scale4', 'scale5', 'scale6', 'scale7', 'scale8',
+'scale9', 'scale10', 'scale11', 'scale12', 'scale13', 'scale14', 'scale15', 'scale16', 'scale17' , 'scale18',
+'scale19', 'scale20', 'scale21', 'scale22', 'scale23', 'scale24', 'scale25', 'scale26', 'scale27', 'scale28',
+'scale29', 'scale30', 'scale31', 'scale32', 'scale33', 'scale34', 'scale35', 'scale36', 'scale37', 'scale38',
+'scale39', 'scale40', 'scale41', 'scale42', 'scale43', 'scale44']
+
+cscales=pvars(cscales=cscales)
 
 class guiFrame(gtk.Frame):
     ''' Mixin to simplify framesetup with size and label '''
@@ -866,24 +903,31 @@ class cfview:
         self.script=script()
         
         # notebook
-        nb=gtk.Notebook()
-        nb.show_tabs=True
-        vbox.pack_start(nb,padding=cfgPadding)
-        self.nb=nb
-        for a,p,m in [ ('Select',xconvLike,self.script),
-                    ('Inspect',guiInspect,self.selector),
-                    ('Gallery',guiGallery,self.selector),
-                   ]:
-            label=gtk.Label(a)
-            w=p(m)
-            self.nb.append_page(w,label)
-            setattr(self,a,w)
-            w.show_all()
+        #nb=gtk.Notebook()
+        #nb.show_tabs=True
+        #vbox.pack_start(nb,padding=cfgPadding)
+        #self.nb=nb
+        #for a,p,m in [ ('Select',xconvLike,self.script)]:
+        #            ('Inspect',guiInspect,self.selector),
+        #            ('Gallery',guiGallery,self.selector),
+        #           ]:
+        #    label=gtk.Label(a)
+        #    w=p(m)
+        #    self.nb.append_page(w,label)
+        #    setattr(self,a,w)
+        #    w.show_all()
         
+
+        w=xconvLike(self.script)
+        vbox.pack_start(w)
+        w.show_all()
+        setattr(self,'Select',w)
+
+
         # status window
-        statusbar=gtk.Statusbar()
-        statusbar.set_has_resize_grip(False)
-        vbox.pack_start(statusbar,padding=cfgPadding,expand=False)
+        #statusbar=gtk.Statusbar()
+        #statusbar.set_has_resize_grip(False)
+        #vbox.pack_start(statusbar,padding=cfgPadding,expand=False)
         
         self.w=window
         
@@ -924,14 +968,15 @@ class cfview:
                     <separator/>
                     <menuitem action="Map settings"/>
                     <separator/>
-                    <menuitem action="Color scales"/>
-                    <separator/>
                     <menuitem action="Vectors"/>
+                    <separator/>
+                    <menuitem action="Color scales"/>
                     <separator/>
                     <menuitem action="Reset all"/>
                 </menu>
 
                 <menu action="Help">
+                    <menuitem action="Interface help"/>
                     <menuitem action="About"/>
                 </menu>
             </menubar>
@@ -962,13 +1007,15 @@ class cfview:
                 'Set contour levels', Config_contour_levels),
                 ('Map settings',gtk.STOCK_OPEN,'Map settings', None,
                 'Map settings', Config_map_settings),
-                ('Color scales',gtk.STOCK_OPEN,'Color scales', None,
-                'Color scales', Config_color_scales),
                 ('Vectors',gtk.STOCK_OPEN,'Vectors', None,
                 'Vectors', Config_vectors),
+                ('Color scales',gtk.STOCK_OPEN,'Color scales', None,
+                'Color scales', Config_color_scales),
                 ('Reset all',gtk.STOCK_OPEN,'Reset all', None,
                 'Reset all', Config_reset_all),
                 ('Help',None,'_Help'),
+                ('Interface help',gtk.STOCK_HELP,'Interface help', None,
+                'Interface help',self.help_interface),
                 ('About',gtk.STOCK_HELP,'About', None,
                 'About cfview',self.help_about),
                 ])
@@ -1041,8 +1088,8 @@ class cfview:
         ''' Open dataset filename '''
         data=cf.read(filename)
         self.Select.set_data(data)
-        self.Inspect.reset()
-        self.Gallery.reset()
+        #self.Inspect.reset()
+        #self.Gallery.reset()
         #Reset any existing data
         self.domain={}
         self.axes={}
@@ -1055,26 +1102,48 @@ class cfview:
         
     def help_about(self,b):
         ''' Provide an about dialog '''
-        m=gtk.AboutDialog()
-        m.set_program_name('cfview')
-        m.set_copyright ( '(c) National Centre for Atmospheric Science')
-        m.set_version(__version__)
-        m.set_comments('''
-This is a pre-release version of NCAS cfview
 
-Credits to:
-    David Hassell - for cf-python
-    Andy Heaps - for cfplot
-    Mudit Gupta - for the prototype pygtk interface to cf-python/cfplot
-    Bryan Lawrence - for the initial version of cfview
+        helpstr='<T>cfview '+(__version__)+'\
+        \n\
+        This is a pre-release version of NCAS cfview\n\
+        \
+        Credits to:\r\
+        Bryan Lawrence - for the initial version of cfview\r\
+        Mudit Gupta - for the prototype pygtk interface to cf-python/cfplot\r\
+        David Hassell, Charles Roberts - for cf-python\r\
+        Andy Heaps - for cf-plot\r\
+        \n'
             
-            ''')
-        m.run()
-        m.destroy()
-
-
+        CFview_help(helpstr, helpstr)
 
         
+    def help_interface(self,b):
+        ''' Provide a help dialog '''
+
+        helpstr='<T>cfview '+(__version__)+'\
+        \n\
+        To load data type cfview filename on the command prompt or File -> Load File once cfview is running.\
+        Data types that cfview can use are netCDF, Met Office PP and Fields files.\n\
+        \
+        <H>Making multiple plots\r\
+        To make muliple plots select the n-up drop down menu in the Configure and Generate Plots section.\
+        1x2 would give one plot in the x direction by two plots in the y direction.  If two contour plots\
+        are made then the plot button will need to be pressed twice to make the separate plots before the\
+        picture appears.\n\
+        \
+        <H>Making a vector plot\r\
+        Select a vector plot from the Configure and Generate Plots panel. Then select the field as a\
+        2-dimensional slice in the grid selector\
+        This is usually a longitude-latitude slice but can also be a latitude-pressure or height\
+        slice or a longitude-pressure/height slice.  Press the plot button to select this as the x component.\
+        Select another slice for the y-component of the vector plot and then press the plot button to make a\
+        vector plot.  Vector options such as string, interpolation and size are available from the Configure\
+        drop down menu from the top bar of cfview.\
+        \n'
+            
+        CFview_help(helpstr, helpstr)
+
+
     def delete(self,w=None,b=None):
         ''' Delete menu '''
         gtk.main_quit()
@@ -1317,6 +1386,107 @@ class xconvLike(QuarterFrame):
         if plotvars.pos == 0: cfp.reset()
 
 
+        #Check colour scale inputs are valid
+        if plotvars.cscale_white != '':
+            message=''
+            for val in plotvars.cscale_white.split():
+                try:
+                    float(val)
+                except ValueError:
+                    message=message+'colour scale white setting = '+val+ ' is not a valid number\n'
+
+            if message != '':
+                dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                dialog.run()
+                dialog.destroy()
+                return
+
+        if plotvars.cscale_ncols != '':
+               message=''
+               try:
+                   float(plotvars.cscale_ncols)
+               except ValueError:
+                   message=message+'colour scale number of colours setting = '+val+ ' is not a valid number\n'
+
+               if message != '':
+                   dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                   dialog.run()
+                   dialog.destroy()
+                   return
+
+
+        if plotvars.cscale_above != '':
+               message=''
+               try:
+                   float(plotvars.cscale_above)
+               except ValueError:
+                   message=message+'colour scale above setting = '+val+ ' is not a valid number\n'
+
+               if message != '':
+                   dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                   dialog.run()
+                   dialog.destroy()
+                   return
+
+        if plotvars.cscale_below != '':
+               message=''
+               try:
+                   float(plotvars.cscale_below)
+               except ValueError:
+                   message=message+'colour scale below setting = '+val+ ' is not a valid number\n'
+
+               if message != '':
+                   dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                   dialog.run()
+                   dialog.destroy()
+                   return
+
+
+
+        #Make up the cscale command if any changes required
+        code=''
+          
+        if plotvars.cscale_auto_set is False: 
+            code="'"+plotvars.cscale+"'"
+            if plotvars.cscale_reverse_set is True: code=code+', reverse=True'
+ 
+            if plotvars.cscale_white != '': 
+                if code != '': code=code+', '
+                code=code+'white='
+                nvals=np.size(plotvars.cscale_white.split())
+                if nvals == 1:
+                    code=code+plotvars.cscale_white
+                else:
+                    code=code+'['
+                    count=0
+                    for val in plotvars.cscale_white.split():
+                        code=code+val
+                        if count < nvals-1: code=code+','
+                        count=count+1
+                    code=code+']'
+
+            if plotvars.cscale_ncols != '': 
+                if code != '': code=code+', '
+                code=code+'ncols='+plotvars.cscale_ncols
+
+            if plotvars.cscale_above != '': 
+                if code != '': code=code+', '
+                code=code+'above='+plotvars.cscale_above
+
+            if plotvars.cscale_below != '': 
+                if code != '': code=code+', '
+                code=code+'below='+plotvars.cscale_below
+
+            if code != '':
+                code='cfp.cscale('+code+')'
+                exec(code)
+                plotvars.code=plotvars.code+'\n#Set colour scale\n'
+                plotvars.code=plotvars.code+code+'\n\n'
+
          
  
         if plot_type == 0:
@@ -1437,7 +1607,150 @@ class xconvLike(QuarterFrame):
               ufield=plotvars.vect_ufield
               vfield=sfield
               plotvars.code=plotvars.code+'vfield=sfield\n\n'
-              code="cfp.vect(u=ufield, v=vfield, key_length=10, scale=100, stride=5, title='%s')"%plotvars.title
+              
+              code='cfp.vect(u=ufield, v=vfield'           
+
+              if plotvars.vect_auto_set is True:
+                  exec('key_length=str(int(np.max((np.sqrt(ufield.array**2+vfield.array**2))/2)))')
+                  code=code+', key_length='+key_length+', scale=100'
+              else:
+                  #Check inputs are numbers
+                  message=''
+                  for val in ['plotvars.vect_scale', 'plotvars.vect_length']:
+                      exec('myval='+val)
+                      try:
+                         float(myval)
+                      except ValueError:
+                         message=message+val+'='+str(myval)+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+                  #Check length and scale > 0
+                  if  float(plotvars.vect_length) <= 0 or float(plotvars.vect_scale) <= 0:
+                      message='Vector length and scale must be > 0.'
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+                  #Add to vect command
+                  code=code+',key_length='+plotvars.vect_length+', scale='+plotvars.vect_scale
+              
+
+              #Add stride if required
+              if plotvars.vect_stride_set is True:
+                  stridevals=plotvars.vect_stride
+                  strides=stridevals.split()
+                  #Check inputs are numbers
+                  message=''
+                  for stride in strides:
+                      try:
+                          float(stride)
+                      except ValueError:
+                          message='Vector stride ='+stride+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+                  #Check inputs are integers
+                  message=''
+                  for stride in strides:
+                      try:
+                          int(stride)
+                      except ValueError:
+                          message='Vector stride ='+stride+ ' is not an integer\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+
+                  #Check stride >= 1
+                  message=''
+                  for stride in strides:
+                      if  float(stride) <= 1:
+                          message='Vector stride must be >= 1.'
+                          dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                          gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                          dialog.run()
+                          dialog.destroy()
+                          return
+
+                  if np.size(strides) == 1: code=code+' ,stride='+strides[0]
+                  if np.size(strides) == 2: code=code+' ,stride=['+strides[0]+','+strides[1]+']'
+
+              #Add pts if required
+              if plotvars.vect_pts_set is True:
+                  ptsvals=plotvars.vect_pts
+                  pts=ptsvals.split()
+                  #Check inputs are numbers
+                  message=''
+                  for pt in pts:
+                      try:
+                          float(pt)
+                      except ValueError:
+                          message='Vector stride ='+pt+ ' is not a valid number\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+                  #Check inputs are integers
+                  message=''
+                  for pt in pts:
+                      try:
+                          int(pt)
+                      except ValueError:
+                          message='Vector interpolation ='+pt+ ' is not an integer\n'
+
+                  if message != '':
+                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                      dialog.run()
+                      dialog.destroy()
+                      return
+
+
+
+                  #Check pts >= 1
+                  message=''
+                  for pt in pts:
+                      if  float(pt) < 1:
+                          message='Vector interpolation must be >= 1.'
+                          dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                          gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                          dialog.run()
+                          dialog.destroy()
+                          return
+
+                  if np.size(pts) == 1: code=code+' ,pts='+pts[0]
+                  if np.size(pts) == 2: code=code+' ,pts=['+pts[0]+','+pts[1]+']'
+
+ 
+             
+
+              #Finish off the vect command
+              code=code+", title='%s')"%plotvars.title
               exec(code)
               plotvars.code=plotvars.code+'\n#Make vector plot\n'
               plotvars.code=plotvars.code+code+'\n\n'
@@ -1476,11 +1789,11 @@ class xconvLike(QuarterFrame):
                  plotvars.code=plotvars.code+code+'\n'
 
                  
-              if plotOptions['mapset']['proj']<>'cyl': 
-                 code="cfp.mapset(proj='%s')"%(plotOptions['mapset']['proj'])
-                 exec(code)
-                 plotvars.code=plotvars.code+'\n#Set mapping\n'
-                 plotvars.code=plotvars.code+code+'\n\n'
+              #if plotOptions['mapset']['proj']<>'cyl': 
+              #   code="cfp.mapset(proj='%s')"%(plotOptions['mapset']['proj'])
+              #   exec(code)
+              #   plotvars.code=plotvars.code+'\n#Set mapping\n'
+              #   plotvars.code=plotvars.code+code+'\n\n'
 
 
               plotvars.title=sfield.file+opstring+subset_string
@@ -1688,17 +2001,28 @@ class xconvLike(QuarterFrame):
 
 
 
-
-
-
-
               #Assemble contour command from plotOptions
               code="cfp.con(sfield"
-              if plotOptions['con']['blockfill']==1:code=code+",blockfill=1"
-              if plotOptions['con']['lines']<>1:code=code+",lines=0"
-              if plotOptions['con']['fill']<>1:code=code+",fill=0"
-              if plotOptions['con']['negative_linestyle']is not None:
-                 code=code+",negative_linestyle=%s"%plotOptions['con']['negative_linestyle']
+
+              contour_style=plotOptions['con']['contour_style']
+              contour_line=plotOptions['con']['contour_line']
+              if contour_style == 1: 
+                 if contour_line == 2: code=code+",lines=0"
+                 if contour_line == 3: code=code+",lines=1, negative_linestyle=1"
+              if contour_style == 2: 
+                 if contour_line == 1: code=code+",blockfill=1,lines=1"
+                 if contour_line == 2: code=code+",blockfill=1, lines=0"
+                 if contour_line == 3: code=code+",blockfill=1, lines=1, negative_linestyle=1"
+              if contour_style == 3: 
+                 if contour_line == 1: code=code+",fill=0,lines=1"
+                 if contour_line == 2: code=code+",fill=0, lines=0"
+                 if contour_line == 3: code=code+",fill=0, lines=1, negative_linestyle=1"
+
+
+              if plotOptions['con']['line_labels'] is False:
+                  code=code+', line_labels=False'
+
+              #if plotOptions['con']['filled']<>1:code=code+",fill=0"
               code=code+",title='%s'"%plotvars.title
               if plotOptions['con']['colorbar_orientation']=='vertical': \
                  code=code+",colorbar_orientation='vertical'"
@@ -1707,7 +2031,6 @@ class xconvLike(QuarterFrame):
               if plotOptions['con']['ylog'] is True: code=code+", ylog=1"
               code=code+')'
 
-              
               exec(code)
               plotvars.code=plotvars.code+'#Make contour plot\n'
               plotvars.code=plotvars.code+code+'\n\n'
@@ -2070,76 +2393,6 @@ class data_show:
         self.text_window=window
         self.text_window.show()
 
-class text_view:
-    '''
-    Pop up text window.
-    For showing code, data and help information
-    '''
-    def close_application(self, widget):
-        self.text_window.destroy()
-
-    def __init__(self, title="", text=""):
-        self.x = 'Testing making a text window'
-    
-    def show(self, title="", text=""):
-        #title='code to make plot'
-        #title=''
-        #text=''
-
-        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        window.set_resizable(True)  
-        window.connect("destroy", self.close_application)
-        window.set_title(title)
-        window.set_border_width(0)
-        window.set_size_request(700, 900)
-
-        box1 = gtk.VBox(False, 0)
-        window.add(box1)
-        box1.show()
-
-        box2 = gtk.VBox(False, 10)
-        box2.set_border_width(10)        
-        box1.pack_start(box2, True, True, 0)
-        box2.show()
-
-        sw = gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        textview = gtk.TextView()
-        textbuffer = textview.get_buffer()
-        sw.add(textview)
-        sw.show()
-        textview.show()
-
-        box2.pack_start(sw)
-        
-        #Set the text view to be plot code.
-        #textbuffer.set_text(plotvars.code)
-        textbuffer.set_text(text)
-
-        hbox = gtk.HButtonBox()
-        hbox.set_size_request(200,100)
-        box2.pack_start(hbox, False, False, 0)
-        box2.set_size_request(200,100)
-        hbox.show()
-
-        vbox = gtk.VBox()
-        vbox.show()
-        hbox.pack_start(vbox, False, False, 0)
-
-        box2 = gtk.VBox(False, 10)
-        box2.set_border_width(10)
-        box1.pack_start(box2, False, True, 0)
-        box2.show()
-
-        button = gtk.Button("close")
-        button.connect("clicked", self.close_application)
-        box2.pack_start(button, True, True, 0)
-        button.set_flags(gtk.CAN_DEFAULT)
-        button.grab_default()
-        button.show()
-
-        self.text_window=window
-        self.text_window.show()
 
   
 class plotChoices(guiFrame):
@@ -2171,99 +2424,111 @@ class plotChoices(guiFrame):
         ''' Sets up the basic action buttons '''
         #sp=smallButton('Simple Plot')
         #np=smallButton('Plot (Configured)')
-        np=smallButton('Plot')
-        hb=smallButton('Help')
-        s1=gtk.VSeparator()
-        s2=gtk.VSeparator()
+        np=smallButton('<b>Plot</b>')
+
+        #np.set_use_size(16)
+        #hb=smallButton('Help')
+        #s1=gtk.VSeparator()
+        #s2=gtk.VSeparator()
         #for b in [sp,s1,np,s2,hb]:
-        for b in [np,s2,hb]:
-            self.row1.pack_start(b,padding=2)
+        #for b in [np,s2,hb]:
+        #    self.row1.pack_start(b,padding=2)
+        self.row1.pack_start(np,padding=80)
         self.vbox.pack_start(self.row1,expand=False,padding=2)
         self.vbox.pack_start(gtk.HSeparator(),expand=False,padding=2)
         #sp.connect('clicked',callback,{})
         np.connect('clicked',self._getConfig,None)
-        hb.connect('clicked',self._help,None)
+        #hb.connect('clicked',self._help,None)
     
     def _row2(self):
         ''' Lays out the buttons for standard plots '''
-        self.projComboShown=1
+        #self.projComboShown=1
         #ptypes=['X-Y','X-Z','Y-Z','X-T','Y-T']
         ptypes=['contour', 'vector', 'contour+vector']
         nup=['1','2x1', '1x2', '2x2' , '3x2', '2x3','3x3']
-        self.proj=['cyl','moll','npolar','spolar']
+        #self.proj=['cyl','moll','npolar','spolar']
         #self.typCombo=myCombo(ptypes,label='type',initial='X-Y',callback=self._showProj)
-        self.typCombo=myCombo(ptypes,label='type',initial='contour',callback=self._showProj)
+        #self.typCombo=myCombo(ptypes,label='type',initial='contour',callback=self._showProj)
+        self.typCombo=myCombo(ptypes,label='type',initial='contour')
         self.nupCombo=myCombo(nup,label='n-up',initial='1')
-        self.projCombo=myCombo(self.proj,label='projection',initial='cyl')
+        #self.projCombo=myCombo(self.proj,label='projection',initial='cyl')
         self.row2.pack_start(self.nupCombo,expand=True,padding=2)
         self.row2.pack_start(self.typCombo,expand=True,padding=2)
-        self.row2.pack_start(self.projCombo,expand=True,padding=2)
+        #self.row2.pack_start(self.projCombo,expand=True,padding=2)
         self.vbox.pack_start(self.row2,expand=False,padding=2)
 
     def _row3(self):
         ''' Lays out the buttons for configuring contours '''
-        contours=['lines','filled','block']
-        labels=['Off','On','On--']
-        self.cbar=['On','Off','On-X','On-Y']
-        self.cbarChoiceShown=1
-        self.conCombo=myCombo(contours,label='contours',initial='filled',
-                callback=self._showCbar)
-        self.linCombo=myCombo(labels,label='labels',initial='On')
-        self.cbarCombo=myCombo(self.cbar,label='bar',initial='On')
+        contours=['Filled','Blockfill', 'None']
+        lines=['On','Negative dashed', 'Off']
+        #self.conCombo=myCombo(contours,label='contours',initial='Filled',
+        #        callback=self._showCbar)
+        #self.lineCombo=myCombo(lines,label='lines',initial='On',
+        #        callback=self._showCbar)
+        self.conCombo=myCombo(contours,label='contour fill',initial='Filled')
+        self.lineCombo=myCombo(lines,label='contour lines',initial='On')
+
+
         #self.cbarCombo=myCombo(self.cbar,label='bar',initial='Off')
-        for w in [self.conCombo,self.linCombo,self.cbarCombo]:
+        for w in [self.conCombo,self.lineCombo]:
             self.row3.pack_start(w,padding=2)
         self.vbox.pack_start(self.row3,expand=False,padding=2)
         
-        extend=['min','max','neither','both']
 
         
     def _row4(self,callback):
+        labels=['On','Off']
+        self.cbar=['On','On-X','On-Y', 'Off']
+        #self.cbarChoiceShown=1
+        self.labCombo=myCombo(labels,label='labels',initial='On')
+        self.cbarCombo=myCombo(self.cbar,label='bar',initial='On')
         ''' Lays out axes information'''
         logv=['Normal','log-x','log-y','log-xy']
         self.axeCombo=myCombo(logv,label='axes',initial='Normal')
         #ac=smallButton('Advanced Config')
         #ac.connect('clicked', AdvancedConfig)
-        self.row4.pack_start(self.axeCombo,padding=2,expand=False)
+        for w in [self.labCombo,self.cbarCombo,self.axeCombo]:
+            self.row4.pack_start(w,padding=2)
+
+        #self.row4.pack_start(self.axeCombo,padding=2,expand=False)
         #self.row4.pack_start(ac,padding=2,expand=True)
         self.vbox.pack_start(self.row4,expand=False,padding=2)
         
-    def _showCbar(self,w,value):
-        ''' Callback used to turn off the colour bar choice as appropriate '''
-        if value=='lines' and self.cbarChoiceShown:
-            self.cbarCombo.destroy()
-            self.cbarChoiceShown=0
-        elif not self.cbarChoiceShown:
-            self.cbarCombo=myCombo(self.cbar,initial='Off')
-            self.row3.pack_start(self.cbarCombo,padding=2)
-            self.cbarChoiceShown=1
-            self.cbarCombo.show()
+    #def _showCbar(self,w,value):
+    #    ''' Callback used to turn off the colour bar choice as appropriate '''
+    #    if value=='lines' and self.cbarChoiceShown:
+    #        self.cbarCombo.destroy()
+    #        self.cbarChoiceShown=0
+    #    elif not self.cbarChoiceShown:
+    #        self.cbarCombo=myCombo(self.cbar,initial='Off')
+    #        self.row4.pack_start(self.cbarCombo,padding=2)
+    #        self.cbarChoiceShown=1
+    #        self.cbarCombo.show()
         
-    def _showProj(self,w,value):
-        ''' Callback used for the typcombo to allow projections for X-Y '''
-        if value=='contour' and not self.projComboShown:
-            self.projCombo=myCombo(self.proj,initial='cyl')
-            self.row2.pack_start(self.projCombo,expand=False,padding=2)
-            self.projCombo.show()
-        if value!='contour' and self.projComboShown:
-            self.projCombo.destroy()
-            self.projComboShown=0
+    #def _showProj(self,w,value):
+    #    ''' Callback used for the typcombo to allow projections for X-Y '''
+    #    if value=='contour' and not self.projComboShown:
+    #        self.projCombo=myCombo(self.proj,initial='cyl')
+    #        self.row2.pack_start(self.projCombo,expand=False,padding=2)
+    #        self.projCombo.show()
+    #    if value!='contour' and self.projComboShown:
+    #        self.projCombo.destroy()
+    #        self.projComboShown=0
             
     def _help(self,w,data):
         ''' Show configuration help '''
-        dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                    gtk.MESSAGE_INFO,gtk.BUTTONS_OK,
-                    'Making vector plots - select u field and then click plot  \
-                                         - select v field and then click plot\
-                     Making contour and vector plots - select contour field and click plot\
-                                         - select u field and then click plot\
-                                         - select v field and then click plot\
-')
+        helpstr='Making vector plots - select u field and then click plot  \n\
+                                         - select v field and then click plot\n\
+                     Making contour and vector plots - select contour field and click plot\n\
+                                         - select u field and then click plot\n\
+                                         - select v field and then click plot\n\
+                 \n'
+        CFview_help(helpstr, helpstr)
 
 
 
-        dialog.run()
-        dialog.destroy()
+        #dialog.run()
+        #dialog.destroy()
    
 
     def _advancedConfig(self,w,data):
@@ -2273,11 +2538,6 @@ class plotChoices(guiFrame):
                     'Sorry advanced config not yet implemented')
         dialog.run()
         dialog.destroy()
-
-
-
-
-
 
 
         
@@ -2296,30 +2556,45 @@ class plotChoices(guiFrame):
                 'columns':
                     {'1':None, '2x1':2, '1x2':1, '2x2':2, '3x2':3, '2x3':2, '3x3':3}[self.nupCombo.get_value()],
                     },
-            'mapset':{
-                'proj':{'cyl':'cyl','moll':'moll','npolar':'npstere',
-                            'spolar':'spstere'}[self.projCombo.get_value()]
-                    },
+            #'mapset':{
+            #    'proj':{'cyl':'cyl','moll':'moll','npolar':'npstere',
+            #                'spolar':'spstere'}[self.projCombo.get_value()]
+            #        },
             'con':{
                 'ptype':
                     #{'X-Y':1,'X-Z':3,'Y-Z':2,'X-T':5,'Y-T':4}[self.typCombo.get_value()],
                     {'contour':1,'vector':2, 'contour+vector':3}[self.typCombo.get_value()],
                 'line_labels':
-                    {'On':True,'On--':True,'Off':False}[self.linCombo.get_value()],
-                'negative_linestyle':
-                    {'On':None,'Off':None,'On--':1}[self.linCombo.get_value()],
+                    {'On':True,'Off':False}[self.labCombo.get_value()],
+                #'negative_linestyle':
+                #    {'On':None,'Off':None,'On--':1}[self.linCombo.get_value()],
                 'colorbar':
                     {'On':1,'Off':None,'On-X':1,'On-Y':1}[self.cbarCombo.get_value()],
                 'colorbar_orientation':
                     #{'Off':None,'On':None,'On-X':'horizontal','On-Y':'vertical'}
                     {'On':'horizontal','Off':None,'On-X':'horizontal','On-Y':'vertical'}
                         [self.cbarCombo.get_value()],
-                'blockfill':
-                    {'lines':None,'filled':None,'block':1}[self.conCombo.get_value()],
-                'lines':
-                    {'lines':True,'filled':True,'block':None}[self.conCombo.get_value()],
-                'fill':
-                    {'lines':None,'filled':True,'block':None}[self.conCombo.get_value()],
+                'contour_style': 
+                        {'Filled':1,'Blockfill':2,'None':3}[self.conCombo.get_value()],
+                'contour_line': 
+                        {'On':1,'Off':2,'Negative dashed':3}[self.lineCombo.get_value()],
+
+                #'blockfill': 
+                #        {'contour_style':3}[self.conCombo.get_value()],
+                #'blockfill with lines': 
+                #        {'contour_style':4}[self.conCombo.get_value()],
+                #'lines': 
+                #        {'contour_style':5}[self.conCombo.get_value()],
+                #'lines with negative dashed': 
+                #        {'contour_style':6}[self.conCombo.get_value()],
+                #'blockfill':
+                #    {'lines':None,'filled':None,'block':1}[self.conCombo.get_value()],
+                #'lines':
+                #    {'lines':True,'filled':True,'block':None}[self.conCombo.get_value()],
+                #'lines ':
+                #    {'lines with dashed negative':True,'filled':True,'block':None,'negative_linestyle':True}[self.conCombo.get_value()],
+                #'fill':
+                #    {'lines':None,'filled':True,'block':None}[self.conCombo.get_value()],
                 'xlog':
                     {'Normal':None,'log-x':True,'log-y':None,'log-xy':True}
                         [self.axeCombo.get_value()],
@@ -2537,6 +2812,23 @@ class Config_contour_levels:
     def set_levs_manual(self, widget):
         plotvars.levs_manual=self.levs_manual.get_text()
 
+
+    def levs_help(self, widget):
+        helpstr='<T>Contour level options\n\
+        Contour levels are initially set automatically based on the range of the field and split into \
+        reasonable contour levels. If a region of the field is chosen for contouring then the range of \
+        the full field is still used.\
+        \n\
+        <H>Setting contour levels\r\
+        When making plots that compare data click on the evenly or unevenly spaced levels tick boxes\
+        and set the as appropriate.  Uneven levels must be separated by spaces and ascend in value.\
+        \n\
+        <H>Colorbar extensions\r\
+        Colorbar extensions are a way of extendind the contours to cover all the data at the ends of the\
+        contour range. Click on the colorbar extension tick boxes as appropriate if these are bot required.\
+        \n'
+        CFview_help(helpstr, helpstr)
+
     def levs_reset(self, widget):
 
         self.toggle_levs_set.set_active(False)
@@ -2613,25 +2905,25 @@ class Config_contour_levels:
         #Levels - set up labels and inputs
         levs_label_min=gtk.Label("Min:")
         levs_min = gtk.Entry()
-        levs_min.set_width_chars(8)
+        levs_min.set_width_chars(5)
         levs_min.set_text(plotvars.levs_min)
         levs_label_max=gtk.Label("Max:")
         levs_max = gtk.Entry()
-        levs_max.set_width_chars(8)
+        levs_max.set_width_chars(5)
         levs_max.set_text(plotvars.levs_max)
         levs_label_step=gtk.Label("Step:")
         levs_step = gtk.Entry()
-        levs_step.set_width_chars(8)
+        levs_step.set_width_chars(5)
         levs_step.set_text(plotvars.levs_step)
 
 
         #Pack the widgets
-        levels_hbox.pack_start(levs_label_min)
-        levels_hbox.pack_start(levs_min)
-        levels_hbox.pack_start(levs_label_max)
-        levels_hbox.pack_start(levs_max)
-        levels_hbox.pack_start(levs_label_step)
-        levels_hbox.pack_start(levs_step)
+        levels_hbox.pack_start(levs_label_min, padding=5, expand=False)
+        levels_hbox.pack_start(levs_min, padding=5, expand=False)
+        levels_hbox.pack_start(levs_label_max, padding=20, expand=False)
+        levels_hbox.pack_start(levs_max, padding=0, expand=False)
+        levels_hbox.pack_start(levs_label_step, padding=20, expand=False)
+        levels_hbox.pack_start(levs_step, padding=0, expand=False)
         levels_hbox.set_sensitive(False)
 
         #Show the widgets
@@ -2658,7 +2950,7 @@ class Config_contour_levels:
         vbox.add(levels_hbox2)
         levs_label_manual=gtk.Label("Ascending values separated by spaces")
         levs_manual = gtk.Entry()
-        levs_manual.set_width_chars(8)
+        levs_manual.set_width_chars(25)
         levs_manual.set_text(plotvars.levs_manual)
 
         separator3 = gtk.HSeparator()
@@ -2667,9 +2959,9 @@ class Config_contour_levels:
 
         levels_manual_box.pack_start(toggle_levs_manual_set, True, True, 0)
         toggle_levs_manual_set.set_active(False)
-        levels_hbox2.pack_start(levs_label_manual)
-        levels_hbox2.pack_start(levs_manual)
-        levels_hbox2.set_sensitive(False);
+        levels_hbox2.pack_start(levs_label_manual, padding=5, expand=False)
+        levels_hbox2.pack_start(levs_manual, padding=5, expand=False)
+        levels_hbox2.set_sensitive(False)
 
 
         #Show the widgets
@@ -2689,10 +2981,12 @@ class Config_contour_levels:
         ###########################
         #Colorbar extension toggles
         ###########################
-
+        hbox_extension_label=gtk.HBox()
+        hbox_extension_label.show()
+        vbox.add(hbox_extension_label)
         extension_text=gtk.Label("Colorbar extensions - extend contours to cover all the data")
         extension_text.show()
-        vbox.add(extension_text)
+        hbox_extension_label.pack_start(extension_text, padding=5, expand=False)
 
         hbox3=gtk.HBox()
         hbox3.show()
@@ -2727,6 +3021,13 @@ class Config_contour_levels:
         button_reset.set_flags(gtk.CAN_DEFAULT)
         button_reset.grab_default()
         button_reset.show()
+
+        button_help = gtk.Button("help")
+        button_help.connect("clicked", self.levs_help)
+        box2.pack_start(button_help, True, True, 0)
+        button_help.set_flags(gtk.CAN_DEFAULT)
+        button_help.grab_default()
+        button_help.show()
 
         button_close = gtk.Button("close")
         button_close.connect("clicked", self.close_application)
@@ -2913,6 +3214,29 @@ class Config_map_settings:
         plotvars.continent_color=self.continent_color.get_text()
 
 
+    def map_help(self, widget):
+        helpstr='<T>Map options\n\
+        <H>Cylindrical projection\r\
+        The default map projection is the cylindrical equidistant projection with the limits \
+        of -180 to 180 degrees in longitude and -90 to 90 degreesin latitude.  Change these as \
+        appropriate to focus the plot onto the area of interest.\n\
+        <H>Polar stereographic plots\r\
+        Polar plots are focussed on either the north or south pole.  The bounding latitude is \
+        the edge of the viewable latitudes and is set to the equator by default.  The centre of \
+        the map domain is where the map is centred.  By default this is 0 degrees which is the \
+        Greenwich meridian in the case of the north pole.  For the South Pole plot thie is usually\
+        changed ot 180 degrees.\n\
+        <H>Map resolution\r\
+        The map resolution is set to a default of Crude.  Higher resolutions take more time to plot\
+        with Full taking several minutes to plot.\n\
+        <H>Continent color and thickness\r\
+        These default to 1.5 and k is black.  Change these as appropriate. Matplotlib named colors\
+        can be seen using the following Python code\n\
+        import matplotlib\r\
+        for name in matplotlib.colors.cnames.iteritems(): print(name)\n\
+        \n'
+        CFview_help(helpstr, helpstr)
+
     def map_reset(self, widget):
         self.toggle_cylin.set_active(True)
         self.cylin_hbox1.set_sensitive(True)
@@ -2942,8 +3266,8 @@ class Config_map_settings:
         self.toggle_high.set_active(False)
         self.toggle_full.set_active(False)
         self.toggle_none.set_active(False)
-        plotvars.continent_color='k'
-        self.continent_color.set_text('k')
+        plotvars.continent_color='black'
+        self.continent_color.set_text('black')
         plotvars.continent_thickness='1.5'
         self.continent_thickness.set_text('1.5')
 
@@ -2986,32 +3310,32 @@ class Config_map_settings:
         #Levels - set up labels and inputs
         lonmin_label=gtk.Label("Lonmin:")
         lonmin = gtk.Entry()
-        lonmin.set_width_chars(8)
+        lonmin.set_width_chars(4)
         lonmin.set_text(plotvars.lonmin)
         lonmax_label=gtk.Label("Lonmax:")
         lonmax = gtk.Entry()
-        lonmax.set_width_chars(8)
+        lonmax.set_width_chars(4)
         lonmax.set_text(plotvars.lonmax)
         latmin_label=gtk.Label("Latmin:")
         latmin = gtk.Entry()
-        latmin.set_width_chars(8)
+        latmin.set_width_chars(4)
         latmin.set_text(plotvars.latmin)
         latmax_label=gtk.Label("Latmax:")
         latmax = gtk.Entry()
-        latmax.set_width_chars(8)
+        latmax.set_width_chars(4)
         latmax.set_text(plotvars.latmax)
 
 
         #Pack the widgets
-        cylin_hbox1.pack_start(lonmin_label)
-        cylin_hbox1.pack_start(lonmin)
-        cylin_hbox1.pack_start(lonmax_label)
-        cylin_hbox1.pack_start(lonmax)
+        cylin_hbox1.pack_start(lonmin_label, padding=5, expand=False)
+        cylin_hbox1.pack_start(lonmin, padding=45,expand=False)
+        cylin_hbox1.pack_start(lonmax_label, padding=5, expand=False)
+        cylin_hbox1.pack_start(lonmax, padding=51,expand=False)
         cylin_hbox1.set_sensitive(True)
-        cylin_hbox2.pack_start(latmin_label)
-        cylin_hbox2.pack_start(latmin)
-        cylin_hbox2.pack_start(latmax_label)
-        cylin_hbox2.pack_start(latmax)
+        cylin_hbox2.pack_start(latmin_label, padding=5, expand=False)
+        cylin_hbox2.pack_start(latmin, padding=50,expand=False)
+        cylin_hbox2.pack_start(latmax_label, padding=5, expand=False)
+        cylin_hbox2.pack_start(latmax, padding=50,expand=False)
         cylin_hbox2.set_sensitive(True)
 
 
@@ -3032,9 +3356,12 @@ class Config_map_settings:
         ###############################
         #Polar stereographic projection
         ###############################
+        polar_label_hbox=gtk.HBox()
+        polar_label_hbox.show()
+        vbox.add(polar_label_hbox)
         polar_label=gtk.Label("Polar stereographic projection")
         polar_label.show()
-        vbox.add(polar_label)
+        polar_label_hbox.pack_start(polar_label, padding=5, expand=False)
 
 
         #Tick box for north and south poles
@@ -3062,16 +3389,16 @@ class Config_map_settings:
         #Bounding latitude and centre of plot - set up labels and inputs        
         boundinglat_label=gtk.Label("Bounding latitude - edge of the viewable latitudes:")
         boundinglat = gtk.Entry()
-        boundinglat.set_width_chars(8)
+        boundinglat.set_width_chars(4)
         boundinglat.set_text(plotvars.boundinglat)
-        polar_hbox1.pack_start(boundinglat_label)
-        polar_hbox1.pack_start(boundinglat)
+        polar_hbox1.pack_start(boundinglat_label, padding=5, expand=False)
+        polar_hbox1.pack_start(boundinglat, padding=50,expand=False)
         lon_0_label=gtk.Label("Centre of map domain:")
         lon_0 = gtk.Entry()
-        lon_0.set_width_chars(8)
+        lon_0.set_width_chars(4)
         lon_0.set_text(plotvars.lon_0)
-        polar_hbox2.pack_start(lon_0_label)
-        polar_hbox2.pack_start(lon_0)
+        polar_hbox2.pack_start(lon_0_label, padding=5, expand=False)
+        polar_hbox2.pack_start(lon_0, padding=220,expand=False)
 
         separator2 = gtk.HSeparator()
         vbox.add(separator2)
@@ -3100,10 +3427,13 @@ class Config_map_settings:
 
         ###############
         #Map resolution
-        ###############
+        ############### 
+        resolution_label_hbox=gtk.HBox()
+        resolution_label_hbox.show()
+        vbox.add(resolution_label_hbox)
         resolution_label=gtk.Label("Map resolution")
         resolution_label.show()
-        vbox.add(resolution_label)
+        resolution_label_hbox.pack_start(resolution_label, padding=5, expand=False)
 
         #resolution_hbox1 and resolution_hbox2 - horizontal boxes for resolution setting
         resolution_hbox1=gtk.HBox()
@@ -3116,33 +3446,33 @@ class Config_map_settings:
         toggle_crude = gtk.CheckButton("Crude")
         toggle_crude.set_active(True)
         toggle_crude.show()
-        resolution_hbox1.pack_start(toggle_crude)
+        resolution_hbox1.pack_start(toggle_crude, padding=1, expand=False)
 
         toggle_low = gtk.CheckButton("Low")
         toggle_low.set_active(False)
         toggle_low.show()
-        resolution_hbox1.pack_start(toggle_low)
+        resolution_hbox1.pack_start(toggle_low, padding=20, expand=False)
 
         toggle_intermediate = gtk.CheckButton("Intermediate")
         toggle_intermediate.set_active(False)
         toggle_intermediate.show()
-        resolution_hbox1.pack_start(toggle_intermediate)
+        resolution_hbox1.pack_start(toggle_intermediate, padding=20, expand=False)
 
         toggle_high = gtk.CheckButton("High")
         toggle_high.set_active(False)
         toggle_high.show()
-        resolution_hbox2.pack_start(toggle_high)
+        resolution_hbox2.pack_start(toggle_high, padding=1, expand=False)
 
         toggle_full = gtk.CheckButton("Full")
         toggle_full.set_active(False)
         toggle_full.show()
-        resolution_hbox2.pack_start(toggle_full)
+        resolution_hbox2.pack_start(toggle_full, padding=30, expand=False)
 
 
         toggle_none = gtk.CheckButton("None")
         toggle_none.set_active(False)
         toggle_none.show()
-        resolution_hbox2.pack_start(toggle_none)
+        resolution_hbox2.pack_start(toggle_none, padding=14, expand=False)
 
         separator4 = gtk.HSeparator()
         vbox.add(separator4)
@@ -3163,17 +3493,17 @@ class Config_map_settings:
         #Entry label and text
         continent_thickness_label=gtk.Label("Continent thickness:")
         continent_thickness = gtk.Entry()
-        continent_thickness.set_width_chars(8)
+        continent_thickness.set_width_chars(5)
         continent_thickness.set_text(plotvars.continent_thickness)
-        continent_hbox1.pack_start(continent_thickness_label)
-        continent_hbox1.pack_start(continent_thickness)
+        continent_hbox1.pack_start(continent_thickness_label, padding=5, expand=False)
+        continent_hbox1.pack_start(continent_thickness, padding=80, expand=False)
 
         continent_color_label=gtk.Label("Continent color:")
         continent_color = gtk.Entry()
-        continent_color.set_width_chars(8)
+        continent_color.set_width_chars(7)
         continent_color.set_text(plotvars.continent_color)
-        continent_hbox2.pack_start(continent_color_label)
-        continent_hbox2.pack_start(continent_color)
+        continent_hbox2.pack_start(continent_color_label, padding=5, expand=False)
+        continent_hbox2.pack_start(continent_color, padding=107, expand=False)
 
 
         #Show the widgets
@@ -3199,6 +3529,13 @@ class Config_map_settings:
         button_reset.set_flags(gtk.CAN_DEFAULT)
         button_reset.grab_default()
         button_reset.show()
+
+        button_help = gtk.Button("help")
+        button_help.connect("clicked", self.map_help)
+        box2.pack_start(button_help, True, True, 0)
+        button_help.set_flags(gtk.CAN_DEFAULT)
+        button_help.grab_default()
+        button_help.show()
 
         button_close = gtk.Button("close")
         button_close.connect("clicked", self.close_application)
@@ -3267,16 +3604,712 @@ class Config_map_settings:
         self.map_window.show()
 
 
+class Config_vectors:
+    ''' Configure vectors via a dialog popup '''
 
+    def close_application(self, widget, data=None):
+        self.map_window.destroy()
+
+    def auto(self, widget):
+        if self.toggle_vect_auto.get_active():
+            plotvars.vect_auto_set=True
+            self.vect_hbox1.set_sensitive(False)
+            self.vect_hbox2.set_sensitive(False)
+        else:
+            plotvars.vect_auto_set=False
+            self.vect_hbox1.set_sensitive(True)
+            self.vect_hbox2.set_sensitive(True)
+
+    def toggle_stride(self, widget):
+        if self.toggle_vect_stride.get_active():
+            self.toggle_vect_pts.set_active(False)
+            plotvars.vect_stride_set=True
+            plotvars.vect_stride_set=True
+            plotvars.vect_pts_set=False
+            self.vect_pts.set_sensitive(False)
+            self.vect_stride.set_sensitive(True)
+        else:
+            plotvars.vect_auto_set=True
+            plotvars.vect_stride_set=False
+            plotvars.vect_pts_set=False
+            self.vect_stride.set_sensitive(False)
+
+
+    def toggle_pts(self, widget):
+        if self.toggle_vect_pts.get_active():
+            self.toggle_vect_stride.set_active(False)
+            self.vect_pts.set_sensitive(True)
+            plotvars.vect_stride_set=False
+            plotvars.vect_pts_set=True
+            self.vect_stride.set_sensitive(False)
+        else:
+            plotvars.vect_auto_set=True
+            plotvars.vect_stride_set=False
+            plotvars.vect_pts_set=False
+            self.vect_pts.set_sensitive(False)
+
+
+
+    def set_vect_length(self, widget):
+        plotvars.vect_length=self.vect_length.get_text()
+
+    def set_vect_scale(self, widget):
+        plotvars.vect_scale=self.vect_scale.get_text()
+
+    def set_vect_stride(self, widget):
+        plotvars.vect_stride=self.vect_stride.get_text()
+        self.vect_pts.set_sensitive(False)
+
+    def set_vect_pts(self, widget):
+        plotvars.vect_pts=self.vect_pts.get_text()
+        self.vect_stride.set_sensitive(False)
+
+    def vect_reset(self, widget):
+        plotvars.vect_length='10'
+        plotvars.scale='100'
+        plotvars.vect_stride='2'
+        plotvars.scale='30'
+        plotvars.vect_auto_set=True
+        plotvars.vect_stride_set=False
+        plotvars.vect_pts_set=False
+        self.toggle_vect_auto.set_active(True)
+        self.vect_hbox1.set_sensitive(False)
+        self.vect_hbox2.set_sensitive(False)
+        self.vect_length.set_text('10')
+        self.vect_scale.set_text('100')
+        self.vect_stride.set_text('1')
+        self.vect_pts.set_text('30')
+        self.toggle_vect_stride.set_active(False)
+        self.toggle_vect_pts.set_active(False)
+        self.vect_stride.set_sensitive(False)
+        self.vect_pts.set_sensitive(False)
+
+
+    def vect_help(self, widget):
+        helpstr='<T>Vector options\
+        \n\
+        Vectors will be automatically drawn based on the reference vector being half of the maximum vector length.\
+        \n\
+        <H>Length and scale\r\
+        When comparing vector plots a common vector length is needed.  Click on the Automatic vectors tick box to \
+        reveal the vector length and scale input boxes. Smaller values of scale give a longer vector length.\
+        \n\
+        If different vector lengths and scales are required in the X and Y directions then enter two values in the \
+        length and scale inputs separated by a space.\
+        \n\
+        <H>Vector spacing\r\
+        Vectors can be spaced either by:\r\
+        striding plotted vectors with a stride of 2 plotting every other vector\r\
+        or:\r\
+        Interpolating the data to a number of vectors in x and y.  An input of 30 in this case will give 30 vectors \
+        in x and y.\
+        \n\
+        The vector spacing inputs will take two space separated values to give different strides or interpolations in x and y.\n\
+        \n'
+        CFview_help(helpstr, helpstr)
+
+
+
+    def __init__(self, widget):
+        # create a new window
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_usize(500, 500)
+        window.set_title("Vector options")
+
+        vbox = gtk.VBox(gtk.FALSE, 0)
+        window.add(vbox)
+        vbox.show()
+
+        #Tick auto vectors
+        toggle_vect_auto = gtk.CheckButton("Automatic vectors")
+        toggle_vect_auto.set_active(True)
+        vbox.add(toggle_vect_auto)
+        toggle_vect_auto.show()
+        separator1 = gtk.HSeparator()
+        vbox.add(separator1)
+        separator1.show()
+
+        ########################
+        #Length, scale and label
+        ######################## 
+        vector_label_hbox1=gtk.HBox()
+        vector_label_hbox1.show()
+        vbox.add(vector_label_hbox1)
+        vector_label1=gtk.Label("Vector length, scale and label")
+        vector_label1.show()
+        vector_label_hbox1.pack_start(vector_label1, padding=5, expand=False)
+
+
+        # vect_hbox1 and vect_hbox2 - horizontal boxes for main vector attibutes
+        vect_hbox1=gtk.HBox()
+        vect_hbox1.show()
+        vbox.add(vect_hbox1)
+        vect_hbox2=gtk.HBox()
+        vect_hbox2.show()
+        vbox.add(vect_hbox2)
+
+                            
+        #Vector length and scale - set up labels and inputs
+        vect_length_label=gtk.Label("Reference vector length:")
+        vect_length = gtk.Entry()
+        vect_length.set_width_chars(4)
+        vect_length.set_text(plotvars.vect_length)
+        vect_scale_label=gtk.Label("Scale (smaller is longer):")
+        vect_scale = gtk.Entry()
+        vect_scale.set_width_chars(4)
+        vect_scale.set_text(plotvars.vect_scale)
+
+
+        #Pack the widgets
+        vect_hbox1.pack_start(vect_length_label, padding=5, expand=False)
+        vect_hbox1.pack_start(vect_length, padding=5, expand=False)
+        vect_hbox2.pack_start(vect_scale_label, padding=5, expand=False)
+        vect_hbox2.pack_start(vect_scale, padding=5, expand=False)
+        vect_hbox1.set_sensitive(False)
+        vect_hbox2.set_sensitive(False)
+
+
+        #Show the widgets
+        vect_length_label.show()
+        vect_length.show()
+        vect_scale_label.show()
+        vect_scale.show()
+
+
+        #Horizontal separator
+        separator2 = gtk.HSeparator()
+        vbox.add(separator2)
+        separator2.show()
+
+
+
+        #########################
+        #Stride and interpolation
+        #########################
+        vector_label_hbox2=gtk.HBox()
+        vector_label_hbox2.show()
+        vbox.add(vector_label_hbox2)
+        vector_label2=gtk.Label("Vector spacing")
+        vector_label2.show()
+        vector_label_hbox2.pack_start(vector_label2, padding=5, expand=False)
+
+        # vect_hbox3 and vect_hbox4 - horizontal boxes for main vector attibutes
+        vect_hbox3=gtk.HBox()
+        vect_hbox3.show()
+        vbox.add(vect_hbox3)
+        vect_hbox4=gtk.HBox()
+        vect_hbox4.show()
+        vbox.add(vect_hbox4)
+
+                            
+        #Vector stride and interpolation - set up labels and inputs
+        toggle_vect_stride = gtk.CheckButton("Stride between vectors")
+        toggle_vect_stride.set_active(False)
+        vect_stride = gtk.Entry()
+        vect_stride.set_width_chars(3)
+        vect_stride.set_text(plotvars.vect_stride)
+        vect_stride.set_sensitive(False)
+        toggle_vect_pts = gtk.CheckButton("Interpolation - number of vectors in x and y")
+        toggle_vect_pts.set_active(False)
+        vect_pts = gtk.Entry()
+        vect_pts.set_width_chars(3)
+        vect_pts.set_text(plotvars.vect_pts)
+        vect_pts.set_sensitive(False)
+
+
+        #Pack the widgets
+        vect_hbox3.pack_start(toggle_vect_stride, padding=5, expand=False)
+        vect_hbox3.pack_start(vect_stride, padding=5, expand=False)
+        vect_hbox4.pack_start(toggle_vect_pts, padding=5, expand=False)
+        vect_hbox4.pack_start(vect_pts, padding=5, expand=False)
+
+
+        #Show the widgets
+        toggle_vect_stride.show()
+        vect_stride.show()
+        toggle_vect_pts.show()
+        vect_pts.show()
+
+
+        #Horizontal separator
+        separator3 = gtk.HSeparator()
+        vbox.add(separator3)
+        separator3.show()
+
+
+
+                            
+
+        #######################################
+        #Box to contain reset and close buttons
+        #######################################
+        box2 = gtk.HBox(False, 10)
+        box2.set_border_width(10)
+        box2.show()
+        vbox.pack_end(box2, False, True, 0)
+
+        button_reset = gtk.Button("reset")
+        button_reset.connect("clicked", self.vect_reset)
+        box2.pack_start(button_reset, True, True, 0)
+        button_reset.set_flags(gtk.CAN_DEFAULT)
+        button_reset.grab_default()
+        button_reset.show()
+
+        button_help = gtk.Button("help")
+        button_help.connect("clicked", self.vect_help)
+        box2.pack_start(button_help, True, True, 0)
+        button_help.set_flags(gtk.CAN_DEFAULT)
+        button_help.grab_default()
+        button_help.show()
+
+        button_close = gtk.Button("close")
+        button_close.connect("clicked", self.close_application)
+        box2.pack_start(button_close, True, True, 0)
+        button_close.set_flags(gtk.CAN_DEFAULT)
+        button_close.grab_default()
+        button_close.show()
+
+
+        ####################
+        #Connect the widgets
+        ####################
+        toggle_vect_auto.connect("toggled", self.auto)
+        toggle_vect_stride.connect("toggled", self.toggle_stride)
+        toggle_vect_pts.connect("toggled", self.toggle_pts)
+        vect_length.connect("changed", self.set_vect_length)
+        vect_scale.connect("changed", self.set_vect_scale)
+        vect_stride.connect("changed", self.set_vect_stride)
+        vect_pts.connect("changed", self.set_vect_pts)
+
+
+        ###############################
+        #Populate self with the widgets
+        ###############################
+        self.toggle_vect_auto=toggle_vect_auto
+        self.toggle_vect_stride=toggle_vect_stride
+        self.toggle_vect_pts=toggle_vect_pts
+        self.vect_hbox1=vect_hbox1
+        self.vect_hbox2=vect_hbox2
+        self.vect_length=vect_length
+        self.vect_scale=vect_scale
+        self.vect_stride=vect_stride
+        self.vect_pts=vect_pts
+
+        self.map_window=window
+        self.map_window.show()
 
 
 class Config_color_scales:
     ''' Configure color scales via a dialog popup '''
-    print 'In config_color_settings'
 
-class Config_vectors:
-    ''' Configure vectors via a dialog popup '''
-    print 'In config_vectors'
+    def close_application(self, widget, data=None):
+        self.map_window.destroy()
+
+    def cscale_auto(self, widget):
+        if self.toggle_cscale_auto.get_active():
+            plotvars.cscale_auto_set=True
+            self.toggle_cscale_reverse.set_sensitive(False)
+            self.cscale_hbox1.set_sensitive(False)
+            self.cscale_hbox2.set_sensitive(False)
+            self.cscale_hbox3.set_sensitive(False)
+            self.cscale_hbox4.set_sensitive(False)
+	    self.cscale_label1.set_sensitive(False)
+            self.cscale_label2.set_sensitive(False)
+    	    self.cscale_label3.set_sensitive(False)
+	    self.cscale_label4.set_sensitive(False)
+	    self.cscale_label5.set_sensitive(False)
+	    self.cscale_label6.set_sensitive(False)
+	    self.cscale_label7.set_sensitive(False)
+            for scale in cscales.cscales:
+                exec('self.hbox_'+scale+'.set_sensitive(False)')
+        else:
+            plotvars.cscale_auto_set=False
+            self.toggle_cscale_reverse.set_sensitive(True)
+            self.cscale_hbox1.set_sensitive(True)
+            self.cscale_hbox2.set_sensitive(True)
+            self.cscale_hbox3.set_sensitive(True)
+            self.cscale_hbox4.set_sensitive(True)
+	    self.cscale_label1.set_sensitive(True)
+            self.cscale_label2.set_sensitive(True)
+    	    self.cscale_label3.set_sensitive(True)
+	    self.cscale_label4.set_sensitive(True)
+	    self.cscale_label5.set_sensitive(True)
+	    self.cscale_label6.set_sensitive(True)
+	    self.cscale_label7.set_sensitive(True)	    
+            for scale in cscales.cscales:
+                exec('self.hbox_'+scale+'.set_sensitive(True)')
+            exec('self.toggle_'+plotvars.cscale+'.set_active(True)')
+
+    def cscale_reverse(self, widget):
+        if self.toggle_cscale_reverse.get_active():
+            plotvars.cscale_reverse_set=True
+        else:
+            plotvars.cscale_reverse_set=False
+
+    def set_white(self, widget):
+        plotvars.cscale_white=self.set_white.get_text()
+
+    def set_ncols(self, widget):
+        plotvars.cscale_ncols=self.set_ncols.get_text()
+
+    def set_above(self, widget):
+        plotvars.cscale_above=self.set_above.get_text()
+
+    def set_below(self, widget):
+        plotvars.cscale_below=self.set_below.get_text()
+
+    def cscale_set(self, widget, data=None):
+        #turn off previous selection
+        exec('self.toggle_'+plotvars.cscale+'.set_active(False)')
+        plotvars.cscale=data
+
+    def cscale_reset(self, widget):
+        plotvars.cscale_auto_set=True
+        plotvars.cscale_reverse_set=False
+        plotvars.cscale_white=''
+        plotvars.cscale_ncols=''
+        plotvars.cscale_above=''
+        plotvars.cscale_below=''
+        exec('self.toggle_'+plotvars.cscale+'.set_active(False)')
+        plotvars.cscale='viridis'
+        self.toggle_cscale_auto.set_active(True)
+        self.toggle_cscale_reverse.set_active(False)
+        self.set_white.set_text('')
+        self.set_ncols.set_text('')
+        self.set_above.set_text('')
+        self.set_below.set_text('')
+
+
+    def cscale_help(self, widget):
+        helpstr='<T>Colour scale options\
+        \n\
+        With the automatic colour scale option ticked cfview selects the colour scale as:\n\
+        viridis - fields that don\'t span zero - temperature in Kelvin etc.  This is a perceptually\
+        neutral colour scale that doesn\'t draw the eye to any part of the scale and is suitable for colour\
+        blind viewers.\r\
+        \r\
+        scale1 - fields that span zero - zonal wind etc.  This is a blue - red scale suitable for\
+        contour plots of fields that have a zero in their contour levels.  The scale is automatically\
+        adjusted so that blue colours are below zero and red colours above.\r\
+	\n\
+        <H>Selecting a colour scale\r\
+        When a different colour scale is selected the scale will be automatically adjusted\
+        to fit the number of contour levels.\
+	\n\
+        <H>Selecting the number of colours\r\
+        Set the number of colours in the scale to gain more control over the colour sca;e.  Once this is done then\
+        the white indicies and scale midpoint options become useful to allow more precise\
+        scale manipulation.  Set a number of white colour indicies by leaving a space between the indices required.\
+        \n'
+        CFview_help(helpstr, helpstr)
+
+    def __init__(self, widget):
+        import matplotlib
+        import matplotlib.pyplot as plot
+
+        # create a new window
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_usize(800, 850)
+        window.set_title("Colour scale options")
+
+        vbox = gtk.VBox(gtk.FALSE, 0)
+        window.add(vbox)
+        vbox.show()
+        window.show()
+
+        #Tick auto vectors
+        toggle_cscale_auto = gtk.CheckButton("Automatic colour scale")
+        toggle_cscale_auto.set_active(True)
+        vbox.add(toggle_cscale_auto)
+        toggle_cscale_auto.show()
+        separator1 = gtk.HSeparator()
+        vbox.add(separator1)
+        separator1.show()
+
+
+        #Tick for reverse
+        toggle_cscale_reverse = gtk.CheckButton("Reverse colour scale")
+        toggle_cscale_reverse.set_active(False)
+        toggle_cscale_reverse.set_sensitive(False)
+        vbox.add(toggle_cscale_reverse)
+        toggle_cscale_reverse.show()
+
+
+        #HBoxes for white, ncols, above and below
+        cscale_hbox1=gtk.HBox()
+        cscale_hbox1.show()
+        vbox.add(cscale_hbox1)
+        cscale_hbox1.set_sensitive(False)
+        cscale_hbox2=gtk.HBox()
+        cscale_hbox2.show()
+        vbox.add(cscale_hbox2)
+        cscale_hbox2.set_sensitive(False)
+        cscale_hbox3=gtk.HBox()
+        cscale_hbox3.show()
+        vbox.add(cscale_hbox3)
+        cscale_hbox3.set_sensitive(False)
+        cscale_hbox4=gtk.HBox()
+        cscale_hbox4.show()
+        vbox.add(cscale_hbox4)
+        cscale_hbox4.set_sensitive(False)
+        separator2 = gtk.HSeparator()
+        vbox.add(separator2)
+        separator2.show()
+
+        #labels and input boxes
+        cscale_ncols_label=gtk.Label("Number of colours in the scale")
+	cscale_ncols_label.set_alignment(xalign=0.05, yalign=0.5) 
+        cscale_ncols = gtk.Entry()
+        cscale_ncols.set_width_chars(3)
+        cscale_ncols.set_text(plotvars.cscale_ncols)
+        cscale_ncols.set_sensitive(True)
+        cscale_white_label=gtk.Label("Set these colour indicies to white")
+	cscale_white_label.set_alignment(xalign=0.05, yalign=0.5) 
+        cscale_white = gtk.Entry()
+        cscale_white.set_width_chars(8)
+        cscale_white.set_text(plotvars.cscale_white)
+        cscale_white.set_sensitive(True)
+        cscale_above_label=gtk.Label("Number of colours above the scale midpoint")
+	cscale_above_label.set_alignment(xalign=0.05, yalign=0.5) 
+        cscale_above = gtk.Entry()
+        cscale_above.set_width_chars(3)
+        cscale_above.set_text(plotvars.cscale_above)
+        cscale_above.set_sensitive(True)
+        cscale_below_label=gtk.Label("Number of colours below the scale midpoint")
+        cscale_below_label.set_alignment(xalign=0.05, yalign=0.5) 
+        cscale_below = gtk.Entry()
+        cscale_below.set_width_chars(3)
+        cscale_below.set_text(plotvars.cscale_below)
+        cscale_below.set_sensitive(True)
+
+        #Show the widgets
+        cscale_white_label.show()
+        cscale_white.show()
+        cscale_ncols_label.show()
+        cscale_ncols.show()
+        cscale_above_label.show()
+        cscale_above.show()
+        cscale_below_label.show()
+        cscale_below.show()
+
+        #Pack the widgets 
+        cscale_hbox1.pack_start(cscale_ncols_label, padding=5, expand=False)
+        cscale_hbox1.pack_start(cscale_ncols, padding=140,expand=False)
+        cscale_hbox2.pack_start(cscale_white_label, padding=5, expand=False)
+        cscale_hbox2.pack_start(cscale_white, padding=125,expand=False)
+        cscale_hbox3.pack_start(cscale_above_label, padding=5, expand=False)
+        cscale_hbox3.pack_start(cscale_above, padding=55,expand=False)
+        cscale_hbox4.pack_start(cscale_below_label, padding=5, expand=False)
+        cscale_hbox4.pack_start(cscale_below, padding=58,expand=False)
+
+
+        ##############
+        #Colour scales
+        ##############
+
+        #create a scrolled window and put a new vbox in it
+        sw = gtk.ScrolledWindow()
+        sw.set_usize(400, 500)
+        sw.set_border_width(10)	
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+        vbox.pack_start(sw, True, True, 0)
+        sw.show()
+
+        sw_vbox=gtk.VBox(gtk.FALSE, 0)
+        sw.add_with_viewport(sw_vbox)
+        sw_vbox.show()
+
+        #Generate xpm colour codes for up to 260 colours
+        #Maximum of 256 colours required
+        letters=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v',\
+                 'w','x','y','z']
+        codes=[]
+        for j in np.arange(10):
+            for i in np.arange(26):
+                codes.append(letters[j]+letters[i])
+
+        #Loop over the colour scales
+        for scale in cscales.cscales:
+		
+            #Add section labels
+            if scale == 'viridis': 	
+		cscale_label1=gtk.Label('Perceptually neutral colour scales')
+		cscale_label1.modify_font(pango.FontDescription("sans 16"))
+		cscale_label1.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label1.set_sensitive(False)
+                cscale_label1.show()
+                sw_vbox.add(cscale_label1)		
+            if scale == 'hotcold_18lev': 		
+		cscale_label2=gtk.Label('\nNCAR Command Language - MeteoSwiss colour maps')
+		cscale_label2.modify_font(pango.FontDescription("sans 16"))
+		cscale_label2.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label2.set_sensitive(False)
+                cscale_label2.show()
+                sw_vbox.add(cscale_label2)			
+            if scale == 'amwg': 	
+		cscale_label3=gtk.Label('\nNCAR Command Language - small color maps (<50 colours)')
+		cscale_label3.modify_font(pango.FontDescription("sans 16"))
+		cscale_label3.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label3.set_sensitive(False)
+                cscale_label3.show()
+                sw_vbox.add(cscale_label3)		
+            if scale == 'amwg256': 	
+		cscale_label4=gtk.Label('\nNCAR Command Language - large color maps (>50 colours)')
+		cscale_label4.modify_font(pango.FontDescription("sans 16"))
+		cscale_label4.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label4.set_sensitive(False)
+                cscale_label4.show()
+                sw_vbox.add(cscale_label4)			
+            if scale == 'StepSeq25': 	
+		cscale_label5=gtk.Label('\nNCAR Command Language - Enhanced to help with colour blindness')
+		cscale_label5.modify_font(pango.FontDescription("sans 16"))
+		cscale_label5.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label5.set_sensitive(False)
+                cscale_label5.show()
+                sw_vbox.add(cscale_label5)									
+            if scale == 'os250kmetres': 	
+		cscale_label6=gtk.Label('\nOrography/bathymetry colour scales')
+		cscale_label6.modify_font(pango.FontDescription("sans 16"))
+		cscale_label6.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label6.set_sensitive(False)
+                cscale_label6.show()
+                sw_vbox.add(cscale_label6)		
+            if scale == 'scale1': 	
+		cscale_label7=gtk.Label('\nIDL guide scales')
+		cscale_label7.modify_font(pango.FontDescription("sans 16"))
+		cscale_label7.set_alignment(xalign=0.0, yalign=0.0) 
+		cscale_label6.set_sensitive(False)
+                cscale_label7.show()
+                sw_vbox.add(cscale_label7)		
+						
+		
+		
+            #horizontal box for colour scales
+            exec('hbox_'+scale+'=gtk.HBox()')
+            exec('hbox_'+scale+'.show()')
+            exec('hbox_'+scale+'.set_sensitive(False)')
+            exec('sw_vbox.add(hbox_'+scale+')')
+
+            #Add toggle
+            exec('toggle_'+scale+" = gtk.CheckButton('"+scale+"')")
+            exec('toggle_'+scale+'.set_active(False)')
+            exec('toggle_'+scale+'.show()')
+            exec('hbox_'+scale+'.pack_start(toggle_'+scale+')')
+             
+            #Connect the widget
+            exec('toggle_'+scale+'.connect("toggled", self.cscale_set, "'+scale+'")')
+
+            #Populate self with the widgets
+            exec('self.toggle_'+scale+'=toggle_'+scale)
+            exec('self.hbox_'+scale+'=hbox_'+scale)
+
+
+            #Make the colour scales into images
+            #Create an xpm file 1 pixel high with one pixel per colour scale element
+            cscale=cfp.cscale(scale)
+            xpm_data=[str(len(cfp.plotvars.cs))+' 1 '+ str(len(cfp.plotvars.cs))+' 2']
+
+            npts=np.size(cfp.plotvars.cs)
+            for col in np.arange(npts):
+                xpm_data.append(codes[col]+' c '+cfp.plotvars.cs[col])
+
+            codes_inc=''
+            for col in np.arange(npts):
+                codes_inc=codes_inc+codes[col]
+
+            xpm_data.append(codes_inc)
+
+
+            #Load xpm_data into a pixmap
+            pixmap, mask = gtk.gdk.pixmap_create_from_xpm_d(window.window, None, xpm_data)
+
+            #Convert to a pixbuf
+            w,h = pixmap.get_size()
+            pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8, w, h)
+            pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(), 0, 0, 0, 0, w, h)
+
+            #Scale up to a larger image
+            pixbuf2=pixbuf.scale_simple(500, 15, gtk.gdk.INTERP_BILINEAR)
+            image = gtk.image_new_from_pixbuf(pixbuf2)
+            image.show()
+
+
+   	    button = gtk.Button()
+            button.props.relief = gtk.RELIEF_NONE
+            button.add(image)
+            button.set_alignment(1.0, 0.5)
+ 	    button.show() 
+            exec('hbox_'+scale+'.pack_start(button)')
+
+
+        #Set default scale to be viridis
+        toggle_viridis.set_active(True)
+
+
+        #######################################
+        #Box to contain reset and close buttons
+        #######################################
+        box2 = gtk.HBox(False, 10)
+        box2.set_border_width(10)
+        box2.show()
+        vbox.pack_end(box2, False, True, 0)
+
+        button_reset = gtk.Button("reset")
+        button_reset.connect("clicked", self.cscale_reset)
+        box2.pack_start(button_reset, True, True, 0)
+        button_reset.set_flags(gtk.CAN_DEFAULT)
+        button_reset.grab_default()
+        button_reset.show()
+
+        button_help = gtk.Button("help")
+        button_help.connect("clicked", self.cscale_help)
+        box2.pack_start(button_help, True, True, 0)
+        button_help.set_flags(gtk.CAN_DEFAULT)
+        button_help.grab_default()
+        button_help.show()
+
+        button_close = gtk.Button("close")
+        button_close.connect("clicked", self.close_application)
+        box2.pack_start(button_close, True, True, 0)
+        button_close.set_flags(gtk.CAN_DEFAULT)
+        button_close.grab_default()
+        button_close.show()
+
+
+        ####################
+        #Connect the widgets
+        ####################
+        toggle_cscale_auto.connect("toggled", self.cscale_auto)
+        toggle_cscale_reverse.connect("toggled", self.cscale_reverse)
+        cscale_white.connect("changed", self.set_white)
+        cscale_ncols.connect("changed", self.set_ncols)
+        cscale_above.connect("changed", self.set_above)
+        cscale_below.connect("changed", self.set_below)
+
+        ###############################
+        #Populate self with the widgets
+        ###############################
+        self.toggle_cscale_auto=toggle_cscale_auto
+        self.toggle_cscale_reverse=toggle_cscale_reverse
+        self.cscale_hbox1=cscale_hbox1
+        self.cscale_hbox2=cscale_hbox2
+        self.cscale_hbox3=cscale_hbox3
+        self.cscale_hbox4=cscale_hbox4
+        self.set_white=cscale_white
+        self.set_ncols=cscale_ncols
+        self.set_above=cscale_above
+        self.set_below=cscale_below
+	self.cscale_label1=cscale_label1
+	self.cscale_label2=cscale_label2
+	self.cscale_label3=cscale_label3
+	self.cscale_label4=cscale_label4
+	self.cscale_label5=cscale_label5
+	self.cscale_label6=cscale_label6
+        self.cscale_label7=cscale_label7
+
+        self.map_window=window
+        #self.map_window.show()
+
 
 class Config_reset_all:
     ''' Reset all the configuration settings back to the defaults '''
@@ -3291,6 +4324,92 @@ class Config_reset_all:
         plotvars.levs_extend_lower=True
         plotvars.levs_extend_upper=True
 
+
+
+class CFview_help: 
+    ''' Display help text '''
+    def close_application(self, widget):
+        #widget.destroy()
+        self.text_window.destroy()
+
+    def __init__(self, widget, helpstr):
+        window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        window.set_resizable(True)  
+        window.connect("destroy", self.close_application)
+
+
+        window.set_border_width(0)
+        window.set_size_request(700, 900)
+
+
+        box1 = gtk.VBox(False, 0)
+        window.add(box1)
+        box1.show()
+
+        box2 = gtk.VBox(False, 10)
+        box2.set_border_width(10)        
+        box1.pack_start(box2, True, True, 0)
+        box2.show()
+
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        textview = gtk.TextView()
+        textview.set_wrap_mode(gtk.WRAP_WORD)
+        textbuffer = textview.get_buffer()
+        sw.add(textview)
+        sw.show()
+        textview.show()
+
+        box2.pack_start(sw)               
+
+        hbox = gtk.HButtonBox()
+        hbox.set_size_request(200,100)
+        box2.pack_start(hbox, False, False, 0)
+        box2.set_size_request(200,100)
+        hbox.show()
+
+        vbox = gtk.VBox()
+        vbox.show()
+        hbox.pack_start(vbox, False, False, 0)
+
+        #Create tags using pango
+        title_tag = textbuffer.create_tag( "h", size_points=20, font="Helvetica", weight=pango.WEIGHT_BOLD) 
+        header_tag = textbuffer.create_tag( "tb", size_points=16, font="Helvetica", weight=pango.WEIGHT_BOLD) 
+        text_tag = textbuffer.create_tag( "t", size_points=14, font="Helvetica") 
+
+        #Set size of tabs
+        tab_size=14
+
+        #Add to text 
+        for lines in helpstr.splitlines(True):
+           #line=(lines.lstrip()).rstrip()
+           #Strip the extra spaces out of the line
+           line=' '.join(filter(None,lines.split(' ')))
+
+           position = textbuffer.get_end_iter()
+           if line[:3] == '<T>' : 
+               window.set_title(line[3:])
+               textbuffer.insert_with_tags( position, line[3:]+'\n', title_tag)
+           elif line[:3] == '<H>' : 
+               textbuffer.insert_with_tags( position, line[3:]+'\n', header_tag)
+           else:
+               textbuffer.insert_with_tags( position, line+'\n', text_tag)
+
+
+        box2 = gtk.VBox(False, 10)
+        box2.set_border_width(10)
+        box1.pack_start(box2, False, True, 0)
+        box2.show()
+
+        button = gtk.Button("close")
+        button.connect("clicked", self.close_application)
+        box2.pack_start(button, True, True, 0)
+        button.set_flags(gtk.CAN_DEFAULT)
+        button.grab_default()
+        button.show()
+
+        self.text_window=window
+        self.text_window.show()
 
 
 def main(filename):
