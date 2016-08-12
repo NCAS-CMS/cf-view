@@ -1,13 +1,12 @@
 #!/usr/bin/env python2.7
 
 #Imports section
-import pygtk
-import gtk
-import cf
+import gtk, pygtk
+import cf, cfplot as cfp
 import numpy as np
 import sys
-import cfplot as cfp
 import matplotlib.pyplot as plt
+import matplotlib
 import gtk, gobject, pango
 import unittest
 from collections import OrderedDict
@@ -20,7 +19,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.9.0'
+__version__='0.9.7'
 
 cfgPadding=5
 
@@ -63,6 +62,7 @@ class pvars(object):
       cscale_above='' - number of colours above the midpoint of the scale
       cscale_below='' - number of colours above the midpoint of the scale
       cscale='viridis' - default colour scale
+      invalid_input=Flase - flag for invalid diaglogue box input
    '''
    def __init__(self, **kwargs):
       '''Initialize a new Pvars instance'''
@@ -86,7 +86,8 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                vect_ufield='', vect_auto_set=True, vect_length='10', vect_scale='100',\
                vect_stride='1', vect_pts='30', vect_stride_set=False,vect_pts_set=False,\
                cscale_auto_set=True, cscale_reverse_set=False, cscale_white='',\
-               cscale_ncols='', cscale_above='', cscale_below='',cscale='viridis'\
+               cscale_ncols='', cscale_above='', cscale_below='',cscale='viridis',\
+               invalid_input=False\
                )
 
 cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
@@ -307,10 +308,7 @@ class arrayCombo(myCombo):
         if self.callback is not None:
             self.callback[0](self.callback[1],value)  
 
-################################################################################
-# EVERYTHING ABOVE IS gtk aware, but not cf aware
-# EVERYTHING BELOW is *both* gtk aware and cf aware
-################################################################################    
+
     
 def cfkeyvalue(f,p):
     ''' Utility method for making a pango string from a cf object <f> and 
@@ -513,14 +511,7 @@ class fieldSelector(guiFrame):
         ny=0
         nz=0
         nt=0
-        #if field.coord('X') is not None: nx=len(field.item('X').array)
-        #if field.coord('Y') is not None: ny=len(field.item('Y').array)
-        #if field.coord('T') is not None: nt=len(field.item('T').array)
 
-        #There can be multiple matches for a dimension.  In this case 
-        #if len(field.items('Z')) == 1: 
-        #    nz=len(field.item('Z').array)
-        #elif len(field.items('Z')) > 1: 
 
         #There can be multiple matches for a dimension as in a Z that has a match and
         #also a Z that has a dimension.  
@@ -584,9 +575,6 @@ class cfGrid(object):
         self.axes={}
         self.drange={}
         self.names={}
-        # FIXME, use CF grid information, not this ...
-        #order=['X','Y','Z','T']
-        #for k in order ...field.dim[k]
         self.shortNames={'dim0':'T','dim1':'Z','dim2':'Y','dim3':'X'}
 
         for axis in ['X','Y','Z','T']:
@@ -597,12 +585,6 @@ class cfGrid(object):
                 self.drange[k]=min(cfdata.array),max(cfdata.array)
                 self.names[k]=self.domain.axis_name(k)
 
-        #Original code
-        #for k in self.domain.data_axes():
-        #    cfdata=field.dim(k)
-        #    self.axes[k]=cfdata
-        #    self.drange[k]=min(cfdata.array),max(cfdata.array)
-        #    self.names[k]=self.domain.axis_name(k)
 
 
 
@@ -902,32 +884,11 @@ class cfview:
         #self.script=script(debug=True)
         self.script=script()
         
-        # notebook
-        #nb=gtk.Notebook()
-        #nb.show_tabs=True
-        #vbox.pack_start(nb,padding=cfgPadding)
-        #self.nb=nb
-        #for a,p,m in [ ('Select',xconvLike,self.script)]:
-        #            ('Inspect',guiInspect,self.selector),
-        #            ('Gallery',guiGallery,self.selector),
-        #           ]:
-        #    label=gtk.Label(a)
-        #    w=p(m)
-        #    self.nb.append_page(w,label)
-        #    setattr(self,a,w)
-        #    w.show_all()
-        
 
         w=xconvLike(self.script)
         vbox.pack_start(w)
         w.show_all()
         setattr(self,'Select',w)
-
-
-        # status window
-        #statusbar=gtk.Statusbar()
-        #statusbar.set_has_resize_grip(False)
-        #vbox.pack_start(statusbar,padding=cfgPadding,expand=False)
         
         self.w=window
         
@@ -953,8 +914,6 @@ class cfview:
             <menubar name="MenuBar">
                 <menu action="File">
                     <menuitem action="Load"/>
-                    <separator/>
-                    <menuitem action="Save"/>
                     <separator/>
                     <menuitem action="Quit"/>
                 </menu>
@@ -993,8 +952,6 @@ class cfview:
                 ('File',None,'_File'),
                 ('Load',gtk.STOCK_OPEN,'Load File',None,
                  'Load File',self.file_load),
-                ('Save',gtk.STOCK_OPEN,'Save code',None,
-                 'Save code',self.code_save),
                  ('Quit',gtk.STOCK_QUIT,'Quit',None,
                  'Quit',self.delete),
                 ('View',None,'_View'),
@@ -1044,27 +1001,6 @@ class cfview:
             self.reset_with(newfile)
         chooser.destroy()
 
-    def code_save(self,b):
-        ''' Save code to make current plot'''
-        chooser=gtk.FileChooserDialog(title='Save code to make current plot',
-                    action=gtk.FILE_CHOOSER_ACTION_SAVE,
-                    buttons=(   gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,
-                                gtk.STOCK_SAVE,gtk.RESPONSE_OK),
-                    )
-        chooser.set_current_name('code.py')
-        response=chooser.run()
-        if response==gtk.RESPONSE_OK:
-            savefile=chooser.get_filename()
-            f=open(savefile, 'w')
-            f.write(plotvars.code)
-            f.close()
-        chooser.destroy()
-
-
-
-       
-
-           
 
 
         # Apply any operators
@@ -1088,16 +1024,13 @@ class cfview:
         ''' Open dataset filename '''
         data=cf.read(filename)
         self.Select.set_data(data)
-        #self.Inspect.reset()
-        #self.Gallery.reset()
+
         #Reset any existing data
         self.domain={}
         self.axes={}
         self.drange={}
         self.names={}
 
-        #self.script.open(filename)
-        #self.script.start()
         plotvars.plot_code=''
         
     def help_about(self,b):
@@ -1105,13 +1038,12 @@ class cfview:
 
         helpstr='<T>cfview '+(__version__)+'\
         \n\
-        This is a pre-release version of NCAS cfview\n\
         \
         Credits to:\r\
-        Bryan Lawrence - for the initial version of cfview\r\
-        Mudit Gupta - for the prototype pygtk interface to cf-python/cfplot\r\
-        David Hassell, Charles Roberts - for cf-python\r\
-        Andy Heaps - for cf-plot\r\
+        Andy Heaps - cf-plot and ongoing cfview development\r\
+        Bryan Lawrence - initial version of cfview\r\
+        Mudit Gupta - prototype pygtk interface to cf-python/cf-plot\r\
+        David Hassell, Charles Roberts - cf-python\r\
         \n'
             
         CFview_help(helpstr, helpstr)
@@ -1122,23 +1054,45 @@ class cfview:
 
         helpstr='<T>cfview '+(__version__)+'\
         \n\
+        <H>Loading data\r\
         To load data type cfview filename on the command prompt or File -> Load File once cfview is running.\
         Data types that cfview can use are netCDF, Met Office PP and Fields files.\n\
         \
-        <H>Making multiple plots\r\
+        <H>Making a contour plot\r\
+        When a field name is selected the Longitude, Latitude , Pressure/Height and Time axes are displayed in \
+        the Grid Selector panel.  The ranges of data will be displayed such that the first two dimensions that \
+        have multiple values will be displayed as a range and all others as a single value.  Pressing plot will \
+        the make a contour plot of the data.\n\
+        \
+        <H>Making a zonal mean latitude vs pressure plot\r\
+        1) Select the mean dropdown line under longitude to mean the data in longitude\r\
+        2) Select the latitude range required\r\
+        3) Select pressure so that the smallest value is the min and largest is the max\r\
+        To make a log pressure plot select log-y in the axes dropdown in the Configure and Generate Plots panel.\n\
+        \
+        <H>Making a vector plot\r\
+        Select a vector plot from the Configure and Generate Plots panel. Make the plot in the following way: \r\
+        1) select x component of vector data and press plot\r\
+        2) select y comonent of vector data and press plot\n\
+        \
+        After pressing plot for the second time the plot will appear on the screen.\r\
+        Vector options such as data striding, interpolation and vector size are available from the Configure -> Vectors\
+        drop down menu from the top bar of cfview.\n\
+        \
+        <H>Making a vector plot over a contour plot\r\
+        Select a contour+vector plot from the Configure and Generate Plots panel.  Make the plot in the following way: \r\
+        1) select contour data and press plot\r\
+        2) select x component of vector data and press plot\r\
+        3) select y comonent of vector data and press plot\r\
+        \r\
+        After pressing plot for the third time the plot will appear on the screen.\n\
+        \
+        <H>Making multiple plots on a page\r\
         To make muliple plots select the n-up drop down menu in the Configure and Generate Plots section.\
-        1x2 would give one plot in the x direction by two plots in the y direction.  If two contour plots\
+        For example, 1x2 would give one plot in the x direction by two plots in the y direction.  If two contour plots\
         are made then the plot button will need to be pressed twice to make the separate plots before the\
         picture appears.\n\
         \
-        <H>Making a vector plot\r\
-        Select a vector plot from the Configure and Generate Plots panel. Then select the field as a\
-        2-dimensional slice in the grid selector\
-        This is usually a longitude-latitude slice but can also be a latitude-pressure or height\
-        slice or a longitude-pressure/height slice.  Press the plot button to select this as the x component.\
-        Select another slice for the y-component of the vector plot and then press the plot button to make a\
-        vector plot.  Vector options such as string, interpolation and size are available from the Configure\
-        drop down menu from the top bar of cfview.\
         \n'
             
         CFview_help(helpstr, helpstr)
@@ -1153,6 +1107,69 @@ class cfview:
         ''' Set window title '''
         self.w.set_title(title)
 
+
+
+class check_input():
+    #Check dialogue inputs are valid numbers
+    def __init__(self, inputs=None, errstr=None, chk_integer=None, nvals=None, gezero=None, geone=None, ascending=False):
+
+        #Convert input strings to a set of inputs
+        #exec('myvals=plotvars.'+inputs)
+        vals=inputs.split()
+
+        #Set a null message
+        message=''
+
+        #Check number of values is correct
+        if nvals is not None:
+            if np.size(vals) != nvals:
+                message=message+errstr+'\nincorrect number of values, got '+str(np.size(vals))+', expected '+str(nvals)+'\n'
+
+
+        #Check inputs are numbers
+        for val in vals:
+            try:
+                float(val)
+            except ValueError:
+                message=message+errstr+'\nnot a valid number: '+val+'\n'
+
+        if message == '' and chk_integer is True:
+            for val in vals:
+                if float(val)-np.floor(float(val)) != 0.0:
+                    message=message+errstr+'\nnot a valid integer: '+val+'\n'
+
+        #Check values are greater than or equal to zero
+        if message == '':
+            if gezero is True:
+                for val in vals:
+                    if float(val) < 0: message=message+errstr+'\nvalue must be greater than or equal to zero: '+val+'\n'
+
+        #Check values are greater than or equal to one
+        if message == '':
+            if geone is True:
+                for val in vals:
+                    if float(val) < 1: message=message+errstr+'\nvalue must be that or equal to one: '+val+'\n'
+
+        #Check values are ascending
+        if message == '':
+            if ascending is True:
+                nvals=np.size(vals)
+                for i in np.arange(nvals-1):
+                    if float(vals[i+1])-float(vals[i]) <= 0.0: message=message+errstr+'\nvalues are: '+vals[i]+' '+vals[i+1]+'\n'
+
+
+
+        if message != '':
+            plotvars.invalid_input=True
+            dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+            gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+            dialog.run()
+            dialog.destroy()
+
+
+
+
+
 class xconvLike(QuarterFrame):
     ''' Set up an xconv like set of panels with 
             field selection on the top left
@@ -1162,6 +1179,8 @@ class xconvLike(QuarterFrame):
         which of course isn't like xconv, but is more cf-like ...
         
         '''
+
+
     def __init__(self,script):
         ''' Initialise with the script recorder '''
         super(xconvLike,self).__init__()
@@ -1185,11 +1204,13 @@ class xconvLike(QuarterFrame):
     def _actionBox(self):
         ''' Provides the buttons and callbacks to the actual actions which 
         the routine supports. '''
-        #actionBox=pcw.plotChoices(callback=self._plot,ysize=90)
         actionBox=plotChoices(callback=self._plot,ysize=90)
         actionBox.show()
         return actionBox
         
+
+
+
     def _plot(self,w,plotOptions):
         ''' Executes a plot given the information returned from the various
         selectors and configuration widgets. In practice we have
@@ -1270,18 +1291,6 @@ class xconvLike(QuarterFrame):
         plotvars.code=plotvars.code+"sfield=cf.read('"+sfield.file+"')"+\
                       plotvars.field_selected+'\n\n'
 
-
-
-
-        #Bryan's original code
-        # first let's do the subspace selection (if any):
-        #kwargs={}
-        #self.script.add('kwargs={}',hash=True)
-        #for d in grid:
-        #    kwargs[d]=cf.wi(grid[d][0],grid[d][1])
-        #    self.script.add("kwargs['%s']=cf.wi(%s,%s)"%(d,grid[d][0],grid[d][1]))
-        #sfield=sfield.subspace(**kwargs)
-        #self.script.add('sfield=sfield.subspace(**kwargs)')
 
 
         #Check if field is subsetted by the user
@@ -1387,64 +1396,22 @@ class xconvLike(QuarterFrame):
 
 
         #Check colour scale inputs are valid
-        if plotvars.cscale_white != '':
-            message=''
-            for val in plotvars.cscale_white.split():
-                try:
-                    float(val)
-                except ValueError:
-                    message=message+'colour scale white setting = '+val+ ' is not a valid number\n'
+        if plotvars.cscale_auto_set is False: 
+            if plotvars.cscale_white != '':
+                check_input(inputs=plotvars.cscale_white, errstr='colour scale white input', chk_integer=True, gezero=True)
+                if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-            if message != '':
-                dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                dialog.run()
-                dialog.destroy()
-                return
+            if plotvars.cscale_ncols != '':
+                check_input(inputs=plotvars.cscale_ncols, errstr='colour scale number of colours', chk_integer=True, nvals=1, geone=True)
+                if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-        if plotvars.cscale_ncols != '':
-               message=''
-               try:
-                   float(plotvars.cscale_ncols)
-               except ValueError:
-                   message=message+'colour scale number of colours setting = '+val+ ' is not a valid number\n'
+            if plotvars.cscale_above != '':
+                check_input(inputs=plotvars.cscale_above, errstr='colour scale white above setting', chk_integer=True, nvals=1, gezero=True)
+                if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-               if message != '':
-                   dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                   dialog.run()
-                   dialog.destroy()
-                   return
-
-
-        if plotvars.cscale_above != '':
-               message=''
-               try:
-                   float(plotvars.cscale_above)
-               except ValueError:
-                   message=message+'colour scale above setting = '+val+ ' is not a valid number\n'
-
-               if message != '':
-                   dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                   dialog.run()
-                   dialog.destroy()
-                   return
-
-        if plotvars.cscale_below != '':
-               message=''
-               try:
-                   float(plotvars.cscale_below)
-               except ValueError:
-                   message=message+'colour scale below setting = '+val+ ' is not a valid number\n'
-
-               if message != '':
-                   dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                   gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                   dialog.run()
-                   dialog.destroy()
-                   return
-
+            if plotvars.cscale_below != '':
+                check_input(inputs=plotvars.cscale_below, errstr='colour scale white below setting', chk_integer=True, nvals=1, gezero=True)
+                if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
 
         #Make up the cscale command if any changes required
@@ -1490,39 +1457,7 @@ class xconvLike(QuarterFrame):
          
  
         if plot_type == 0:
-           #Plot a graph if 1D            
-           #plotvars.code=plotvars.code+'#Select data for plot\n'
-           #code='import numpy as np'
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #xtitle=''                 
-           #yunits='Value'
-           #code="xvals=np.squeeze(sfield.array)"
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #plotvars.title=sfield.file+opstring+subset_string
-           #for mydim in sfield.items():
-           #   vals=np.squeeze(sfield.item(mydim).array)                 
-           #   if np.size(vals) > 1: 
-           #      xpts=vals
-           #      #code="xpts=np.squeeze(sfield.item('%s').array)"%mydim
-           #      axis_name=getattr(sfield.item(mydim), 'standard_name', mydim)
-           #      code="xpts=np.squeeze(sfield.item('%s').array)"%axis_name
-           #      plotvars.code=plotvars.code+code+'\n'
-           #      units='Value'
-           #      #xtitle
-           #      xtitle=getattr(sfield.item(mydim), 'standard_name', 'NoName')
-           #      if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'long_name', 'NoName')
-           #      if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'short_name', 'NoName')
-           #      if xtitle == 'NoName': xtitle=getattr(sfield.item(mydim), 'ncvar', 'NoName')
-           #      xunits=getattr(sfield.item(mydim), 'units', 'No units')
-           #      #ytitle
-           #      if hasattr(sfield, 'id'): ytitle=sfield.id
-           #      if hasattr(sfield, 'ncvar'): ytitle=sfield.ncvar
-           #      if hasattr(sfield, 'short_name'): ytitle=sfield.short_name 
-           #      if hasattr(sfield, 'long_name'): ytitle=sfield.long_name 
-           #      if hasattr(sfield, 'standard_name'): ytitle=sfield.standard_name
-           #      if hasattr(sfield, 'Units'): yunits=sfield.Units
+
              
 
            plotvars.code=plotvars.code+'\n#Make a graph plot\n'
@@ -1531,29 +1466,7 @@ class xconvLike(QuarterFrame):
            exec(code)
            plotvars.code=plotvars.code+code+'\n'
 
-           #Open the plot if a single plot
-           #if plotvars.nplots == 1:
-           #   code="cfp.gopen()"
-           #   exec("\n"+code)
-           #   plotvars.code=plotvars.code+code+'\n'
 
-           #Plot the graph
-           #code="cfp.plotvars.plot.tick_params(direction='out', which='both')"
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.set_xlabel('%s(%s)')"%(xtitle,xunits)
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.set_ylabel('%s(%s)')"%(ytitle,yunits)
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.plot(xpts, xvals)"
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #code="cfp.plotvars.plot.set_title('%s')"%plotvars.title
-           #exec(code)
-           #plotvars.code=plotvars.code+code+'\n'
-           #Close the plot if a single plot
            if plotvars.nplots != 1:
               plotvars.pos=plotvars.pos+1
               if plotvars.pos <= plotvars.nplots: 
@@ -1561,21 +1474,6 @@ class xconvLike(QuarterFrame):
                  exec(code)
                  plotvars.code=plotvars.code+'\n#Move to next plot position\n'
                  plotvars.code=plotvars.code+code+'\n\n'
-
-
-
-           #   code="cfp.gclose()"
-           #   exec(code)
-           #   plotvars.code=plotvars.code+code+'\n'
-           #else:
-           #   #Move onto next plot
-           #   plotvars.pos=plotvars.pos+1
-           #   if plotvars.pos <= plotvars.nplots: 
-           #      code="cfp.gpos(pos=%s)"%plotvars.pos
-           #      exec(code)
-           #      plotvars.code=plotvars.code+'\n#Move to next plot position\n'
-           #      plotvars.code=plotvars.code+code+'\n\n'
-
 
 
         #vector plot
@@ -1615,30 +1513,12 @@ class xconvLike(QuarterFrame):
                   code=code+', key_length='+key_length+', scale=100'
               else:
                   #Check inputs are numbers
-                  message=''
-                  for val in ['plotvars.vect_scale', 'plotvars.vect_length']:
-                      exec('myval='+val)
-                      try:
-                         float(myval)
-                      except ValueError:
-                         message=message+val+'='+str(myval)+ ' is not a valid number\n'
-
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
-
-
-                  #Check length and scale > 0
-                  if  float(plotvars.vect_length) <= 0 or float(plotvars.vect_scale) <= 0:
-                      message='Vector length and scale must be > 0.'
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
+                  if plotvars.vect_scale != '':
+                      check_input(inputs=plotvars.vect_length, errstr='vector length setting', chk_integer=True, gezero=True)
+                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+                  if plotvars.vect_scale != '':
+                      check_input(inputs=plotvars.vect_scale, errstr='vector scale setting', chk_integer=True, gezero=True)
+                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
                   #Add to vect command
                   code=code+',key_length='+plotvars.vect_length+', scale='+plotvars.vect_scale
@@ -1649,48 +1529,9 @@ class xconvLike(QuarterFrame):
                   stridevals=plotvars.vect_stride
                   strides=stridevals.split()
                   #Check inputs are numbers
-                  message=''
-                  for stride in strides:
-                      try:
-                          float(stride)
-                      except ValueError:
-                          message='Vector stride ='+stride+ ' is not a valid number\n'
-
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
-
-
-                  #Check inputs are integers
-                  message=''
-                  for stride in strides:
-                      try:
-                          int(stride)
-                      except ValueError:
-                          message='Vector stride ='+stride+ ' is not an integer\n'
-
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
-
-
-
-                  #Check stride >= 1
-                  message=''
-                  for stride in strides:
-                      if  float(stride) <= 1:
-                          message='Vector stride must be >= 1.'
-                          dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                          gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                          dialog.run()
-                          dialog.destroy()
-                          return
+                  if plotvars.vect_stride != '':
+                      check_input(inputs=plotvars.vect_stride, errstr='vector stride setting', chk_integer=True, geone=True)
+                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
                   if np.size(strides) == 1: code=code+' ,stride='+strides[0]
                   if np.size(strides) == 2: code=code+' ,stride=['+strides[0]+','+strides[1]+']'
@@ -1700,48 +1541,9 @@ class xconvLike(QuarterFrame):
                   ptsvals=plotvars.vect_pts
                   pts=ptsvals.split()
                   #Check inputs are numbers
-                  message=''
-                  for pt in pts:
-                      try:
-                          float(pt)
-                      except ValueError:
-                          message='Vector stride ='+pt+ ' is not a valid number\n'
+                  check_input(inputs=plotvars.vect_pts, errstr='vector pts setting', chk_integer=True, geone=True)
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
-
-
-                  #Check inputs are integers
-                  message=''
-                  for pt in pts:
-                      try:
-                          int(pt)
-                      except ValueError:
-                          message='Vector interpolation ='+pt+ ' is not an integer\n'
-
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
-
-
-
-                  #Check pts >= 1
-                  message=''
-                  for pt in pts:
-                      if  float(pt) < 1:
-                          message='Vector interpolation must be >= 1.'
-                          dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                          gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                          dialog.run()
-                          dialog.destroy()
-                          return
 
                   if np.size(pts) == 1: code=code+' ,pts='+pts[0]
                   if np.size(pts) == 2: code=code+' ,pts=['+pts[0]+','+pts[1]+']'
@@ -1788,13 +1590,6 @@ class xconvLike(QuarterFrame):
                  exec("\n"+code)
                  plotvars.code=plotvars.code+code+'\n'
 
-                 
-              #if plotOptions['mapset']['proj']<>'cyl': 
-              #   code="cfp.mapset(proj='%s')"%(plotOptions['mapset']['proj'])
-              #   exec(code)
-              #   plotvars.code=plotvars.code+'\n#Set mapping\n'
-              #   plotvars.code=plotvars.code+code+'\n\n'
-
 
               plotvars.title=sfield.file+opstring+subset_string
               
@@ -1804,21 +1599,14 @@ class xconvLike(QuarterFrame):
 
               if plotvars.levs_set is True:
                   #Check inputs are numbers
-                  message=''
-                  for val in ['plotvars.levs_min', 'plotvars.levs_max', 'plotvars.levs_step']:
-                      exec('myval='+val)
-                      try:
-                         float(myval)
-                      except ValueError:
-                         message=message+val+'='+str(myval)+ ' is not a valid number\n'
+                  check_input(inputs=plotvars.levs_min, errstr='contour levels minimum ', nvals=1)
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
+                  check_input(inputs=plotvars.levs_max, errstr='contour levels maximum ', nvals=1)
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
+                  check_input(inputs=plotvars.levs_step, errstr='contour levels step ', nvals=1)
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
                   #Check min < max and step > 0
                   if  float(plotvars.levs_min) >= float(plotvars.levs_max) or float(plotvars.levs_step) <= 0:
@@ -1834,34 +1622,13 @@ class xconvLike(QuarterFrame):
 
               if plotvars.levs_manual_set is True:
                   #Check inputs are numbers
-                  message=''
-                  for val in plotvars.levs_manual.split():
-                      try:
-                         float(val)
-                      except ValueError:
-                         message=message+val+ ' is not a valid number\n'
+                  check_input(inputs=plotvars.levs_manual, errstr='contour manual levels ')
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
 
                   #Check levels are ascending
-                  message=''
-                  levs=plotvars.levs_manual.split()
-                  nvals=np.size(plotvars.levs_manual.split())
-                  count=0
-                  for i in np.arange(nvals-1):
-                      if float(levs[i+1]) - float(levs[i]) <= 0:
-                          message=message+'Levels are not ascending '+ levs[i]+' '+levs[i+1]+'\n'
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
+                  check_input(inputs=plotvars.levs_manual, errstr='contour manual levels must be ascending  ', ascending=True)
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
 
  
@@ -1905,20 +1672,17 @@ class xconvLike(QuarterFrame):
                   if plotvars.lonmin != '-180' or plotvars.lonmax != '180' or plotvars.latmin != '-90' \
                       or plotvars.latmax != '90':
                        #Check inputs are numbers
-                       message=''
-                       for val in ['plotvars.lonmin', 'plotvars.lonmax', 'plotvars.latmin', 'plotvars.latmax']:
-                           exec('myval='+val)
-                           try:
-                               float(myval)
-                           except ValueError:
-                               message=message+val[9:]+'='+str(myval)+ ' is not a valid number\n'
+                       check_input(inputs=plotvars.lonmin, errstr='map lonmin ', nvals=1)
+                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-                       if message != '':
-                           dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                           gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                           dialog.run()
-                           dialog.destroy()
-                           return
+                       check_input(inputs=plotvars.lonmax, errstr='map lonmax ', nvals=1)
+                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+
+                       check_input(inputs=plotvars.latmin, errstr='map latmin ', nvals=1)
+                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+
+                       check_input(inputs=plotvars.latmax, errstr='map latmax ', nvals=1)
+                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
 
                        #Check lonmin < lonmax and latmin < latmax
@@ -1939,19 +1703,13 @@ class xconvLike(QuarterFrame):
                   #Check inputs are numbers
                   message=''
                   if plotvars.lon_0 != '0' or plotvars.boundinglat != '0':
-                      for val in ['plotvars.lon_0', 'plotvars.boundinglat']:
-                           exec('myval='+val)
-                           try:
-                               float(myval)
-                           except ValueError:
-                               message=message+val[9:]+'='+str(myval)+ ' is not a valid number\n'
 
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
+                      check_input(inputs=plotvars.lon_0, errstr='map lon_0 ', nvals=1)
+                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+
+                      check_input(inputs=plotvars.boundinglat, errstr='map boundinglat ', nvals=1)
+                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+
 
                   code="cfp.mapset(proj='"+plotvars.proj+"'"
                   if plotvars.lon_0 != '0': code=code+', lon_0='+plotvars.lon_0
@@ -1973,27 +1731,30 @@ class xconvLike(QuarterFrame):
 
 
               #Set continent thickness and colour if required
-              if plotvars.continent_thickness != '1.5' or plotvars.continent_color != 'k':
+              if plotvars.continent_thickness != '1.5' or plotvars.continent_color != 'black':
                   #Check continent_thinckness is a valid number
-                  message=''
                   if plotvars.continent_thickness != '1.5':
-                      exec('myval='+plotvars.continent_thickness)
-                      try:
-                          float(myval)
-                      except ValueError:
-                          message='continent_thickness='+plotvars.continent_thickness+ ' is not a valid number\n'
+                      check_input(inputs=plotvars.continent_thickness, errstr='map continent thickness ', nvals=1)
+                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-                  if message != '':
-                      dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                      gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                      dialog.run()
-                      dialog.destroy()
-                      return
 
                   #Generate cf-plot setvars command as required
                   code='cfp.setvars('
                   if plotvars.continent_thickness != '1.5': code=code+"continent_thickness='"+plotvars.continent_thickness+"',"
-                  if plotvars.continent_color != 'k': code=code+"continent_color='"+plotvars.continent_color+"'"
+                  if plotvars.continent_color != 'black':
+                      #Check input colour is a valid matplotlib colour
+                      if plotvars.continent_color not in matplotlib.colors.cnames:
+                           message='Continent colour must be a valid matplotlib colour\n'
+                           message=message+'Search on the web for valid matplotlib color names'
+                           dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                           gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                           dialog.run()
+                           dialog.destroy()
+                           return
+
+
+
+                      code=code+"continent_color='"+plotvars.continent_color+"'"
                   code=code+')'
                   exec(code)
                   plotvars.code=plotvars.code+'#Set continent attributes\n'
@@ -2148,6 +1909,34 @@ class code_show:
         #widget.destroy()
         self.text_window.destroy()
 
+    def code_save(self,b):
+        ''' Save code to make current plot'''
+        chooser=gtk.FileChooserDialog(title='Save code to make current plot',
+                    action=gtk.FILE_CHOOSER_ACTION_SAVE,
+                    buttons=(   gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,
+                                gtk.STOCK_SAVE,gtk.RESPONSE_OK),
+                    )
+        chooser.set_current_name('code.py')
+        response=chooser.run()
+        if response==gtk.RESPONSE_OK:
+            savefile=chooser.get_filename()
+            f=open(savefile, 'w')
+            f.write(plotvars.code)
+            f.close()
+        chooser.destroy()
+
+    def code_help(self, widget):
+        helpstr='<T>Code help\n\
+        A plot must have been made before viewing the code.\n\
+        The code to generate the plot can\
+        be saved from the save button or copied from the window and run at the Python command prompt.\
+        This code can then be modified by the user to add additonal data, plots or cf-plot options.\
+        \n'
+
+        CFview_help(helpstr, helpstr)
+
+
+
     def __init__(self, widget):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_resizable(True)  
@@ -2194,9 +1983,30 @@ class code_show:
         box1.pack_start(box2, False, True, 0)
         box2.show()
 
+
+        #Box to contain the buttons
+        box_buttons = gtk.HBox(False, 10)
+        box_buttons.set_border_width(10)
+        box_buttons.show()
+        vbox.pack_end(box_buttons, False, True, 0)
+
+        button_save = gtk.Button("save")
+        button_save.connect("clicked", self.code_save)
+        box_buttons.pack_start(button_save, True, True, 0)
+        button_save.set_flags(gtk.CAN_DEFAULT)
+        button_save.grab_default()
+        button_save.show()
+
+        button_help = gtk.Button("help")
+        button_help.connect("clicked", self.code_help)
+        box_buttons.pack_start(button_help, True, True, 0)
+        button_help.set_flags(gtk.CAN_DEFAULT)
+        button_help.grab_default()
+        button_help.show()
+
         button = gtk.Button("close")
         button.connect("clicked", self.close_application)
-        box2.pack_start(button, True, True, 0)
+        box_buttons.pack_start(button, True, True, 0)
         button.set_flags(gtk.CAN_DEFAULT)
         button.grab_default()
         button.show()
@@ -2369,15 +2179,6 @@ class data_show:
         hbox.pack_start(vbox, False, False, 0)
         
 
-        #button = gtk.Button("close")        
-        #button.set_size_request(200,100)
-        #button.connect("clicked", self.close_application)
-        #box2.pack_start(button, True, True, 0)
-        #button.set_flags(gtk.CAN_DEFAULT)
-        #button.grab_default()
-        #button.show()
-        #window.show()
-
         box2 = gtk.VBox(False, 10)
         box2.set_border_width(10)
         box1.pack_start(box2, False, True, 0)
@@ -2422,54 +2223,32 @@ class plotChoices(guiFrame):
     
     def _row1(self,callback):
         ''' Sets up the basic action buttons '''
-        #sp=smallButton('Simple Plot')
-        #np=smallButton('Plot (Configured)')
-        np=smallButton('<b>Plot</b>')
 
-        #np.set_use_size(16)
-        #hb=smallButton('Help')
-        #s1=gtk.VSeparator()
-        #s2=gtk.VSeparator()
-        #for b in [sp,s1,np,s2,hb]:
-        #for b in [np,s2,hb]:
-        #    self.row1.pack_start(b,padding=2)
+        np=smallButton('<b>Plot</b>')
         self.row1.pack_start(np,padding=80)
         self.vbox.pack_start(self.row1,expand=False,padding=2)
         self.vbox.pack_start(gtk.HSeparator(),expand=False,padding=2)
-        #sp.connect('clicked',callback,{})
         np.connect('clicked',self._getConfig,None)
-        #hb.connect('clicked',self._help,None)
+
     
     def _row2(self):
         ''' Lays out the buttons for standard plots '''
-        #self.projComboShown=1
-        #ptypes=['X-Y','X-Z','Y-Z','X-T','Y-T']
+
         ptypes=['contour', 'vector', 'contour+vector']
         nup=['1','2x1', '1x2', '2x2' , '3x2', '2x3','3x3']
-        #self.proj=['cyl','moll','npolar','spolar']
-        #self.typCombo=myCombo(ptypes,label='type',initial='X-Y',callback=self._showProj)
-        #self.typCombo=myCombo(ptypes,label='type',initial='contour',callback=self._showProj)
         self.typCombo=myCombo(ptypes,label='type',initial='contour')
         self.nupCombo=myCombo(nup,label='n-up',initial='1')
-        #self.projCombo=myCombo(self.proj,label='projection',initial='cyl')
         self.row2.pack_start(self.nupCombo,expand=True,padding=2)
         self.row2.pack_start(self.typCombo,expand=True,padding=2)
-        #self.row2.pack_start(self.projCombo,expand=True,padding=2)
         self.vbox.pack_start(self.row2,expand=False,padding=2)
 
     def _row3(self):
         ''' Lays out the buttons for configuring contours '''
         contours=['Filled','Blockfill', 'None']
         lines=['On','Negative dashed', 'Off']
-        #self.conCombo=myCombo(contours,label='contours',initial='Filled',
-        #        callback=self._showCbar)
-        #self.lineCombo=myCombo(lines,label='lines',initial='On',
-        #        callback=self._showCbar)
         self.conCombo=myCombo(contours,label='contour fill',initial='Filled')
         self.lineCombo=myCombo(lines,label='contour lines',initial='On')
 
-
-        #self.cbarCombo=myCombo(self.cbar,label='bar',initial='Off')
         for w in [self.conCombo,self.lineCombo]:
             self.row3.pack_start(w,padding=2)
         self.vbox.pack_start(self.row3,expand=False,padding=2)
@@ -2479,57 +2258,17 @@ class plotChoices(guiFrame):
     def _row4(self,callback):
         labels=['On','Off']
         self.cbar=['On','On-X','On-Y', 'Off']
-        #self.cbarChoiceShown=1
         self.labCombo=myCombo(labels,label='labels',initial='On')
         self.cbarCombo=myCombo(self.cbar,label='bar',initial='On')
         ''' Lays out axes information'''
         logv=['Normal','log-x','log-y','log-xy']
         self.axeCombo=myCombo(logv,label='axes',initial='Normal')
-        #ac=smallButton('Advanced Config')
-        #ac.connect('clicked', AdvancedConfig)
         for w in [self.labCombo,self.cbarCombo,self.axeCombo]:
             self.row4.pack_start(w,padding=2)
 
-        #self.row4.pack_start(self.axeCombo,padding=2,expand=False)
-        #self.row4.pack_start(ac,padding=2,expand=True)
         self.vbox.pack_start(self.row4,expand=False,padding=2)
         
-    #def _showCbar(self,w,value):
-    #    ''' Callback used to turn off the colour bar choice as appropriate '''
-    #    if value=='lines' and self.cbarChoiceShown:
-    #        self.cbarCombo.destroy()
-    #        self.cbarChoiceShown=0
-    #    elif not self.cbarChoiceShown:
-    #        self.cbarCombo=myCombo(self.cbar,initial='Off')
-    #        self.row4.pack_start(self.cbarCombo,padding=2)
-    #        self.cbarChoiceShown=1
-    #        self.cbarCombo.show()
-        
-    #def _showProj(self,w,value):
-    #    ''' Callback used for the typcombo to allow projections for X-Y '''
-    #    if value=='contour' and not self.projComboShown:
-    #        self.projCombo=myCombo(self.proj,initial='cyl')
-    #        self.row2.pack_start(self.projCombo,expand=False,padding=2)
-    #        self.projCombo.show()
-    #    if value!='contour' and self.projComboShown:
-    #        self.projCombo.destroy()
-    #        self.projComboShown=0
-            
-    def _help(self,w,data):
-        ''' Show configuration help '''
-        helpstr='Making vector plots - select u field and then click plot  \n\
-                                         - select v field and then click plot\n\
-                     Making contour and vector plots - select contour field and click plot\n\
-                                         - select u field and then click plot\n\
-                                         - select v field and then click plot\n\
-                 \n'
-        CFview_help(helpstr, helpstr)
 
-
-
-        #dialog.run()
-        #dialog.destroy()
-   
 
     def _advancedConfig(self,w,data):
         ''' Generate advanced plot configuration information via a dialog popup '''
@@ -2548,7 +2287,6 @@ class plotChoices(guiFrame):
         (i.e. it implements most of the cf-plot API (more of it
         is implemented via the advanced config.) '''
         config={
-            #'nup':int(self.nupCombo.get_value()),
             'nup':self.nupCombo.get_value(),
             'gopen':{
                 'rows':
@@ -2556,18 +2294,12 @@ class plotChoices(guiFrame):
                 'columns':
                     {'1':None, '2x1':2, '1x2':1, '2x2':2, '3x2':3, '2x3':2, '3x3':3}[self.nupCombo.get_value()],
                     },
-            #'mapset':{
-            #    'proj':{'cyl':'cyl','moll':'moll','npolar':'npstere',
-            #                'spolar':'spstere'}[self.projCombo.get_value()]
-            #        },
             'con':{
                 'ptype':
-                    #{'X-Y':1,'X-Z':3,'Y-Z':2,'X-T':5,'Y-T':4}[self.typCombo.get_value()],
                     {'contour':1,'vector':2, 'contour+vector':3}[self.typCombo.get_value()],
                 'line_labels':
                     {'On':True,'Off':False}[self.labCombo.get_value()],
-                #'negative_linestyle':
-                #    {'On':None,'Off':None,'On--':1}[self.linCombo.get_value()],
+
                 'colorbar':
                     {'On':1,'Off':None,'On-X':1,'On-Y':1}[self.cbarCombo.get_value()],
                 'colorbar_orientation':
@@ -2578,23 +2310,6 @@ class plotChoices(guiFrame):
                         {'Filled':1,'Blockfill':2,'None':3}[self.conCombo.get_value()],
                 'contour_line': 
                         {'On':1,'Off':2,'Negative dashed':3}[self.lineCombo.get_value()],
-
-                #'blockfill': 
-                #        {'contour_style':3}[self.conCombo.get_value()],
-                #'blockfill with lines': 
-                #        {'contour_style':4}[self.conCombo.get_value()],
-                #'lines': 
-                #        {'contour_style':5}[self.conCombo.get_value()],
-                #'lines with negative dashed': 
-                #        {'contour_style':6}[self.conCombo.get_value()],
-                #'blockfill':
-                #    {'lines':None,'filled':None,'block':1}[self.conCombo.get_value()],
-                #'lines':
-                #    {'lines':True,'filled':True,'block':None}[self.conCombo.get_value()],
-                #'lines ':
-                #    {'lines with dashed negative':True,'filled':True,'block':None,'negative_linestyle':True}[self.conCombo.get_value()],
-                #'fill':
-                #    {'lines':None,'filled':True,'block':None}[self.conCombo.get_value()],
                 'xlog':
                     {'Normal':None,'log-x':True,'log-y':None,'log-xy':True}
                         [self.axeCombo.get_value()],
@@ -2613,20 +2328,7 @@ def checkConsistency(field,plotOptions):
     generate error messages if appropriate. Return '' if ok! '''
     fixit='\nPlease use the grid selector to choose a 1d or 2d field'
     message=''
-    #if plotOptions=={}:
-    #    # simple plot option, we expect a 2d field
-    #    if (len(xyshape(field)) < 1 or len(xyshape(field)) > 2):
-    #        message= 'cfview can only plot 1D or 2D fields'+fixit
-    #        return message
-    #    else: message=''
-    #else:
-        # The key thing we need to check is for consistency between
-        # plot options and the shape, so we can work out what to do with
-        # for example, and XY plot which is 6-up.
-    #    multi=plotOptions['nup']<>'1'
-    #    message=plotPossibleWithField(field,plotOptions['con']['ptype'],multi)
-    #    if message<>'': 
-    #        if not multi: message+=fixit
+
     return message
         
 def axes_sizes(f):
@@ -2646,12 +2348,6 @@ def axes_sizes(f):
             except ValueError:
                 results[axis]=None
 
-    #for axis in ['X','Y','Z','T']:
-    #    try:
-    #        results[axis]=sizes[f.domain.axis(axis)]
-    #    except ValueError:
-    #        results[axis]=None
-
     return results
     
 def xyshape(f):
@@ -2662,38 +2358,7 @@ def xyshape(f):
         if sizes[s]>1: shapeString+=s
     return shapeString
     
-#def ptype2string(ptype):
-#    ''' Take a plot type understood by cf-plot, and convert to an XYZT string '''
-#    return {1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[ptype]
-    
-#def plotPossibleWithField(f,ptype,multi=False):
-#    ''' For a given field, is a plot of ptype possible?
-#            ptype is the integer understood by cf-plot.
-#        One extra dimension can be allowed to be non-singular,
-#        but only if multi is true.
-#        Returns '' for success, otherwise a string with an error message!
-#    '''
-#    ss=ptype2string(ptype)
-#    fs_shape=xyshape(f)
-#    nd=len(fs_shape)
-#    message=''
-#    if nd>3:
-#        message='Dimensionality (%s) too great'%nd
-#    elif nd==3 and not multi:
-#        message='Dimensionality (3) not allowed unless multiple plots'
-#    elif nd<2:
-#        message='Dimensionality (%s) too small'%nd
-#    elif nd==2 and multi:
-#        message='Dimensionality (2) too small for multiple plots'
-#    elif nd==3 and multi:
-#        for s in ss:
-#            if s not in fs_shape:
-#                message='Missing axis %s'%s
-#    else:
-#        raise ValueError('This should not occur')
-#    #print multi,nd,ss,ptype,fs_shape,f.shape,message
-#    #return message
-#    return ''
+
 
 def getSlicesAndTitles(field,plotOptions):
     ''' Get appropriate title information for each plot, and for multiple
@@ -2715,24 +2380,7 @@ def getSlicesAndTitles(field,plotOptions):
                 title+=' %s:%s '%(grid.names[dim],grid.axes[dim].array[0])
         # just return the title, no subspace argument selector necessary.
         r=[(title,None),]
-    #else:
-    #    # find the dimension we're stepping through.
-    #    myplot={1:'XY',3:'XZ',2:'YZ',5:'XT',4:'YT'}[plotOptions['con']['ptype']]
-    #    shape=xyshape(field)                                 # eg XYT
-    #    stepper=shape.strip(myplot)                          # eg T
-    #    dim=field.domain.axis(stepper)                       # eg 'dim2'
-    #    r=[]
-    #    # how many, minimum of length of field or nup
-    #    howmany=min(plotOptions['nup'],len(grid.axes[dim].array))
-    #    #howmany=len(grid.axes[dim].array)
-    #    for i in range(howmany):
-    #        thisTitle=title
-    #        key,value=grid.names[dim],grid.axes[dim].array[i]
-    #        thisTitle+=' %s:%s '%(key,value)
-    #        # need to use dim in the next command to avoid possible name ambiguity
-    #        # in non-cf compliant files.
-    #        r.append((thisTitle,{dim:value}))
-    #    print shape,stepper,dim,key,value
+
     return r
             
              
@@ -2824,7 +2472,7 @@ class Config_contour_levels:
         and set the as appropriate.  Uneven levels must be separated by spaces and ascend in value.\
         \n\
         <H>Colorbar extensions\r\
-        Colorbar extensions are a way of extendind the contours to cover all the data at the ends of the\
+        Colorbar extensions are a way of extending the contours to cover all the data at the ends of the\
         contour range. Click on the colorbar extension tick boxes as appropriate if these are bot required.\
         \n'
         CFview_help(helpstr, helpstr)
@@ -3218,20 +2866,20 @@ class Config_map_settings:
         helpstr='<T>Map options\n\
         <H>Cylindrical projection\r\
         The default map projection is the cylindrical equidistant projection with the limits \
-        of -180 to 180 degrees in longitude and -90 to 90 degreesin latitude.  Change these as \
+        of -180 to 180 degrees in longitude and -90 to 90 degrees in latitude.  Change these as \
         appropriate to focus the plot onto the area of interest.\n\
         <H>Polar stereographic plots\r\
         Polar plots are focussed on either the north or south pole.  The bounding latitude is \
         the edge of the viewable latitudes and is set to the equator by default.  The centre of \
         the map domain is where the map is centred.  By default this is 0 degrees which is the \
         Greenwich meridian in the case of the north pole.  For the South Pole plot thie is usually\
-        changed ot 180 degrees.\n\
+        changed to 180 degrees.\n\
         <H>Map resolution\r\
         The map resolution is set to a default of Crude.  Higher resolutions take more time to plot\
         with Full taking several minutes to plot.\n\
         <H>Continent color and thickness\r\
-        These default to 1.5 and k is black.  Change these as appropriate. Matplotlib named colors\
-        can be seen using the following Python code\n\
+        These default to 1.5 and black.  Change these as appropriate. Matplotlib named colors\
+        can be seen using the following Python code at the Python command prompt:\n\
         import matplotlib\r\
         for name in matplotlib.colors.cnames.iteritems(): print(name)\n\
         \n'
@@ -3983,7 +3631,8 @@ class Config_color_scales:
     def cscale_help(self, widget):
         helpstr='<T>Colour scale options\
         \n\
-        With the automatic colour scale option ticked cfview selects the colour scale as:\n\
+        With the automatic colour scale option ticked cfview selects the colour scale depending on the data to \
+        be contoured:\n\
         viridis - fields that don\'t span zero - temperature in Kelvin etc.  This is a perceptually\
         neutral colour scale that doesn\'t draw the eye to any part of the scale and is suitable for colour\
         blind viewers.\r\
@@ -3997,16 +3646,13 @@ class Config_color_scales:
         to fit the number of contour levels.\
 	\n\
         <H>Selecting the number of colours\r\
-        Set the number of colours in the scale to gain more control over the colour sca;e.  Once this is done then\
+        Set the number of colours in the scale to gain more control over the colour scale.  Once this is done then\
         the white indicies and scale midpoint options become useful to allow more precise\
         scale manipulation.  Set a number of white colour indicies by leaving a space between the indices required.\
         \n'
         CFview_help(helpstr, helpstr)
 
     def __init__(self, widget):
-        import matplotlib
-        import matplotlib.pyplot as plot
-
         # create a new window
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_usize(800, 850)
