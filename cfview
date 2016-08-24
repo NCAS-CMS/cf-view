@@ -19,7 +19,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.9.7'
+__version__='0.9.8'
 
 cfgPadding=5
 
@@ -619,9 +619,7 @@ class gridSelector(guiFrame):
         dcount=0
         for axis in 'X', 'Y', 'Z', 'T':
            for dim in self.grid.axes:
-              com='res=self.grid.axes[dim].'+axis
-              exec(com)
-              if res is True:
+              if getattr(self.grid.axes[dim], axis) is True:
                  if len(self.grid.axes[dim].array) > 1: dcount = dcount + 1
                  box=self._makeSlider(dim, dcount)
                  self.sliders[dim]=box
@@ -1010,14 +1008,13 @@ class cfview:
             if grid[d][2]<>None:
                 op_counter=op_counter+1
                 axis_name=getattr(sfield.item(d), 'standard_name', d)
+                sfield=sfield.collapse(grid[d][2],axes=axis_name)
                 code="sfield=sfield.collapse('%s',axes='%s')"%(grid[d][2],axis_name)
-                exec(code)
                 if op_counter == 1: plotvars.code=plotvars.code+'#Apply operators\n'
                 plotvars.code=plotvars.code+code+'\n'
                 opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
 
 
-        print sfield
 
         
     def reset_with(self,filename):
@@ -1114,7 +1111,6 @@ class check_input():
     def __init__(self, inputs=None, errstr=None, chk_integer=None, nvals=None, gezero=None, geone=None, ascending=False):
 
         #Convert input strings to a set of inputs
-        #exec('myvals=plotvars.'+inputs)
         vals=inputs.split()
 
         #Set a null message
@@ -1212,7 +1208,7 @@ class xconvLike(QuarterFrame):
 
 
     def _plot(self,w,plotOptions):
-        ''' Executes a plot given the information returned from the various
+        ''' Make a plot given the information returned from the various
         selectors and configuration widgets. In practice we have
             - the grid selector telling us about the data slicing,
             - the field selector telling us about what data to plot, and
@@ -1227,13 +1223,8 @@ class xconvLike(QuarterFrame):
         
 
         #Extract data
-        code='sfield=self.fields[0]'
-        exec(code)
-
-
-
-
-
+        sfield=self.fields[0]
+       
 
         #Single plot
         if plotOptions['nup'] == '1': 
@@ -1244,33 +1235,23 @@ class xconvLike(QuarterFrame):
         #Multiple plots
         if plotOptions['nup'] != '1' and plotvars.pos == 0:
            #Set number of plots in gplot from interface nup parameter
-           if plotOptions['nup'] == '2x1': 
-              code="cfp.gopen(columns=2, rows=1)"
-              plotvars.nplots=2
-           if plotOptions['nup'] == '1x2': 
-              code="cfp.gopen(columns=1, rows=2, orientation='portrait')"
-              plotvars.nplots=2
-           if plotOptions['nup'] == '2x2': 
-              code="cfp.gopen(columns=2, rows=2)"
-              plotvars.nplots=4
-           if plotOptions['nup'] == '3x2':
-              code="cfp.gopen(columns=3, rows=2)"
-              plotvars.nplots=6
-           if plotOptions['nup'] == '2x3':
-              code="cfp.gopen(columns=2, rows=3, orientation='portrait')"
-              plotvars.nplots=6
-           if plotOptions['nup'] == '3x3':
-              code="cfp.gopen(columns=3, rows=3)"
-              plotvars.nplots=9
-           exec("\n"+code)
+           if plotOptions['nup'] == '2x1': columns=2; rows=1
+           if plotOptions['nup'] == '1x2': columns=1; rows=2
+           if plotOptions['nup'] == '2x2': columns=2; rows=2
+           if plotOptions['nup'] == '3x2': columns=3; rows=2
+           if plotOptions['nup'] == '2x3': columns=2; rows=3
+           if plotOptions['nup'] == '3x3': columns=3; rows=3
+           
+           plotvars.nplots=columns*rows
            plotvars.code=script_start
-           plotvars.code=plotvars.code+code+'\n'
+           cfp.gopen(columns=columns, rows=rows)
+           plotvars.code=plotvars.code+"#Set plot columns and rows\n"
+           plotvars.code=plotvars.code+"cfp.gopen(columns="+str(columns)+", rows="+str(rows)+')\n'
 
            #Position at first plot
            plotvars.pos=1
-           code="cfp.gpos(pos=1)"
-           exec(code)
-           plotvars.code=plotvars.code+code+'\n\n'
+           cfp.gpos(pos=1)
+           plotvars.code=plotvars.code+'cfp.gpos(pos=1)\n\n'
            plotvars.title=''
 
 
@@ -1294,7 +1275,8 @@ class xconvLike(QuarterFrame):
 
 
         #Check if field is subsetted by the user
-        subset_counter=0
+        opts={}
+
         subset_string=''
         for d in grid:
             dmin=np.min(sfield.item(d).array)
@@ -1309,33 +1291,46 @@ class xconvLike(QuarterFrame):
             #Take account of multiple axes with almost the same name
             #by adding the 'exact' keyword to the subset
             naxes=len(sfield.items(axis_name))
+         
             exact_str=''
-            if naxes > 1: exact_str="'exact',"
-
+            if naxes > 1: 
+                opts['exact']=True
+                exact_str="'exact',"
 
             if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
-               subset_counter=subset_counter+1
                if (abs(grid[d][1]-grid[d][0]) <= tol):
                   #Single value
-                  code="sfield=sfield.subspace(%s%s=%s)"%(exact_str,axis_name,repr(grid[d][0]))
+                  opts[axis_name]=float(repr(grid[d][0]))
                   subset_string=subset_string+' '+axis_name+':'+repr(grid[d][0])+' '
                else:
                   #Range of values
-                  code="sfield=sfield.subspace(%s%s=cf.wi(%s,%s))"%(exact_str,axis_name,repr(grid[d][0]),repr(grid[d][1]))
-               
-               exec(code)
-               if subset_counter == 1: plotvars.code=plotvars.code+'#Subspace the data\n'
-               plotvars.code=plotvars.code+code+'\n'
+                  opts[axis_name]=cf.wi(float(repr(grid[d][0])), float(repr(grid[d][1])))
 
-            
 
-        if subset_counter > 0: plotvars.code=plotvars.code+'\n'
+
+        code=''
+        sfield=sfield.subspace(**opts)
+        plotvars.code=plotvars.code+'#Subspace the data\n'
+        for key in opts.keys():
+            if isinstance(opts[key], cf.query.Query):
+                #range using cf.wi
+                if code != '': code=code+','+key+'=cf.wi('+str(opts[key].value[0])+','+str(opts[key].value[1])+')'
+                if code == '': code=key+'=cf.wi('+str(opts[key].value[0])+','+str(opts[key].value[1])+')'
+            else:
+                #Single value
+                if code != '': code=code+','+key+'='+str(opts[key])
+                if code == '': code=key+'='+str(opts[key])
+
+
+        plotvars.code=plotvars.code+'sfield=sfield.subspace('+code+')\n\n'
+
 
 
         #Do we have to apply any operators?
         #Apply these all together to sfield as if longitude and latitude are meaned at the same
         #time this is a global area weighted mean.  If applied individually it is a linear mean in
         #longitude followed by a linear mean in latitude.
+        opts={}
         opstring=' '
         op_counter=0
         for d in grid:
@@ -1345,12 +1340,15 @@ class xconvLike(QuarterFrame):
                 axis_name=getattr(sfield.item(d), 'standard_name', d)
                 opstring+='%s: %s'%(axis_name,grid[d][2])
 
+
         if op_counter >0 :
-           code="sfield=sfield.collapse('"+opstring+"')"
+           sfield=sfield.collapse(opstring)
            plotvars.code=plotvars.code+'#Apply operators\n'
-           plotvars.code=plotvars.code+code+'\n\n'
-           exec(code)
+           plotvars.code=plotvars.code+"sfield=sfield.collapse('"+opstring+"')\n"
  
+
+
+
 
         plotvars.data=sfield
 
@@ -1414,66 +1412,49 @@ class xconvLike(QuarterFrame):
                 if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
 
-        #Make up the cscale command if any changes required
-        code=''
-          
+        #Make a list of cscacle options requested and translate this into user code 
         if plotvars.cscale_auto_set is False: 
-            code="'"+plotvars.cscale+"'"
-            if plotvars.cscale_reverse_set is True: code=code+', reverse=True'
- 
-            if plotvars.cscale_white != '': 
-                if code != '': code=code+', '
-                code=code+'white='
-                nvals=np.size(plotvars.cscale_white.split())
-                if nvals == 1:
-                    code=code+plotvars.cscale_white
-                else:
-                    code=code+'['
-                    count=0
-                    for val in plotvars.cscale_white.split():
-                        code=code+val
-                        if count < nvals-1: code=code+','
-                        count=count+1
-                    code=code+']'
+            opts={}
+            code=''
+            opts['cmap']=plotvars.cscale
+            if plotvars.cscale_ncols !='': opts['ncols']=np.int(plotvars.cscale_ncols)
+            if plotvars.cscale_white !='':
+               if np.size(plotvars.cscale_white.split()) == 1:
+                   opts['white']=int(plotvars.cscale_white)
+               else:
+                   opts['white']=[int(numeric_string) for numeric_string in plotvars.cscale_white.split()]
 
-            if plotvars.cscale_ncols != '': 
-                if code != '': code=code+', '
-                code=code+'ncols='+plotvars.cscale_ncols
+            if plotvars.cscale_reverse_set is True: opts['reverse']=True
+            if plotvars.cscale_above !='': opts['above']=np.int(plotvars.cscale_above)
+            if plotvars.cscale_below !='': opts['below']=np.int(plotvars.cscale_below)
 
-            if plotvars.cscale_above != '': 
-                if code != '': code=code+', '
-                code=code+'above='+plotvars.cscale_above
 
-            if plotvars.cscale_below != '': 
-                if code != '': code=code+', '
-                code=code+'below='+plotvars.cscale_below
+            #Set the colour scale with user options
+            cfp.cscale(**opts)
 
-            if code != '':
-                code='cfp.cscale('+code+')'
-                exec(code)
-                plotvars.code=plotvars.code+'\n#Set colour scale\n'
-                plotvars.code=plotvars.code+code+'\n\n'
+            for key in ['cmap', 'ncols', 'reverse', 'white', 'below', 'above']:
+                if key in opts.keys():
+                    if code != '': code=code+','+key+'='+str(opts[key])
+                    if code == '': code=key+'='+str(opts[key])
 
+            #Add the user code to the internal code to make the plot
+            plotvars.code=plotvars.code+'\n#Set colour scale\n'
+            plotvars.code=plotvars.code+'cfp.cscale('+code+')'+'\n\n'
          
+
  
         if plot_type == 0:
-
-             
-
            plotvars.code=plotvars.code+'\n#Make a graph plot\n'
-
-           code="cfp.lineplot(sfield)"
-           exec(code)
-           plotvars.code=plotvars.code+code+'\n'
+           cfp.lineplot(sfield)
+           plotvars.code=plotvars.code+'cfp.lineplot(sfield)\n'
 
 
            if plotvars.nplots != 1:
               plotvars.pos=plotvars.pos+1
               if plotvars.pos <= plotvars.nplots: 
-                 code="cfp.gpos(pos=%s)"%plotvars.pos
-                 exec(code)
+                 cfp.gpos(pos=plotvars.pos)
                  plotvars.code=plotvars.code+'\n#Move to next plot position\n'
-                 plotvars.code=plotvars.code+code+'\n\n'
+                 plotvars.code=plotvars.code+"cfp.gpos(pos=%s)"%plotvars.pos+'\n\n'
 
 
         #vector plot
@@ -1506,11 +1487,16 @@ class xconvLike(QuarterFrame):
               vfield=sfield
               plotvars.code=plotvars.code+'vfield=sfield\n\n'
               
-              code='cfp.vect(u=ufield, v=vfield'           
+              opts={}
+              code=''          
+
+              #Add u and v fileds as opts
+              opts['u']=ufield
+              opts['v']=vfield
 
               if plotvars.vect_auto_set is True:
-                  exec('key_length=str(int(np.max((np.sqrt(ufield.array**2+vfield.array**2))/2)))')
-                  code=code+', key_length='+key_length+', scale=100'
+                  opts['key_length']=int(np.max((np.sqrt(ufield.array**2+vfield.array**2))/2))
+                  opts['scale']=100
               else:
                   #Check inputs are numbers
                   if plotvars.vect_scale != '':
@@ -1521,8 +1507,9 @@ class xconvLike(QuarterFrame):
                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
                   #Add to vect command
-                  code=code+',key_length='+plotvars.vect_length+', scale='+plotvars.vect_scale
-              
+                  opts['key_length']=float(plotvars.vect_length)
+                  opts['scale']=float(plotvars.vect_scale)
+             
 
               #Add stride if required
               if plotvars.vect_stride_set is True:
@@ -1533,8 +1520,8 @@ class xconvLike(QuarterFrame):
                       check_input(inputs=plotvars.vect_stride, errstr='vector stride setting', chk_integer=True, geone=True)
                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
-                  if np.size(strides) == 1: code=code+' ,stride='+strides[0]
-                  if np.size(strides) == 2: code=code+' ,stride=['+strides[0]+','+strides[1]+']'
+                  if np.size(strides) == 1: opts['stride']=np.int(strides[0])
+                  if np.size(strides) == 2: opts['stride']=[np.int(strides[0]), np.int(strides[1])]
 
               #Add pts if required
               if plotvars.vect_pts_set is True:
@@ -1545,17 +1532,26 @@ class xconvLike(QuarterFrame):
                   if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
 
-                  if np.size(pts) == 1: code=code+' ,pts='+pts[0]
-                  if np.size(pts) == 2: code=code+' ,pts=['+pts[0]+','+pts[1]+']'
+                  if np.size(pts) == 1: opts['pts']=np.int(pts[0])
+                  if np.size(pts) == 2: opts['pts']=[np.int(pts[0]), np.int(pts[1])]
 
  
              
 
-              #Finish off the vect command
-              code=code+", title='%s')"%plotvars.title
-              exec(code)
+              #Add the title
+              opts['title']=plotvars.title
+              
+              #Make the vector plot
+              cfp.vect(**opts)
+
+              #Translate opts to user code
+              plotvars.code=plotvars.code+'#Set levels\n'
+              for key in ['u', 'v', 'key_length', 'scale', 'stride', 'pts', 'title']:
+                  if key in opts.keys():
+                       if code != '': code=code+','+key+'='+str(opts[key])
+                       if code == '': code=key+'='+str(opts[key])
               plotvars.code=plotvars.code+'\n#Make vector plot\n'
-              plotvars.code=plotvars.code+code+'\n\n'
+              plotvars.code=plotvars.code+'cfp.vect(u=ufield, v=vfield'+code+')\n\n'
 
               #reset counters and move on to the next plot
               plotvars.vect_ufield=None
@@ -1563,10 +1559,9 @@ class xconvLike(QuarterFrame):
               plotvars.title=''
               plotvars.pos=plotvars.pos+1
               if plotvars.pos <= plotvars.nplots and plotvars.nplots > 1: 
-                 code="cfp.gpos(pos=%s)"%plotvars.pos
-                 exec(code)                    
+                 cfp.gpos(pos=plotvars.pos)
                  plotvars.code=plotvars.code+'\n#Move to next plot position\n'
-                 plotvars.code=plotvars.code+code+'\n\n'
+                 plotvars.code=plotvars.code+"cfp.gpos(pos=%s)"%plotvars.pos+'\n\n'
               plotvars.plot_counter=plotvars.plot_counter+1
 
 
@@ -1586,17 +1581,19 @@ class xconvLike(QuarterFrame):
            if plot_type == 3 and plotvars.plot_counter > 1: proceed=0
            if proceed == 1:
               if plotvars.nplots == 1 and plot_type == 3: 
-                 code="cfp.gopen()"
-                 exec("\n"+code)
-                 plotvars.code=plotvars.code+code+'\n'
+                 cfp.gopen()
+                 plotvars.code=plotvars.code+"cfp.gopen()\n"
 
 
               plotvars.title=sfield.file+opstring+subset_string
               
               #Set levels if set in contour_levels
               #Reset levels to automatic
-              exec('cfp.levs()')
+              cfp.levs()
+              opts={}
+              code=''
 
+              #User supplies min, max, step
               if plotvars.levs_set is True:
                   #Check inputs are numbers
                   check_input(inputs=plotvars.levs_min, errstr='contour levels minimum ', nvals=1)
@@ -1617,9 +1614,13 @@ class xconvLike(QuarterFrame):
                       dialog.destroy()
                       return
  
-                  code="cfp.levs(min="+plotvars.levs_min+", max="+plotvars.levs_max+", step="+plotvars.levs_step
+
+                  opts['min']=np.float(plotvars.levs_min)
+                  opts['max']=np.float(plotvars.levs_max)
+                  opts['step']=np.float(plotvars.levs_step)
 
 
+              #User supplies a set of ascending levels
               if plotvars.levs_manual_set is True:
                   #Check inputs are numbers
                   check_input(inputs=plotvars.levs_manual, errstr='contour manual levels ')
@@ -1630,41 +1631,34 @@ class xconvLike(QuarterFrame):
                   check_input(inputs=plotvars.levs_manual, errstr='contour manual levels must be ascending  ', ascending=True)
                   if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
 
+                  opts['manual']=[int(numeric_string) for numeric_string in plotvars.levs_manual.split()]
 
- 
-                  code="cfp.levs(manual=["
-                  nvals=np.size(plotvars.levs_manual.split())
-                  count=0
-                  for val in plotvars.levs_manual.split():
-                      code=code+val
-                      if count < nvals-1: code=code+','
-                      count=count+1
-                  code=code+']' 
+                  
+
 
               #Add on colour bar extensions if specified
-              if plotvars.levs_set is False and plotvars.levs_manual_set is False: 
-                  if  plotvars.levs_extend_lower is False or plotvars.levs_extend_upper is False:
-                      code='cfp.levs('
-              if plotvars.levs_set is True or plotvars.levs_manual_set is True: 
-                  if  plotvars.levs_extend_lower is False or plotvars.levs_extend_upper is False:
-                      code=code+','
-              if plotvars.levs_set is False or plotvars.levs_manual_set is False: 
-                  if plotvars.levs_extend_lower is False and plotvars.levs_extend_upper is True:
-                      code=code+"extend='max'"
-                  if plotvars.levs_extend_lower is True and plotvars.levs_extend_upper is False:
-                      code=code+"extend='min'"
-                  if plotvars.levs_extend_lower is False and plotvars.levs_extend_upper is False:
-                      code=code+"extend='neither'"
-                  code=code+")"
+              if  plotvars.levs_extend_lower is True and plotvars.levs_extend_upper is False:
+                  opts['extend']='lower'
+              if  plotvars.levs_extend_lower is False and plotvars.levs_extend_upper is True:
+                  opts['extend']='upper'
+              if  plotvars.levs_extend_lower is False and plotvars.levs_extend_upper is False:
+                  opts['extend']='neither'
 
+              if len(opts) > 0:
+                   cfp.levs(**opts)
 
-              if code[:8] == 'cfp.levs':
-                   exec(code)
+                   #Translate opts to user code
                    plotvars.code=plotvars.code+'#Set levels\n'
-                   plotvars.code=plotvars.code+code+'\n\n'
+                   for key in ['min', 'max', 'step', 'manual', 'extend']:
+                       if key in opts.keys():
+                           if code != '': code=code+','+key+'='+str(opts[key])
+                           if code == '': code=key+'='+str(opts[key])
+
+                   plotvars.code=plotvars.code+'cfp.levs('+code+')\n\n'
 
             
               #Map settings
+              opts={}
               code=''
               #Set the cylindrical map limits if changed
               if plotvars.proj == 'cyl':
@@ -1693,118 +1687,138 @@ class xconvLike(QuarterFrame):
                            dialog.run()
                            dialog.destroy()
                            return
- 
-                       code="cfp.mapset(lonmin="+plotvars.lonmin+", lonmax="+plotvars.lonmax\
-                            +", latmin="+plotvars.latmin+", latmax="+plotvars.latmax
+
+                       opts['lonmin']=np.float(plotvars.lonmin)
+                       opts['lonmax']=np.float(plotvars.lonmax)
+                       opts['latmin']=np.float(plotvars.latmin)
+                       opts['latmax']=np.float(plotvars.latmax)
 
 
               #Polar plot if selected
-              if plotvars.proj == 'npstere' or plotvars.proj == 'spstere': 
+              if plotvars.proj == 'npstere' or plotvars.proj == 'spstere':
+                  opts['proj']=plotvars.proj
                   #Check inputs are numbers
                   message=''
-                  if plotvars.lon_0 != '0' or plotvars.boundinglat != '0':
-
+                  if plotvars.lon_0 != '0':
                       check_input(inputs=plotvars.lon_0, errstr='map lon_0 ', nvals=1)
                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+                      opts['lon_0']=np.float(plotvars.lon_0)
 
+                  if plotvars.lon_0 != '0' or plotvars.boundinglat != '0':
                       check_input(inputs=plotvars.boundinglat, errstr='map boundinglat ', nvals=1)
                       if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+                      opts['boundinglat']=np.float(plotvars.boundinglat)
 
-
-                  code="cfp.mapset(proj='"+plotvars.proj+"'"
-                  if plotvars.lon_0 != '0': code=code+', lon_0='+plotvars.lon_0
-                  if plotvars.boundinglat != '0': code=code+', boundinglat='+plotvars.boundinglat
 
               #Change resolution if requested
-              if plotvars.resolution !='c':
-                  if code == '': 
-                      code="cfp.mapset(resolution='"+plotvars.resolution+"'"
-                  else:
-                      code=code+",resolution='"+plotvars.resolution+"'"
-              
-              #Run code if changes have been made    
-              if code != '':
-                  code=code+')'
-                  exec(code)
-                  plotvars.code=plotvars.code+'#Set map projection and limits\n'
-                  plotvars.code=plotvars.code+code+'\n\n'
+              if plotvars.resolution !='c': opts['resolution']=plotvars.resolution
+
+
+              if len(opts) > 0:
+                   cfp.mapset(**opts)
+
+                   #Translate opts to user code
+                   plotvars.code=plotvars.code+'#Set map projection and limits\n'
+                   for key in ['lonmin', 'lonmax', 'latmin', 'latmax', 'proj', 'lon_0', 'boundinglat', 'resolution']:
+                       if key in opts.keys():
+                           if code != '': code=code+','+key+'='+str(opts[key])
+                           if code == '': code=key+'='+str(opts[key])
+
+                   plotvars.code=plotvars.code+'cfp.mapset('+code+')\n\n'
+
 
 
               #Set continent thickness and colour if required
-              if plotvars.continent_thickness != '1.5' or plotvars.continent_color != 'black':
-                  #Check continent_thinckness is a valid number
-                  if plotvars.continent_thickness != '1.5':
-                      check_input(inputs=plotvars.continent_thickness, errstr='map continent thickness ', nvals=1)
-                      if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+              opts={}
+              code=''
+              #Check continent_thinckness is a valid number
+              if plotvars.continent_thickness != '1.5':
+                  check_input(inputs=plotvars.continent_thickness, errstr='map continent thickness ', nvals=1)
+                  if plotvars.invalid_input is True: plotvars.invalid_input=False ; return
+
+                  opts['continent_thickness']=np.float(plotvars.continent_thickness)
+
+              if plotvars.continent_color != 'black':
+                  #Check input colour is a valid matplotlib colour
+                  if plotvars.continent_color not in matplotlib.colors.cnames:
+                       message='Continent colour must be a valid matplotlib colour\n'
+                       message=message+'Search on the web for valid matplotlib color names'
+                       dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
+                       gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
+                       dialog.run()
+                       dialog.destroy()
+                       return
+
+                  opts['continent_color']=plotvars.continent_color
 
 
-                  #Generate cf-plot setvars command as required
-                  code='cfp.setvars('
-                  if plotvars.continent_thickness != '1.5': code=code+"continent_thickness='"+plotvars.continent_thickness+"',"
-                  if plotvars.continent_color != 'black':
-                      #Check input colour is a valid matplotlib colour
-                      if plotvars.continent_color not in matplotlib.colors.cnames:
-                           message='Continent colour must be a valid matplotlib colour\n'
-                           message=message+'Search on the web for valid matplotlib color names'
-                           dialog=gtk.MessageDialog(None,gtk.DIALOG_DESTROY_WITH_PARENT,
-                           gtk.MESSAGE_ERROR,gtk.BUTTONS_CLOSE,message)
-                           dialog.run()
-                           dialog.destroy()
-                           return
+              if len(opts) > 0:
+                   cfp.setvars(**opts)
+
+                  #Translate opts to user code
+                   for i, j in opts.iteritems(): 
+                       if code != '': code=code+','+i+'='+str(j)
+                       if code == '': code=i+'='+str(j)
+                   plotvars.code=plotvars.code+'#Set continent attributes\n'
+                   plotvars.code=plotvars.code+'cfp.setvars('+code+')\n\n'
 
 
 
-                      code=code+"continent_color='"+plotvars.continent_color+"'"
-                  code=code+')'
-                  exec(code)
-                  plotvars.code=plotvars.code+'#Set continent attributes\n'
-                  plotvars.code=plotvars.code+code+'\n\n'
 
-
-
-              #Assemble contour command from plotOptions
-              code="cfp.con(sfield"
+              #Assemble contour opts from plotOptions
+              opts={}
 
               contour_style=plotOptions['con']['contour_style']
               contour_line=plotOptions['con']['contour_line']
               if contour_style == 1: 
-                 if contour_line == 2: code=code+",lines=0"
-                 if contour_line == 3: code=code+",lines=1, negative_linestyle=1"
+                 if contour_line == 2: opts['lines']=0
+                 if contour_line == 3: opts['lines']=1; opts['negative_linestyle']=1
               if contour_style == 2: 
-                 if contour_line == 1: code=code+",blockfill=1,lines=1"
-                 if contour_line == 2: code=code+",blockfill=1, lines=0"
-                 if contour_line == 3: code=code+",blockfill=1, lines=1, negative_linestyle=1"
+                 if contour_line == 1: opts['blockfill']=1; opts['lines']=1
+                 if contour_line == 2: opts['blockfill']=1; opts['lines']=0
+                 if contour_line == 3: opts['blockfill']=1; opts['lines']=1; opts['negative_linestyle']=1
               if contour_style == 3: 
-                 if contour_line == 1: code=code+",fill=0,lines=1"
-                 if contour_line == 2: code=code+",fill=0, lines=0"
-                 if contour_line == 3: code=code+",fill=0, lines=1, negative_linestyle=1"
+                 if contour_line == 1: opts['fill']=0; opts['lines']=1
+                 if contour_line == 2: opts['fill']=0; opts['lines']=0
+                 if contour_line == 3: opts['fill']=0; opts['lines']=1; opts['negative_linestyle']=1
 
 
-              if plotOptions['con']['line_labels'] is False:
-                  code=code+', line_labels=False'
+              if plotOptions['con']['line_labels'] is False: opts['line_labels']=False
+              opts['title']=plotvars.title
+              if plotOptions['con']['colorbar_orientation']=='vertical': opts['colorbar_orientation']='vertical'
+              if plotOptions['con']['colorbar'] is None: opts['ylog']=None
+              if plotOptions['con']['xlog'] is True: opts['xlog']=1
+              if plotOptions['con']['ylog'] is True: opts['ylog']=1
+              
 
-              #if plotOptions['con']['filled']<>1:code=code+",fill=0"
-              code=code+",title='%s'"%plotvars.title
-              if plotOptions['con']['colorbar_orientation']=='vertical': \
-                 code=code+",colorbar_orientation='vertical'"
-              if plotOptions['con']['colorbar'] is None: code=code+",colorbar=None"
-              if plotOptions['con']['xlog'] is True: code=code+", xlog=1"
-              if plotOptions['con']['ylog'] is True: code=code+", ylog=1"
-              code=code+')'
 
-              exec(code)
+              cfp.con(sfield, **opts)
+
+              #Translate opts to user code
+              code=''                
+              for key in ['fill', 'blockfill', 'lines', 'negative_linestyle', 'line_labels', 'colorbar_orientation',
+                          'xlog', 'ylog']:
+                  if key in opts.keys():
+                      if code != '': code=code+','+key+'='+str(opts[key])
+                      if code == '': code=key+'='+str(opts[key])
+              if 'title' in opts.keys(): 
+                  if code != '': code=code+", title=\'"+str(opts['title'])+"\'"
+                  if code == '': code="title=\'"+str(opts['title'])+"\'"
+
               plotvars.code=plotvars.code+'#Make contour plot\n'
-              plotvars.code=plotvars.code+code+'\n\n'
+              plotvars.code=plotvars.code+'cfp.con(sfield,'+code+')\n\n'
+
+
+
 
               if plot_type ==1: plotvars.title=''
               plotvars.plot_counter=plotvars.plot_counter+1
               if plot_type == 1:  
                  plotvars.pos=plotvars.pos+1
                  if plotvars.pos <= plotvars.nplots and plotvars.nplots > 1: 
-                    code="cfp.gpos(pos=%s)"%plotvars.pos
-                    exec(code)
+                    cfp.gpos(pos=plotvars.pos)
                     plotvars.code=plotvars.code+'\n#Move to next plot position\n'
-                    plotvars.code=plotvars.code+code+'\n\n'
+                    plotvars.code=plotvars.code+"cfp.gpos(pos=%s)"%plotvars.pos+'\n\n'
 
 
 
@@ -1814,9 +1828,8 @@ class xconvLike(QuarterFrame):
            if plot_type == 0 or plot_type == 1:  plot_reset=1
            if plot_type == 2 and plotvars.plot_counter == 2: plot_reset=1
            if plot_type == 3 and plotvars.plot_counter == 3: 
-              code="cfp.gclose()"
-              exec(code)
-              plotvars.code=plotvars.code+code+'\n'
+              cfp.gclose()
+              plotvars.code=plotvars.code+'\ncfp.gclose()\n'
               plot_reset=1
 
            if plot_reset == 1:
@@ -1837,9 +1850,8 @@ class xconvLike(QuarterFrame):
            plotvars.pos=0
            plotvars.plot_counter=0
            plotvars.plot_finish=0
-           code="cfp.gclose()"
-           exec(code)
-           plotvars.code=plotvars.code+code+'\n'
+           cfp.gclose()
+           plotvars.code=plotvars.code+'\ncfp.gclose()\n'
 
 
 
@@ -3569,7 +3581,8 @@ class Config_color_scales:
 	    self.cscale_label6.set_sensitive(False)
 	    self.cscale_label7.set_sensitive(False)
             for scale in cscales.cscales:
-                exec('self.hbox_'+scale+'.set_sensitive(False)')
+                getattr(self, 'hbox_'+scale).set_sensitive(False)
+
         else:
             plotvars.cscale_auto_set=False
             self.toggle_cscale_reverse.set_sensitive(True)
@@ -3585,8 +3598,8 @@ class Config_color_scales:
 	    self.cscale_label6.set_sensitive(True)
 	    self.cscale_label7.set_sensitive(True)	    
             for scale in cscales.cscales:
-                exec('self.hbox_'+scale+'.set_sensitive(True)')
-            exec('self.toggle_'+plotvars.cscale+'.set_active(True)')
+                getattr(self, 'hbox_'+scale).set_sensitive(True)
+            getattr(self, 'toggle_'+plotvars.cscale).set_sensitive(True)
 
     def cscale_reverse(self, widget):
         if self.toggle_cscale_reverse.get_active():
@@ -3608,7 +3621,7 @@ class Config_color_scales:
 
     def cscale_set(self, widget, data=None):
         #turn off previous selection
-        exec('self.toggle_'+plotvars.cscale+'.set_active(False)')
+        getattr(self, 'toggle_'+plotvars.cscale).set_sensitive(False)
         plotvars.cscale=data
 
     def cscale_reset(self, widget):
@@ -3618,7 +3631,7 @@ class Config_color_scales:
         plotvars.cscale_ncols=''
         plotvars.cscale_above=''
         plotvars.cscale_below=''
-        exec('self.toggle_'+plotvars.cscale+'.set_active(False)')
+        getattr(self, 'toggle_'+plotvars.cscale).set_active(False)
         plotvars.cscale='viridis'
         self.toggle_cscale_auto.set_active(True)
         self.toggle_cscale_reverse.set_active(False)
@@ -3662,6 +3675,7 @@ class Config_color_scales:
         window.add(vbox)
         vbox.show()
         window.show()
+
 
         #Tick auto vectors
         toggle_cscale_auto = gtk.CheckButton("Automatic colour scale")
@@ -3830,24 +3844,24 @@ class Config_color_scales:
 						
 		
 		
+
             #horizontal box for colour scales
-            exec('hbox_'+scale+'=gtk.HBox()')
-            exec('hbox_'+scale+'.show()')
-            exec('hbox_'+scale+'.set_sensitive(False)')
-            exec('sw_vbox.add(hbox_'+scale+')')
+            setattr(self, 'hbox_'+scale, gtk.HBox())
+            getattr(self, 'hbox_'+scale).show()
+            getattr(self, 'hbox_'+scale).set_sensitive(False)
+            sw_vbox.add(getattr(self, 'hbox_'+scale))
+
 
             #Add toggle
-            exec('toggle_'+scale+" = gtk.CheckButton('"+scale+"')")
-            exec('toggle_'+scale+'.set_active(False)')
-            exec('toggle_'+scale+'.show()')
-            exec('hbox_'+scale+'.pack_start(toggle_'+scale+')')
-             
-            #Connect the widget
-            exec('toggle_'+scale+'.connect("toggled", self.cscale_set, "'+scale+'")')
+            setattr(self, 'toggle_'+scale, gtk.CheckButton(scale))
+            getattr(self, 'toggle_'+scale).show()
+            getattr(self, 'toggle_'+scale).set_active(False)
+            getattr(self, 'hbox_'+scale).pack_start(getattr(self, 'toggle_'+scale))
 
-            #Populate self with the widgets
-            exec('self.toggle_'+scale+'=toggle_'+scale)
-            exec('self.hbox_'+scale+'=hbox_'+scale)
+            #Connect the widget
+            getattr(self, 'toggle_'+scale).connect("toggled", self.cscale_set, scale)
+
+
 
 
             #Make the colour scales into images
@@ -3885,11 +3899,10 @@ class Config_color_scales:
             button.add(image)
             button.set_alignment(1.0, 0.5)
  	    button.show() 
-            exec('hbox_'+scale+'.pack_start(button)')
-
+            getattr(self, 'hbox_'+scale).pack_start(button)
 
         #Set default scale to be viridis
-        toggle_viridis.set_active(True)
+        #toggle_viridis.set_active(True)
 
 
         #######################################
