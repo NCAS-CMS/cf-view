@@ -11,7 +11,6 @@ import gtk, gobject, pango
 import unittest
 from collections import OrderedDict
 from distutils.version import StrictVersion
-from subprocess import call
 
 #Check numpy version is okay
 numpy_version_min='1.8.1'
@@ -19,7 +18,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='0.9.8'
+__version__='1.0.0'
 
 cfgPadding=5
 
@@ -174,8 +173,38 @@ class myCombo(gtk.HBox):
     def __init__(self,content,label=None,initial=None, callback=None,fontSize=8,
                  padding=2):
         ''' Initialise with content, label, callback and fontsize '''
+        
+
+        #if np.size(content) < 500:
+        #    print 'In small ComboBox creation', label, np.size(content)
+        #    super(myCombo,self).__init__()
+        #    self._model=gtk.ListStore(gobject.TYPE_STRING)
+        #    self._box=gtk.ComboBox(self._model)
+        #    txt=gtk.CellRendererText()
+        #    self._box.pack_start(txt,True)
+        #    self._box.add_attribute(txt,'text',0)
+        #    txt.set_property('font','sans %s'%fontSize)
+        #    if label is not None:
+        #        mylabel=smallLabel(label)
+        #        self.pack_start(mylabel,padding=padding,expand=False)
+        #    if callback is not None:
+        #        self._callback=callback
+        #        self._box.connect('changed',self.__myComboCallback)
+        #    self.pack_start(self._box,padding=padding,expand=True) 
+        #   
+        #    for item in content:
+        #        self._model.append([item])
+
+
+        #else:
+
         super(myCombo,self).__init__()
-        self._model=gtk.ListStore(gobject.TYPE_STRING)
+        mymodel=gtk.ListStore(gobject.TYPE_STRING)
+        for item in content:
+            mymodel.append([item])
+
+
+        self._model=mymodel
         self._box=gtk.ComboBox(self._model)
         txt=gtk.CellRendererText()
         self._box.pack_start(txt,True)
@@ -187,9 +216,7 @@ class myCombo(gtk.HBox):
         if callback is not None:
             self._callback=callback
             self._box.connect('changed',self.__myComboCallback)
-        self.pack_start(self._box,padding=padding,expand=True) 
-        for item in content:
-            self._model.append([item])
+        self.pack_start(self._box,padding=padding,expand=True)          
 
         #print 'ajh - myCombo - setting self.content to ', content, type(content)
         #if type(content) is float: print 'ajh - myCombo - float is ', float(content)
@@ -199,8 +226,8 @@ class myCombo(gtk.HBox):
         ''' Set active value of combobox '''
         if v not in self.content:  
 
-            print 'ajh -self.content is ', self.content, type(self.content)
-            print 'ajh - v is ', v, type(v)        
+            #print 'ajh - self.content is ', self.content, type(self.content)
+            #print 'ajh - v is ', v, type(v)        
 
             raise ValueError('Attempt to set combobox to non valid value')
         else:
@@ -1010,7 +1037,7 @@ class cfview:
                 axis_name=getattr(sfield.item(d), 'standard_name', d)
                 sfield=sfield.collapse(grid[d][2],axes=axis_name)
                 code="sfield=sfield.collapse('%s',axes='%s')"%(grid[d][2],axis_name)
-                if op_counter == 1: plotvars.code=plotvars.code+'#Apply operators\n'
+                if op_counter == 1: plotvars.code=plotvars.code+'#Apply operators'
                 plotvars.code=plotvars.code+code+'\n'
                 opstring+='%s:%s '%(grid[d][2],sfield.domain.axis_name(d))
 
@@ -1292,10 +1319,10 @@ class xconvLike(QuarterFrame):
             #by adding the 'exact' keyword to the subset
             naxes=len(sfield.items(axis_name))
          
-            exact_str=''
-            if naxes > 1: 
-                opts['exact']=True
-                exact_str="'exact',"
+            #exact_str=''
+            #if naxes > 1: 
+            #    opts['exact']=True
+            #    exact_str="'exact',"
 
             if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
                if (abs(grid[d][1]-grid[d][0]) <= tol):
@@ -1344,7 +1371,7 @@ class xconvLike(QuarterFrame):
         if op_counter >0 :
            sfield=sfield.collapse(opstring)
            plotvars.code=plotvars.code+'#Apply operators\n'
-           plotvars.code=plotvars.code+"sfield=sfield.collapse('"+opstring+"')\n"
+           plotvars.code=plotvars.code+"sfield=sfield.collapse('"+opstring+"')\n\n"
  
 
 
