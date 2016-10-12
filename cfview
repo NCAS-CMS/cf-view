@@ -18,7 +18,7 @@ numpy_errstr='\n numpy >= ' + numpy_version_min + ' needs to be installed to use
 if np.__version__ < StrictVersion(numpy_version_min): raise  Warning(numpy_errstr) 
 
 
-__version__='1.0.0'
+__version__='1.0.4'
 
 cfgPadding=5
 
@@ -42,6 +42,7 @@ class pvars(object):
       levs_min='0' - user selected minimim level
       levs_max='0' - user selected maximim level
       levs_step='0' - user selected level step
+      common_colorbar=False - use one colorbar at the bottom of the plot
       resolution='c' - map resolution
       continent_thickness='1.5' - Thickness of the drawn continents
       continent_color='black' - colour of the drawn continents
@@ -78,7 +79,7 @@ class pvars(object):
 plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selected='',\
                file_selected='', data=None, levs_set=False, levs_manual_set=False,\
                levs_min='0', levs_max='0', levs_step='0',levs_manual='', \
-               levs_extend_lower=True, levs_extend_upper=True,
+               levs_extend_lower=True, levs_extend_upper=True, common_colorbar=False,
                proj='cyl', lonmin='-180', lonmax='180', latmin='-90', latmax='90',\
                boundinglat='0', lon_0='0',
                resolution='c', continent_thickness='1.5', continent_color='black',\
@@ -88,6 +89,7 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                cscale_ncols='', cscale_above='', cscale_below='',cscale='viridis',\
                invalid_input=False\
                )
+
 
 cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
 'mch_default', 'perc2_9lev', 'percent_11lev', 'precip2_15lev', 'precip2_17lev', 'precip3_16lev',
@@ -218,20 +220,32 @@ class myCombo(gtk.HBox):
             self._box.connect('changed',self.__myComboCallback)
         self.pack_start(self._box,padding=padding,expand=True)          
 
-        #print 'ajh - myCombo - setting self.content to ', content, type(content)
-        #if type(content) is float: print 'ajh - myCombo - float is ', float(content)
+
         self.content=content
         if initial is not None: self.set_value(initial)
     def set_value(self,v):
         ''' Set active value of combobox '''
+
+        floatval=True
+        try:
+            float(v)   
+        except:
+            floatval=False
+
+        if floatval: val=v
+        if not floatval: val="\'"+v+"\'"
+
+
         if v not in self.content:  
-
-            #print 'ajh - self.content is ', self.content, type(self.content)
-            #print 'ajh - v is ', v, type(v)        
-
-            raise ValueError('Attempt to set combobox to non valid value')
+            #Try adding string quotes to see if that matches
+            val="\'"+v+"\'"
+   
+            if val not in self.content:  
+                raise ValueError('Attempt to set combobox to non valid value')
+            else:
+                self._box.set_active(self.content.index(val))
         else:
-            #print 'ajh - myCombo - setting val to ', v
+
             self._box.set_active(self.content.index(v))
      
 
@@ -307,13 +321,19 @@ class arrayCombo(myCombo):
         # take account of three different types of float that are input
         # 
 
-        #print 'ajh - set_value passed is ', v, type(v), repr(v)
 
-        if type(v) is float or type(v) is np.float32 \
-           or type(v) is np.float64:
+
+        floatval=True
+        try:
+            float(v)   
+        except:
+            floatval=False
+
+        #if type(v) is float or type(v) is np.float32 or type(v) is np.float64:
+        if floatval:
             super(arrayCombo,self).set_value(repr(v))
-        else:
-            super(arrayCombo,self).set_value(str(v))
+        else:          
+            super(arrayCombo,self).set_value(v)
 
 
     def get_value(self):
@@ -322,12 +342,22 @@ class arrayCombo(myCombo):
         # Convert numbers with a lot of decimal places to a np.float64 so 
         # that full precision is retained else return a float.
 
-        
-        ndecs=super(arrayCombo,self).get_value()[::-1].find('.')
-        if ndecs < 8:
-            return np.float(super(arrayCombo,self).get_value())
+
+        val=super(arrayCombo,self).get_value()
+        floatval=True
+        try:
+            float(val)   
+        except:
+            floatval=False
+
+        if floatval:
+            ndecs=val[::-1].find('.')
+            if ndecs < 8:
+                return np.float(val)
+            else:
+                return np.float64(val)
         else:
-            return np.float64(super(arrayCombo,self).get_value())
+            return val
 
 
     def __aCcallback(self,entry,value):
@@ -614,8 +644,6 @@ class cfGrid(object):
 
 
 
-
-
         
 class gridSelector(guiFrame):
     ''' Provides a selector for choosing a sub-space in a multi-dimensional field'''
@@ -661,44 +689,71 @@ class gridSelector(guiFrame):
         for selecting a collapse operator. Note that the
         max grid selector slaves from the min grid selector,
         so users should always use that one first.'''
-        maxcombo=arrayCombo(self.grid.axes[dim].array,'Max:')
-        mincombo=arrayCombo(self.grid.axes[dim].array,'Min:',
-                    callback=(self._linkCallback,maxcombo),
-                    initial=self.grid.drange[dim][0])
+
+        #Set up slider array values depending if the dimension is time or not.
+        #Time users dtarray and otherwise uses array
+
+        if self.grid.axes[dim].T :
+
+            array=self.grid.axes[dim].dtarray
+            array=array.astype(str)
+            array_min=str(min(self.grid.axes[dim].dtarray))
+            array_max=str(max(self.grid.axes[dim].dtarray))
+
+        else:
+            array=self.grid.axes[dim].array
+            array_min=self.grid.drange[dim][0]
+            array_max=self.grid.drange[dim][1]
+
+
+
+        maxcombo=arrayCombo(array,'Max:')
+        mincombo=arrayCombo(array,'Min:', callback=(self._linkCallback,maxcombo), initial=array_min)
 
         colcombo=collapseCombo(initial='range')
-        self.combos[dim]=(mincombo,maxcombo,colcombo)        
+        self.combos[dim]=(mincombo,maxcombo,colcombo)     
+   
         # can't do this one at initial value coz it gets reset by the link
-        maxcombo.set_value(self.grid.drange[dim][1])
+        maxcombo.set_value(array_max)
 
         if dcount > 2:
             #After the first two ranges set additional ranges to be the first value of the field.
-            #If the axis is a pressure of height coordinate set it to be the maximim value of
+            #If the axis is a pressure or height coordinate set it to be the maximim value of
             #the field i.e. that nearest the ground. 
-         
-            mincombo.set_value(self.grid.drange[dim][0])
-            maxcombo.set_value(self.grid.drange[dim][0])
-
-            height_units=['millibar', 'mbar', 'decibar', 'atmosphere', 'atm', 'pascal','Pa', 'hPa',\
-                 'meter', 'metre', 'm', 'kilometer', 'kilometre', 'km']
-            if hasattr(self.grid.axes[dim], 'Units'):
-                if str(self.grid.axes[dim].Units) in height_units:
-                    mincombo.set_value(max(self.grid.drange[dim]))
-                    maxcombo.set_value(max(self.grid.drange[dim]))
+              
 
 
+            mincombo.set_value(array_min)
+            maxcombo.set_value(array_min)
+
+
+            #height_units=['millibar', 'mbar', 'decibar', 'atmosphere', 'atm', 'pascal','Pa', 'hPa',\
+            #     'meter', 'metre', 'm', 'kilometer', 'kilometre', 'km']
+            #if hasattr(self.grid.axes[dim], 'Units'):
+            #    if str(self.grid.axes[dim].Units) in height_units:
+            #        mincombo.set_value(array_max)
+            #        maxcombo.set_value(array_max)
+
+            #Set the Z axis to the maximum value
+            if self.grid.axes[dim].Z :
+                mincombo.set_value(array_max)
+                maxcombo.set_value(array_max)
 
 
         # all the box and border malarkey to make it look nice
         vbox=gtk.VBox()
         bbox=gtk.HBox()
 
-        if len(self.grid.axes[dim].array)>1:
+        if len(array) > 1:
             bbox.pack_start(colcombo,padding=2)
             bbox.pack_start(mincombo,padding=2)
             bbox.pack_start(maxcombo,padding=2)
         else:
-            bbox.pack_start(smallLabel('Value %s'%repr(self.grid.axes[dim].array[0])))
+            if self.grid.axes[dim].T :
+                bbox.pack_start(smallLabel('Value: %s'%(array_min)))
+            else:
+                bbox.pack_start(smallLabel('Value: %s'%repr(array_min)))
+                #bbox.pack_start(smallLabel('Value %s'%repr(self.grid.axes[dim].array[0])))
 
         vbox.pack_start(bbox,padding=5)
         frame=gtk.Frame(self.grid.names[dim])
@@ -1271,9 +1326,12 @@ class xconvLike(QuarterFrame):
            
            plotvars.nplots=columns*rows
            plotvars.code=script_start
-           cfp.gopen(columns=columns, rows=rows)
+           if plotvars.common_colorbar is False: cfp.gopen(columns=columns, rows=rows)
+           if plotvars.common_colorbar is True: cfp.gopen(columns=columns, rows=rows, bottom=0.2)
            plotvars.code=plotvars.code+"#Set plot columns and rows\n"
-           plotvars.code=plotvars.code+"cfp.gopen(columns="+str(columns)+", rows="+str(rows)+')\n'
+           plotvars.code=plotvars.code+"cfp.gopen(columns="+str(columns)+", rows="+str(rows)
+           if plotvars.common_colorbar is True: plotvars.code=plotvars.code+', bottom=0.2'
+           plotvars.code=plotvars.code+')\n'
 
            #Position at first plot
            plotvars.pos=1
@@ -1312,8 +1370,11 @@ class xconvLike(QuarterFrame):
 
             axis_name=getattr(sfield.item(d), 'standard_name', d)
 
-            if len(sfield.item(d).array) == 1: subset_string=subset_string+\
-               ' '+axis_name+':'+str(grid[d][0])+' '
+            if len(sfield.item(d).array) == 1: 
+                subset_string=subset_string+' '+axis_name+':'+str(grid[d][0])+' '
+
+
+
 
             #Take account of multiple axes with almost the same name
             #by adding the 'exact' keyword to the subset
@@ -1324,29 +1385,85 @@ class xconvLike(QuarterFrame):
             #    opts['exact']=True
             #    exact_str="'exact',"
 
-            if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
-               if (abs(grid[d][1]-grid[d][0]) <= tol):
-                  #Single value
-                  opts[axis_name]=float(repr(grid[d][0]))
-                  subset_string=subset_string+' '+axis_name+':'+repr(grid[d][0])+' '
-               else:
-                  #Range of values
-                  opts[axis_name]=cf.wi(float(repr(grid[d][0])), float(repr(grid[d][1])))
 
+            #A string value is a time axis otherwise we have numeric values
+            floatval=True
+            try:          
+               float(grid[d][0])
+            except:
+               floatval=False
+
+
+            if floatval:
+                if (abs(dmin-grid[d][0]) > tol) or (abs(dmax-grid[d][1]) > tol):
+                    if (abs(grid[d][1]-grid[d][0]) <= tol):
+                        #Single value
+                        opts[axis_name]=float(repr(grid[d][0]))
+                        subset_string=subset_string+' '+axis_name+':'+repr(grid[d][0])+' '
+                    else:
+                        #Range of values
+                        opts[axis_name]=cf.wi(float(repr(grid[d][0])), float(repr(grid[d][1])))
+            else:
+                time_units = sfield.item('T').Units
+                #Remove quotes from string
+                time1=cf.Data(cf.dt(grid[d][0][1:-1]), units=time_units)
+                time2=cf.Data(cf.dt(grid[d][1][1:-1]), units=time_units)
+
+                dmin=min(sfield.item(d).dtarray)
+                dmax=max(sfield.item(d).dtarray)
+
+                if time1 > dmin or time2 < dmax:
+                    if (time1 == time2):
+                    #Single value
+                        opts[axis_name]=cf.dt(grid[d][0][1:-1])
+                        subset_string=subset_string+' '+axis_name+':'+str(grid[d][0])[1:-1]
+                    else:
+                        #Range of values
+                        opts[axis_name]=cf.wi(cf.dt(grid[d][0][1:-1]), cf.dt(grid[d][1][1:-1]))
+                        subset_string=subset_string+' '+axis_name+':'+str(grid[d][0])[1:-1]+', '+str(grid[d][1])[1:-1]
+
+
+
+
+        #Apply the subspace operators
+        sfield=sfield.subspace(**opts)
 
 
         code=''
-        sfield=sfield.subspace(**opts)
         plotvars.code=plotvars.code+'#Subspace the data\n'
         for key in opts.keys():
+
+            #Extract time strings if a Datetime object
+            timestr1=''
+            timestr2=''
+
+
+
+            if isinstance(opts[key], cf.query.Datetime): timestr1="cf.dt('"+str(opts[key])+"')"
+
+            if isinstance(opts[key], cf.query.Query):
+                if isinstance(opts[key].value[0], cf.Datetime):
+                    timestr1="cf.dt('"+str(opts[key].value[0])+"')"
+                    timestr2="cf.dt('"+str(opts[key].value[1])+"')"
+
+
             if isinstance(opts[key], cf.query.Query):
                 #range using cf.wi
-                if code != '': code=code+','+key+'=cf.wi('+str(opts[key].value[0])+','+str(opts[key].value[1])+')'
-                if code == '': code=key+'=cf.wi('+str(opts[key].value[0])+','+str(opts[key].value[1])+')'
+                if timestr1 == '':
+                    if code != '': code=code+','+key+'=cf.wi('+str(opts[key].value[0])+','+str(opts[key].value[1])+')'
+                    if code == '': code=key+'=cf.wi('+str(opts[key].value[0])+','+str(opts[key].value[1])+')'
+                else:
+                    if code != '': code=code+','+key+'=cf.wi('+timestr1+', '+timestr2+')'
+                    if code == '': code=key+'=cf.wi('+timestr1+', '+timestr2+')'
+
             else:
                 #Single value
-                if code != '': code=code+','+key+'='+str(opts[key])
-                if code == '': code=key+'='+str(opts[key])
+                if timestr1 == '':
+                    if code != '': code=code+','+key+'='+str(opts[key])
+                    if code == '': code=key+'='+str(opts[key])
+                else:
+                    if code != '': code=code+','+key+timestr1
+                    if code == '': code=key+'='+timestr1
 
 
         plotvars.code=plotvars.code+'sfield=sfield.subspace('+code+')\n\n'
@@ -1817,6 +1934,9 @@ class xconvLike(QuarterFrame):
               if plotOptions['con']['xlog'] is True: opts['xlog']=1
               if plotOptions['con']['ylog'] is True: opts['ylog']=1
               
+              if plotvars.common_colorbar is True: 
+                 if plotvars.pos == plotvars.nplots and plotvars.nplots > 1: opts['colorbar_position']=[0.1, 0.1, 0.8, 0.02]
+                 else: opts['colorbar']=None
 
 
               cfp.con(sfield, **opts)
@@ -1824,7 +1944,7 @@ class xconvLike(QuarterFrame):
               #Translate opts to user code
               code=''                
               for key in ['fill', 'blockfill', 'lines', 'negative_linestyle', 'line_labels', 'colorbar_orientation',
-                          'xlog', 'ylog']:
+                          'xlog', 'ylog', 'colorbar', 'colorbar_position']:
                   if key in opts.keys():
                       if code != '': code=code+','+key+'='+str(opts[key])
                       if code == '': code=key+'='+str(opts[key])
@@ -2442,6 +2562,8 @@ class Config_contour_levels:
             plotvars.levs_extend_upper=True
             self.toggle_lower.set_active(True)
             self.toggle_upper.set_active(True)
+            self.toggle_common_colorbar.set_sensitive(False)
+
 
     def levs_set(self, widget):
         if self.toggle_levs_set.get_active():
@@ -2451,12 +2573,13 @@ class Config_contour_levels:
             self.levels_hbox2.set_sensitive(False);
             self.toggle_levs_manual_set.set_active(False)
             self.toggle_automatic.set_active(False)
+            self.toggle_common_colorbar.set_sensitive(True)
         else:
             plotvars.levs_set=False
             plotvars.levs_manual_set=False
             self.levels_hbox.set_sensitive(False)
             self.toggle_automatic.set_active(True)
-
+            self.toggle_common_colorbar.set_sensitive(False)
 
     def levs_manual_set(self, widget):
         if self.toggle_levs_manual_set.get_active():
@@ -2466,12 +2589,13 @@ class Config_contour_levels:
             self.levels_hbox2.set_sensitive(True)
             self.toggle_levs_set.set_active(False)
             self.toggle_automatic.set_active(False)
+            self.toggle_common_colorbar.set_sensitive(True)
         else:
             plotvars.levs_set=False
             plotvars.levs_manual_set=False
             self.levels_hbox2.set_sensitive(False);
             self.toggle_automatic.set_active(True)
-
+            self.toggle_common_colorbar.set_sensitive(False)
 
     def lower_set(self, widget):
         if self.toggle_lower.get_active():
@@ -2499,6 +2623,12 @@ class Config_contour_levels:
     def set_levs_manual(self, widget):
         plotvars.levs_manual=self.levs_manual.get_text()
 
+    def common_colorbar_set(self, widget):
+        if self.toggle_common_colorbar.get_active():
+            plotvars.common_colorbar=True
+        else:
+            plotvars.common_colorbar=False
+
 
     def levs_help(self, widget):
         helpstr='<T>Contour level options\n\
@@ -2513,6 +2643,11 @@ class Config_contour_levels:
         <H>Colorbar extensions\r\
         Colorbar extensions are a way of extending the contours to cover all the data at the ends of the\
         contour range. Click on the colorbar extension tick boxes as appropriate if these are bot required.\
+        \n\
+        <H>Common colorbar\r\
+        Select a common colorbar if you have the same set of levels for all the plots and need just one colorbar.\
+        It is important to set this and the levels before making any plots otherwise the colorbar and plot levels\
+        will be mismatched.\
         \n'
         CFview_help(helpstr, helpstr)
 
@@ -2528,6 +2663,7 @@ class Config_contour_levels:
         plotvars.levs_extend_upper=True
         self.toggle_lower.set_active(True)
         self.toggle_upper.set_active(True)
+        self.toggle_common_colorbar.set_active(False)
         plotvars.levs_min=''
         plotvars.levs_max=''
         plotvars.levs_step=''
@@ -2694,6 +2830,29 @@ class Config_contour_levels:
         hbox3.pack_start(toggle_upper)
 
 
+        #################
+        #Common color bar
+        ################# 
+        hbox_common_colorbar_label=gtk.HBox()
+        hbox_common_colorbar_label.show()
+        vbox.add(hbox_common_colorbar_label)
+        common_colorbar_text=gtk.Label("Common colorbar - use one colorbar to apply to all plots")
+        common_colorbar_text.show()
+        hbox_common_colorbar_label.pack_start(common_colorbar_text, padding=5, expand=False)
+
+        toggle_common_colorbar = gtk.CheckButton("Use a common colorbar")
+        toggle_common_colorbar.set_active(False)
+        vbox.add(toggle_common_colorbar)
+        toggle_common_colorbar.show()
+        toggle_common_colorbar.set_sensitive(False)
+
+        separator5 = gtk.HSeparator()
+        vbox.add(separator5)
+        separator5.show()
+
+
+
+
         #######################################
         #Box to contain reset and close buttons
         #######################################
@@ -2733,6 +2892,7 @@ class Config_contour_levels:
         toggle_levs_manual_set.connect("toggled", self.levs_manual_set)
         toggle_lower.connect("toggled", self.lower_set)
         toggle_upper.connect("toggled", self.upper_set)
+        toggle_common_colorbar.connect("toggled", self.common_colorbar_set)
 
         levs_min.connect("changed", self.set_levs_min)
         levs_max.connect("changed", self.set_levs_max)
@@ -2748,6 +2908,7 @@ class Config_contour_levels:
         self.toggle_levs_manual_set=toggle_levs_manual_set
         self.toggle_lower=toggle_lower
         self.toggle_upper=toggle_upper
+        self.toggle_common_colorbar=toggle_common_colorbar
 
         self.levs_min=levs_min
         self.levs_max=levs_max
@@ -3600,6 +3761,7 @@ class Config_color_scales:
             self.cscale_hbox2.set_sensitive(False)
             self.cscale_hbox3.set_sensitive(False)
             self.cscale_hbox4.set_sensitive(False)
+            self.cscale_hbox5.set_sensitive(False)
 	    self.cscale_label1.set_sensitive(False)
             self.cscale_label2.set_sensitive(False)
     	    self.cscale_label3.set_sensitive(False)
@@ -3617,6 +3779,7 @@ class Config_color_scales:
             self.cscale_hbox2.set_sensitive(True)
             self.cscale_hbox3.set_sensitive(True)
             self.cscale_hbox4.set_sensitive(True)
+            self.cscale_hbox5.set_sensitive(True)
 	    self.cscale_label1.set_sensitive(True)
             self.cscale_label2.set_sensitive(True)
     	    self.cscale_label3.set_sensitive(True)
@@ -3689,6 +3852,10 @@ class Config_color_scales:
         Set the number of colours in the scale to gain more control over the colour scale.  Once this is done then\
         the white indicies and scale midpoint options become useful to allow more precise\
         scale manipulation.  Set a number of white colour indicies by leaving a space between the indices required.\
+	\n\
+        <H>Selecting a common colorbar\r\
+        Set a common colorbar in the configure -> contour levels menu. It is important to do this before making the first plot\
+        or the plot levels and the colour bar may be mismatched.\
         \n'
         CFview_help(helpstr, helpstr)
 
@@ -3739,6 +3906,10 @@ class Config_color_scales:
         cscale_hbox4.show()
         vbox.add(cscale_hbox4)
         cscale_hbox4.set_sensitive(False)
+        cscale_hbox5=gtk.HBox()
+        cscale_hbox5.show()
+        vbox.add(cscale_hbox5)
+        cscale_hbox5.set_sensitive(False)
         separator2 = gtk.HSeparator()
         vbox.add(separator2)
         separator2.show()
@@ -3768,6 +3939,8 @@ class Config_color_scales:
         cscale_below.set_width_chars(3)
         cscale_below.set_text(plotvars.cscale_below)
         cscale_below.set_sensitive(True)
+        cscale_common_colorbar_label=gtk.Label("Common colorbar - set this in the levels configuration")
+
 
         #Show the widgets
         cscale_white_label.show()
@@ -3778,6 +3951,8 @@ class Config_color_scales:
         cscale_above.show()
         cscale_below_label.show()
         cscale_below.show()
+        cscale_common_colorbar_label.show()
+
 
         #Pack the widgets 
         cscale_hbox1.pack_start(cscale_ncols_label, padding=5, expand=False)
@@ -3788,6 +3963,9 @@ class Config_color_scales:
         cscale_hbox3.pack_start(cscale_above, padding=55,expand=False)
         cscale_hbox4.pack_start(cscale_below_label, padding=5, expand=False)
         cscale_hbox4.pack_start(cscale_below, padding=58,expand=False)
+        cscale_hbox5.pack_start(cscale_common_colorbar_label, padding=5, expand=False)
+
+
 
 
         ##############
@@ -3928,8 +4106,7 @@ class Config_color_scales:
  	    button.show() 
             getattr(self, 'hbox_'+scale).pack_start(button)
 
-        #Set default scale to be viridis
-        #toggle_viridis.set_active(True)
+
 
 
         #######################################
@@ -3981,6 +4158,7 @@ class Config_color_scales:
         self.cscale_hbox2=cscale_hbox2
         self.cscale_hbox3=cscale_hbox3
         self.cscale_hbox4=cscale_hbox4
+        self.cscale_hbox5=cscale_hbox5
         self.set_white=cscale_white
         self.set_ncols=cscale_ncols
         self.set_above=cscale_above
@@ -4001,16 +4179,48 @@ class Config_reset_all:
     ''' Reset all the configuration settings back to the defaults '''
 
     def __init__(self, nodata):
+        plotvars.pos=0
+        plotvars.nplots=1
+        plotvars.code=''
+        plotvars.plot_counter=0
+        plotvars.title=''
+        plotvars.field_selected=''
+        plotvars.file_selected=''
+        plotvars.data=None
+        plotvars.levs_set=False
+        plotvars.levs_manual_set=False
         plotvars.levs_min='0'
         plotvars.levs_max='0'
         plotvars.levs_step='0'
-        plotvars.levs_set=False
-        plotvars.levs_manual_set=False
         plotvars.levs_manual=''
         plotvars.levs_extend_lower=True
         plotvars.levs_extend_upper=True
-
-
+        plotvars.proj='cyl'
+        plotvars.lonmin='-180'
+        plotvars.lonmax='180'
+        plotvars.latmin='-90'
+        plotvars.latmax='90'
+        plotvars.boundinglat='0'
+        plotvars.lon_0='0'
+        plotvars.resolution='c'
+        plotvars.continent_thickness='1.5'
+        plotvars.continent_color='black'
+        plotvars.vect_ufield=''
+        plotvars.vect_auto_set=True
+        plotvars.vect_length='10'
+        plotvars.vect_scale='100'
+        plotvars.vect_stride='1'
+        plotvars.vect_pts='30'
+        plotvars.vect_stride_set=False
+        plotvars.vect_pts_set=False
+        plotvars.cscale_auto_set=True
+        plotvars.cscale_reverse_set=False
+        plotvars.cscale_white=''
+        plotvars.cscale_ncols=''
+        plotvars.cscale_above=''
+        plotvars.cscale_below=''
+        plotvars.cscale='viridis'
+        print 'screen windows are ', gtk.gdk.window_get_toplevels()
 
 class CFview_help: 
     ''' Display help text '''

@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 from distutils.command.build import build
 
-version      = '1.0.0'
+version      = '1.0.4'
 packages     = ['cf']
 
 
