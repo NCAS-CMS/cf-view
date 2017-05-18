@@ -87,8 +87,8 @@ class myCombo(gtk.HBox):
         #print 'self.content is ', self.content
         #print 'v is ', v
         if v not in self.content:   
-            print('self.content is ', self.content)
-            print('v is ', v)
+            print 'self.content is ', self.content
+            print 'v is ', v
             raise ValueError('Attempt to set combobox to non valid value')
         else:
             self._box.set_active(self.content.index(v))
@@ -111,7 +111,7 @@ class collapseCombo(myCombo):
         ''' Initialise with the current value, a callback to be called if
         the value changes, and if necessary, a font size '''
         super(collapseCombo,self).__init__(
-            list(self.options.keys()),initial=initial,callback=callback,fontSize=fontSize)
+            self.options.keys(),initial=initial,callback=callback,fontSize=fontSize)
         # FIXME. I think I want the size request to be 20, but the
         # problem is that the text on the button disappears. I need
         # to shrink the container button, but I don't know how to do
@@ -158,7 +158,7 @@ class arrayCombo(myCombo):
     def set_value(self,v):
         ''' Set active value of combobox '''
         # need to override the mixin class to ensure type conversion from float
-        print('combo v is', v, type(v))
+        print 'combo v is', v, type(v)
         #if type(v) is numpy.float32: 
         #    print 'Passing float', str(float(v))
         #    super(arrayCombo,self).set_value(str(float(v)))
@@ -204,7 +204,7 @@ def cfdimprops(f):
         if coord is None: continue
         for k in coord.properties:
             kv=cfkeyvalue(coord,k)
-            if kv!='':s+='     %s\n'%kv
+            if kv<>'':s+='     %s\n'%kv
         s+='     <b>Units: </b>%s'%str(f.coord(p).data.Units)
         r.append(s)
     return r
@@ -236,7 +236,7 @@ class fieldMetadata(scrolledFrame):
             # just show the field properties
             u=[cfkeyvalue(fields[0],p) for p in fields[0].properties]
         for i in u: 
-            if i!='':string+='%s\n'%i
+            if i<>'':string+='%s\n'%i
         if self.shown:  
             self.label.destroy()
             self.hbox.destroy()  # we don't want it to be the old size
@@ -272,7 +272,7 @@ class gridMetadata(scrolledFrame):
             # just show the field properties
             u=cfdimprops(fields[0])
         for i in u: 
-            if i!='':string+='%s\n'%i
+            if i<>'':string+='%s\n'%i
         if self.shown:  
             self.label.destroy()
             self.hbox.destroy()  # we don't want it to be the old size
@@ -383,13 +383,13 @@ class fieldSelector(guiFrame):
         if not self.columns_are_setup: self._setColumns()
         
         # clear existing content, if any
-        if len(self.fieldStore)!=0:
+        if len(self.fieldStore)<>0:
             self.fieldStore.clear()
             
         # loop over fields
         i=0
         for field in data:
-            print(i, field)
+            print i, field
             self.fieldStore.append(self.cf_field_to_columns(i,field))
             i+=1
        
@@ -664,7 +664,7 @@ class TestCFutilities(unittest.TestCase):
         # gotten around to that.
         for p in self.f.properties:
             self.assertEqual(cfkeyvalue(self.f,p),expecting[p])
-            print(p,cfkeyvalue(self.f,p))
+            print p,cfkeyvalue(self.f,p)
     def test_cfdimprops(self):
         ''' test the cfdimprops method doesn't crash '''
         p=cfdimprops(self.f)
