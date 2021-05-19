@@ -1,10 +1,10 @@
-A graphical interface to select and contour data from NetCDF, Met Office PP and fields files.
+
 
 =======
 cf-view
 =======
 
-cf-view is a GUI to view contour, vector and line plots of climate data.  
+cfview is a netCDF and Met Ofice file format data analysis and viewer for the atmospheric sciences and is intended to be an xconv+ replacement.
 
 
 Documentation
