@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 from distutils.command.build import build
 
-version      = '2.0.0'
+version      = '2.0.1'
 packages     = ['cf']
 
 
@@ -19,6 +19,10 @@ setup(name = "cf-view",
       url          = "http://ajheaps.github.io/cf-view",
       download_url = "https://github.com/ajheaps/CF-View",
       platforms    = ["Linux"],
+      install_requires = ['cf-python >= 3.8.0',
+                          'cf-plot >= 3.1.6',
+                          'pyqt >= 5.5.0',
+                          ],
       keywords     = ['cf','netcdf','data','science',
                       'oceanography','meteorology','climate'],
       scripts      = ['cfview']
