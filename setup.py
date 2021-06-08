@@ -5,7 +5,7 @@ packages     = ["cf"]
 
 setup(name = "cf-view",
       long_description = "GUI for viewing CF files",
-      version      = "2.0.1",
+      version      = "2.0.2",
       description  = "GUI for viewing CF files",
       author       = "Andy Heaps",
       maintainer   = "Andy Heaps",
