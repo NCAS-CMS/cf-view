@@ -113,7 +113,7 @@ class Interface:
         # nc file. It used to die, but now it emits a warning.
         
         def loadFile(widget, self, Data=None):
-            if self.openFile.get_filename()[-3:] != '.nc':
+            if self.openFile.get_filename()[-3:] <> '.nc':
                 self.addErrorMessage("Warning - Unpredictable if file not netCDF")
             self.fileChanged(self.openFile.get_filename())
             cancelOpenFile(None, self)
