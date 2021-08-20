@@ -64,7 +64,9 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                write_defaults=False, collapse_types=None, line_colour = 'C0',\
                line_style='solid', line_xmin=None, line_xmax=None, line_ymin=None, line_ymax=None,\
                line_title='', line_width='1.0', line_marker = '', line_markersize='',\
-               line_markeredgecolor='', line_markeredgewidth='', line_limits='automatic')
+               line_markeredgecolor='', line_markeredgewidth='', line_limits='automatic',\
+               vector_title='', vector_scale=100, vector_stride='', vector_pts='',\
+               vector_key_length=10, vector_pivot='middle')
 
 
 cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
@@ -359,7 +361,7 @@ class Cfview(QMainWindow):
             dim_lists[i].setFont(custom_font_fixed_width)
             #dim_lists[i].setCurrentRow(0)
             #dim_lists[i].selectAll()
-            #dim_lists[i].itemSelectionChanged.connect(self.reset_field_title)
+            dim_lists[i].itemSelectionChanged.connect(self.reset_field_title)
 
             if plotvars.file_selected is not None:
                 if dims_field[i] > 0:
@@ -575,6 +577,7 @@ class Cfview(QMainWindow):
         self.contour_window = None  # No external window yet.
         self.contour_levels = None  # No external window yet.
         self.line_window = None  # No external window yet.
+        self.vector_window = None  # No external window yet.
         self.colour_scale = None  # No external window yet.
         self.map_window = None  # No external window yet.
         self.data_window = None  # No external window yet.
@@ -982,7 +985,7 @@ class Cfview(QMainWindow):
 
             # generate the code to read the data and apply subspace and collapse args
             variable_names = ['f', 'g', 'h']
-            com_con, i = Cf_funcs.generate_code(com_subspace, com_collapse)
+            com_con = Cf_funcs.generate_code(com_subspace, com_collapse)
 
 
 
@@ -1235,7 +1238,7 @@ class Cfview(QMainWindow):
  
 
 
-            com_con += 'cfp.con(' + variable_names[i] 
+            com_con += 'cfp.con(' + 'f'
 
            
             if len(con_args) > 0:
@@ -1255,7 +1258,7 @@ class Cfview(QMainWindow):
 
 
 
-            print('### Code for plot is ###')
+            print('### Code to make the plot is ###')
             print(com_con)
 
             cfp.con(f, **con_args)
@@ -1310,26 +1313,18 @@ class Cfview(QMainWindow):
             # Form the subspace dictionary
             subspace_args = Cf_funcs.subspace_args(self.parent)
 
-            print('subspace_args are', subspace_args)
 
             # Get the subspace and collapse commands
             com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
-
-
-            print('com_subspace is ', com_subspace)
-
-            print('com_collapse is ', com_collapse)
 
 
             # Form the cf-python / cf-plot code to generate the plot
             
             #line_con = Cf_funcs.generate_cf_code()
 
-            # generate the code to read the data and apply subspace and collapse args
-            variable_names = ['f', 'g', 'h']
-            com_line, i = Cf_funcs.generate_code(com_subspace, com_collapse)
-            print('com_line is ', com_line)
-            print('i is ', i)
+            # Generate the code to read the data and apply subspace and collapse args
+
+            com_line= Cf_funcs.generate_code(com_subspace, com_collapse)
 
 
             # Set data limits if requested
@@ -1357,7 +1352,7 @@ class Cfview(QMainWindow):
             cfp.lineplot(f, **line_args)
 
             # Show the commands to make this line plot
-            com_line += 'cfp.lineplot(' + variable_names[i] 
+            com_line += 'cfp.lineplot(' + 'f'
 
             if len(line_args) > 0:
                 for arg in line_args:
@@ -1374,9 +1369,15 @@ class Cfview(QMainWindow):
             
 
         if plotvars.plot_type == 'Vector':
-            print('plotting vectors')
-            index_x = self.vector_x_indexComboBox.currentIndex()
 
+
+            # Reject plot if other than x-y at present
+            if plotvars.contour_type != 'x-y':
+                print('Only longitude-latitude vector plots are possible at present')
+                return
+
+
+            index_x = self.vector_x_indexComboBox.currentIndex()
             index_y = self.vector_y_indexComboBox.currentIndex()
 
             # Check selected data has enough items to be a vector plot
@@ -1422,19 +1423,9 @@ class Cfview(QMainWindow):
 
 
 
-            # Form the subspace dictionaries
+            # Form the subspace dictionaries and apply if necessary
             u_subspace_args = Cf_funcs.subspace_args2(index_x)
             v_subspace_args = Cf_funcs.subspace_args2(index_y)
-
-            print('u_subspace_args', u_subspace_args)
-
-            print('v_subspace_args', v_subspace_args)
-
-
-            # Set the map
-            if plotvars.contour_type == 'x-y':
-                cfp.mapset(proj=plotvars.proj)
-
 
             u = deepcopy(plotvars.fields[index_x])
             if len(u_subspace_args) > 0:
@@ -1444,47 +1435,68 @@ class Cfview(QMainWindow):
             if len(v_subspace_args) > 0:
                 v = v.subspace(**v_subspace_args)
 
-            print('u is ', u)
-
-            print('v is ', v)
-
-
-
-            cfp.vect(u=u, v=v, key_length=10, scale=100, stride=5)
+            # Set the map
+            if plotvars.contour_type == 'x-y':
+                cfp.mapset(proj=plotvars.proj)
 
 
 
+            # Assemble vector arguments
+            vect_args = {}
+                            
+            if plotvars.vector_title == '':
+                vect_args['titles'] = True
+            else:
+                vect_args['title'] = plotvars.vector_title
 
+            vals_okay, errstr = Data_check.test_numbers([plotvars.vector_key_length])
+            if not vals_okay:
+                print('Error in vector key length\n' + errstr)
+                return
+            vect_args['key_length'] = Data_check.test_type(plotvars.vector_key_length)
 
+            vals_okay, errstr = Data_check.test_numbers([plotvars.vector_scale])
+            if not vals_okay:
+                print('Error in vector scale\n' + errstr)
+                return
+            vect_args['scale'] = int(float(plotvars.vector_scale))
 
+            if plotvars.vector_stride != '' and plotvars.vector_pts == '':
+                vals_okay, errstr = Data_check.test_numbers([plotvars.vector_stride])
+                if not vals_okay:
+                    print('Error in vector stride\n' + errstr)
+                    return
+                vect_args['stride'] = int(float(plotvars.vector_stride))
+
+            if plotvars.vector_pts != '':
+                vals_okay, errstr = Data_check.test_numbers([plotvars.vector_pts])
+                if not vals_okay:
+                    print('Error in vector interpolation pts\n' + errstr)
+                    return
+                vect_args['pts'] = int(float(plotvars.vector_pts))
+         
+
+            # Generate code to make the plot
+           
             # Get the subspace and collapse commands
             ucom_subspace, ucom_collapse = Cf_funcs.com_subspace_collapse(u_subspace_args)
-
-            print('ucom_subspace, ucom_collapse are', ucom_subspace, ucom_collapse)
-
-
             vcom_subspace, vcom_collapse = Cf_funcs.com_subspace_collapse(v_subspace_args)
 
-            print('vcom_subspace, vcom_collapse are', vcom_subspace, vcom_collapse)
-
-
-
             # generate the code to read the data and apply subspace and collapse args
-            variable_names = ['f', 'g', 'h']
-            com_u, i = Cf_funcs.generate_code(ucom_subspace, ucom_collapse)
-            print('com_u is ', com_u)
+            com_u = Cf_funcs.generate_code(ucom_subspace, ucom_collapse, index=index_x, var_index=0)
+            com_v = Cf_funcs.generate_code(vcom_subspace, vcom_collapse, index=index_y, var_index=1)
+            com = com_u + com_v
 
-            com_v, i = Cf_funcs.generate_code(vcom_subspace, vcom_collapse)
-            print('com_v is ', com_v)
+            # Assemble the cfp.vect command
+            vect_com = 'cfp.vect(u=f, v=g, '
+            for arg in vect_args:
+                vect_com += ', ' + arg + "='" + str(vect_args[arg]) + "'"
+            vect_com += ')'
+            com += vect_com
 
+            print('### Code to make the plot is ###', com)
 
-            print('i is ', i)
-
-
-
-
-
-
+            cfp.vect(u=u, v=v, **vect_args)
 
 
 
@@ -1668,7 +1680,6 @@ class Cfview(QMainWindow):
                 obj.setVisible(False)
 
         if text == 'Vector':
-            print('in plot_type vector code')
             self.contour_type_ComboBox.setVisible(True)
             self.line_type_ComboBox.setVisible(False)
 
@@ -1941,6 +1952,9 @@ class Cfview(QMainWindow):
 
     def reset_field_title(self):
 
+        # Return if no fieldlist at this time
+        if not hasattr(self, 'fieldlist'):
+            return
 
         # Reset the dimension sizes in the field string 
         selected = self.fieldlist.selectedItems()
@@ -2088,6 +2102,12 @@ class Cfview(QMainWindow):
             if self.line_window is None:
                 self.line_window = Line_window()
             self.line_window.show()
+
+        if value.text() == 'vectors':
+            if self.vector_window is None:
+                self.vector_window = Vector_window()
+            self.vector_window.show()
+
 
 
 
@@ -5267,15 +5287,15 @@ class Data_check():
         pass
         
     def test_type(val):  
-        # Test if input string is a string, integer or float
+        # Test if input string is an integer or float
         # Need to match the data to the value
 
         try:
             a = float(val)
-            if int(val)/val == 1:
+            if int(a)/float(a) == 1:
                 return int(val)
-            if abs(val) > 1:
-                if val/int(val) > 1:
+            if abs(a) > 1:
+                if a/int(a) > 1:
                     if plotvars.fields[plotvars.index_number].dtype == 'float32':
                         return np.float32(val)
                     if plotvars.fields[plotvars.index_number].dtype == 'float64':
@@ -5669,7 +5689,6 @@ class Cf_funcs():
         collapses = plotvars.stored_collapses['f' + str(index)] 
 
         f = plotvars.fields[index]
-        print('f is', f)
         
         # Work out the selected points for the dimensions
         if dims['x'] == -1:
@@ -5742,7 +5761,6 @@ class Cf_funcs():
 
             if plotvars.plot_type == 'Line':
                 mydim = str(cfview_parent.line_type_ComboBox.currentText())
-                print('subspace_args - mydim is ', mydim)
                 if any(dim == dims[i].lower() for dim in [mydim]):
                     pass
                 else:
@@ -5788,8 +5806,6 @@ class Cf_funcs():
         dim_vals = plotvars.stored_dimensions['f' + str(index)]
         collapses = plotvars.stored_collapses['f' + str(index)] 
 
-        print('dim_vals are ', dim_vals)
-        print('collapses are', collapses)
 
         #lists = [cfview_parent.xlist.selectedItems(), cfview_parent.ylist.selectedItems(),\
         #         cfview_parent.zlist.selectedItems(), cfview_parent.tlist.selectedItems()]
@@ -5815,10 +5831,6 @@ class Cf_funcs():
                 else:
                     val = f.coord(dims[i]).dtarray[dim_indicies[j]]
                 vals.append(str(val))
-
-            print('i and vals are ', i, vals)
-
-
 
 
 
@@ -5924,20 +5936,34 @@ class Cf_funcs():
 
 
 
-    def generate_code(com_subspace, com_collapse):
+    def generate_code(com_subspace, com_collapse, index=None, var_index=None):
 
-        com = 'import cf\n'
-        com += 'import cfplot as cfp\n'
 
-        index = plotvars.index_number
+        if var_index is None:
+            var_index = 0
+
+        if var_index == 0:
+            com = 'import cf\n'
+            com += 'import cfplot as cfp\n'
+        else:
+            com = ''
+
+        if index is None:
+            index = plotvars.index_number
         f = deepcopy(plotvars.fields[index])
 
-        if isinstance(plotvars.file_selected, str):
-             file = plotvars.file_selected.split('/')[-1]
-             com += "f = cf.read('" + str(file) + "')[" + str(index) +']\n'
+        variable_names = ['f', 'g', 'h']
+        if var_index is None:
+            var = variable_names[0]
         else:
-             file = plotvars.file_selected
-             com += "f = cf.read(" + str(file) + ")[" + str(index) +']\n'
+            var = variable_names[var_index]
+
+        if isinstance(plotvars.file_selected, str):
+            file = plotvars.file_selected.split('/')[-1]
+            com += var + " = cf.read('" + str(file) + "')[" + str(index) +']\n'
+        else:
+            file = plotvars.file_selected
+            com += var + " = cf.read(" + str(file) + ")[" + str(index) +']\n'
 
 
         # Check for bounds if a collapse is required
@@ -5955,24 +5981,20 @@ class Cf_funcs():
                         bounds = coord.create_bounds()
                         coord.set_bounds(bounds)
                         com += '\n# Adding missing bounds for ' + dims[idim] + '\n'
-                        com += "coord = f.coord('" + dims[idim] + "')\n"
+                        com += "coord = " + var + ".coord('" + dims[idim] + "')\n"
                         com += 'bounds = coord.create_bounds()\n'
                         com += 'coord.set_bounds(bounds)\n\n'
 
 
-        i = 0
-        variable_names = ['f', 'g', 'h']
 
         if com_subspace != '':
-            com += variable_names[i+1] + ' = f.subspace(' + com_subspace + ')\n'
-            i = i + 1
+            com += var + ' = ' + var + '.subspace(' + com_subspace + ')\n'
+
 
         if com_collapse != '':
-            com += variable_names[i+1] + ' = ' + variable_names[i]
-            com += '.collapse(' + com_collapse + ', weights=True)\n'
-            i = i + 1
+            com += var + ' = ' + var + '.collapse(' + com_collapse + ', weights=True)\n'
 
-        return com, i
+        return com
 
 
 
@@ -6306,7 +6328,181 @@ class Line_window(QWidget):
         self.line_help.show()
 
 
+class Vector_window(QWidget):
+    '''popup window for changing vector defaults'''
 
+    def __init__(self):
+        super(Vector_window, self).__init__()
+        self.initUI()
+
+
+    def initUI(self):
+
+        # Set up the bottom buttons
+        resetButton = QPushButton("Reset")
+        resetButton.clicked.connect(self.reset)
+
+        helpButton = QPushButton("Help")
+        helpButton.clicked.connect(self.help)
+
+        quitButton = QPushButton("Quit")
+        quitButton.clicked.connect(self.close)
+
+        # Text box labels
+        vector_titleLabel = QLabel('title')
+        vector_scaleLabel = QLabel('scale')
+        vector_strideLabel = QLabel('stride')
+        vector_ptsLabel = QLabel('pts')
+        vector_key_lengthLabel = QLabel('key length')
+
+
+
+        # Text boxes
+        vector_titleTextBox = QLineEdit()
+        vector_titleTextBox.setText('')
+        vector_titleTextBox.textChanged.connect(lambda: self.textbox_changed('title'))
+
+        vector_scaleTextBox = QLineEdit()
+        vector_scaleTextBox.setText(str(plotvars.vector_scale))
+        vector_scaleTextBox.textChanged.connect(lambda: self.textbox_changed('scale'))
+
+        vector_strideTextBox = QLineEdit()
+        vector_strideTextBox.setText('')
+        vector_strideTextBox.textChanged.connect(lambda: self.textbox_changed('stride'))
+
+        vector_ptsTextBox = QLineEdit()
+        vector_ptsTextBox.setText('')
+        vector_ptsTextBox.textChanged.connect(lambda: self.textbox_changed('pts'))
+
+        vector_key_lengthTextBox = QLineEdit()
+        vector_key_lengthTextBox.setText(str(plotvars.vector_key_length))
+        vector_key_lengthTextBox.textChanged.connect(lambda: self.textbox_changed('key_length'))
+
+        self.vector_titleLabel = vector_titleLabel
+        self.vector_scaleLabel = vector_scaleLabel
+        self.vector_strideLabel = vector_strideLabel
+        self.vector_ptsLabel = vector_ptsLabel
+        self.vector_key_lengthLabel = vector_key_lengthLabel
+        self.vector_titleTextBox = vector_titleTextBox
+        self.vector_scaleTextBox = vector_scaleTextBox
+        self.vector_strideTextBox = vector_strideTextBox
+        self.vector_ptsTextBox = vector_ptsTextBox
+        self.vector_key_lengthTextBox = vector_key_lengthTextBox
+
+
+
+        # Set the layout
+        vbox = QVBoxLayout()
+
+
+        hbox_title = QHBoxLayout()
+        hbox_title.addWidget(self.vector_titleLabel)
+        hbox_title.addWidget(self.vector_titleTextBox)
+        vbox.addLayout(hbox_title)
+
+        vbox.addWidget(HLine())
+
+        hbox_scale = QHBoxLayout()
+        hbox_scale.addWidget(self.vector_scaleLabel)
+        hbox_scale.addWidget(self.vector_scaleTextBox)
+        vbox.addLayout(hbox_scale)
+
+        hbox_stride = QHBoxLayout()
+        hbox_stride.addWidget(self.vector_strideLabel)
+        hbox_stride.addWidget(self.vector_strideTextBox)
+        vbox.addLayout(hbox_stride)
+
+        hbox_pts = QHBoxLayout()
+        hbox_pts.addWidget(self.vector_ptsLabel)
+        hbox_pts.addWidget(self.vector_ptsTextBox)
+        vbox.addLayout(hbox_pts)
+
+        hbox_key_length = QHBoxLayout()
+        hbox_key_length.addWidget(self.vector_key_lengthLabel)
+        hbox_key_length.addWidget(self.vector_key_lengthTextBox)
+        vbox.addLayout(hbox_key_length)
+
+
+        # The buttons
+        hbox_buttons = QHBoxLayout()
+        vbox.addLayout(hbox_buttons)
+        hbox_buttons.addWidget(resetButton)
+        hbox_buttons.addWidget(helpButton)
+        hbox_buttons.addWidget(quitButton)
+        vbox.addLayout(hbox_buttons)
+
+
+        self.vector_help = None  # No external window yet.
+
+        self.setWindowTitle('vector plot settings')
+        self.setLayout(vbox)
+
+        # Set theme and font
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        self.setPalette(palette)
+
+        custom_font = QFont(plotvars.font, plotvars.fontsize)
+        self.window().setFont(custom_font)
+
+
+        self.show()
+
+
+
+    def textbox_changed(self, text):
+
+        textbox = getattr(self, 'vector_' + text + 'TextBox') 
+        setattr(plotvars, 'vector_' + text, textbox.text()) 
+
+
+
+    def reset(self):
+
+        # Reset vector options
+       
+        self.vector_titleTextBox.setText('')
+        self.vector_scaleTextBox.setText('')
+        self.vector_strideTextBox.setText('')
+        self.vector_ptsTextBox.setText('')
+        self.vector_key_lengthTextBox.setText('')
+
+        plotvars.vector_title = ''
+        plotvars.vector_scale = ''
+        plotvars.vector_stride = ''
+        plotvars.vector_pts = ''
+        plotvars.vector_key_length = ''
+        plotvars.vector_pivot = 'middle'
+
+
+
+
+
+
+    def help(self):
+
+        if self.vector_help is None:
+
+            html = '<body><h2>Vector plot options</h2>'
+            html += '<h3>Vector properties</h3>'
+            html += '<b>title</b> If a title is unset then the title is the u and v fields<br>'
+            html += '<b>scale</b> Initially set to 100.  A value of 50 gives vectors that are twice as long<br>'
+            html += '<b>pts</b> Interpolate to this number of points in the plot x and y directions<br>'
+            html += '<b>stride</b> Skip this number of points in the plot x and y directions<br>' 
+            html += '<b>key_length</b> Use this value for the reference vector<br>'
+
+
+
+            self.line_help = Help(html)
+
+        self.line_help.show()
 
 
 
