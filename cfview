@@ -889,9 +889,11 @@ class Cfview(QMainWindow):
 
 
     def plot(self, s):
-        # Make a plot
+        # Make a line, contour or contour and vector plot
 
         index = plotvars.index_number
+        if plotvars.plot_type == 'Contour and vector':
+            index = self.contour_indexComboBox.currentIndex()
 
         # Return if no field
         if index == -1:
@@ -906,11 +908,12 @@ class Cfview(QMainWindow):
         con_args = {}
         dims = ['X', 'Y', 'Z', 'T']
 
+        if plotvars.plot_type == 'Contour' or plotvars.plot_type == 'Contour and vector':
 
-        if plotvars.plot_type == 'Contour':
 
             # Check selected data has enough items to be a contour plot
-            nx, ny, nz, nt = Cf_funcs.selected_dims(self.parent)
+
+            nx, ny, nz, nt = Cf_funcs.selected_dims(index)
             dim_sizes = [nx, ny, nz, nt]
 
             for i in np.arange(4):
@@ -931,11 +934,9 @@ class Cfview(QMainWindow):
 
 
             # Form the subspace dictionary
-            subspace_args = Cf_funcs.subspace_args(self.parent)
-
+            subspace_args = Cf_funcs.subspace_args(self.parent, index)
 
             # Form the contour dictionary
-
             if plotvars.fill and not plotvars.lines:
                 con_args['lines'] = False
             if not plotvars.fill and plotvars.lines:
@@ -986,7 +987,7 @@ class Cfview(QMainWindow):
             # generate the code to read the data and apply subspace and collapse args
             variable_names = ['f', 'g', 'h']
             com_con = Cf_funcs.generate_code(com_subspace, com_collapse)
-
+            
 
 
             # Add contour levels if specified
@@ -1243,8 +1244,10 @@ class Cfview(QMainWindow):
            
             if len(con_args) > 0:
                 for arg in con_args:
-                    com_con += ', ' + arg + '=' + str(con_args[arg])
-    
+                    if arg != 'title':
+                        com_con += ', ' + arg + '=' + str(con_args[arg])
+                    else:
+                        com_con += ", '" + arg + '=' + str(con_args[arg]) + "'"
             com_con += ')'
     
 
@@ -1256,10 +1259,13 @@ class Cfview(QMainWindow):
                 f = f.collapse(com_collapse.strip("'"), weights=True)
 
 
+            # Use cfp.gopen if a contour and vector plot
+            if plotvars.plot_type == 'Contour and vector':
+                cfp.gopen()
 
-
-            print('### Code to make the plot is ###')
-            print(com_con)
+            if plotvars.plot_type != 'Contour and vector':
+                print('### Code to make the plot is ###')
+                print(com_con)
 
             cfp.con(f, **con_args)
     
@@ -1270,7 +1276,7 @@ class Cfview(QMainWindow):
             mydim = str(self.line_type_ComboBox.currentText())
             dims = ['x', 'y', 'z', 't']
             index = dims.index(mydim)
-            nx, ny, nz, nt = Cf_funcs.selected_dims(self.parent)
+            nx, ny, nz, nt = Cf_funcs.selected_dims(index)
             dimvals = [nx, ny, nz, nt]
 
             if dimvals[index] < 2:
@@ -1311,28 +1317,19 @@ class Cfview(QMainWindow):
 
 
             # Form the subspace dictionary
-            subspace_args = Cf_funcs.subspace_args(self.parent)
-
+            subspace_args = Cf_funcs.subspace_args(self.parent, index)
 
             # Get the subspace and collapse commands
             com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
 
-
-            # Form the cf-python / cf-plot code to generate the plot
-            
-            #line_con = Cf_funcs.generate_cf_code()
-
             # Generate the code to read the data and apply subspace and collapse args
-
             com_line= Cf_funcs.generate_code(com_subspace, com_collapse)
 
 
             # Set data limits if requested
             cfp.gset()
             if plotvars.line_limits == 'user':
-                print('setting user data limits')
-                # Check data is numbers
-
+                # Check the input user data are numbers
                 cfp.gset(float(plotvars.line_xmin), float(plotvars.line_xmax), float(plotvars.line_ymin), float(plotvars.line_ymax))
 
                 com_line += 'cfp.gset(xmin=' + plotvars.line_xmin + ', '
@@ -1368,7 +1365,7 @@ class Cfview(QMainWindow):
             print('### Code to make plot is ### \n', com_line)
             
 
-        if plotvars.plot_type == 'Vector':
+        if plotvars.plot_type == 'Vector' or plotvars.plot_type =='Contour and vector':
 
 
             # Reject plot if other than x-y at present
@@ -1382,7 +1379,7 @@ class Cfview(QMainWindow):
 
             # Check selected data has enough items to be a vector plot
             # First the x component
-            nx, ny, nz, nt = Cf_funcs.selected_dims2(index_x)
+            nx, ny, nz, nt = Cf_funcs.selected_dims(index_x)
             dim_sizes = [nx, ny, nz, nt]
 
             for i in np.arange(4):
@@ -1402,7 +1399,7 @@ class Cfview(QMainWindow):
 
 
             # Then the y component
-            nx, ny, nz, nt = Cf_funcs.selected_dims2(index_y)
+            nx, ny, nz, nt = Cf_funcs.selected_dims(index_y)
             dim_sizes = [nx, ny, nz, nt]
 
             for i in np.arange(4):
@@ -1424,8 +1421,8 @@ class Cfview(QMainWindow):
 
 
             # Form the subspace dictionaries and apply if necessary
-            u_subspace_args = Cf_funcs.subspace_args2(index_x)
-            v_subspace_args = Cf_funcs.subspace_args2(index_y)
+            u_subspace_args = Cf_funcs.subspace_args(self.parent, index_x)
+            v_subspace_args = Cf_funcs.subspace_args(self.parent, index_y)
 
             u = deepcopy(plotvars.fields[index_x])
             if len(u_subspace_args) > 0:
@@ -1483,22 +1480,43 @@ class Cfview(QMainWindow):
             vcom_subspace, vcom_collapse = Cf_funcs.com_subspace_collapse(v_subspace_args)
 
             # generate the code to read the data and apply subspace and collapse args
-            com_u = Cf_funcs.generate_code(ucom_subspace, ucom_collapse, index=index_x, var_index=0)
-            com_v = Cf_funcs.generate_code(vcom_subspace, vcom_collapse, index=index_y, var_index=1)
+
+            if plotvars.plot_type == 'Vector':
+                com_u = Cf_funcs.generate_code(ucom_subspace, ucom_collapse, index=index_x, var_index=0)
+                com_v = Cf_funcs.generate_code(vcom_subspace, vcom_collapse, index=index_y, var_index=1)
+            else:
+                com_u = Cf_funcs.generate_code(ucom_subspace, ucom_collapse, index=index_x, var_index=1)
+                com_v = Cf_funcs.generate_code(vcom_subspace, vcom_collapse, index=index_y, var_index=2)
             com = com_u + com_v
 
             # Assemble the cfp.vect command
-            vect_com = 'cfp.vect(u=f, v=g, '
+            if plotvars.plot_type == 'Vector':
+                vect_com = 'cfp.vect(u=f, v=g'
+            else:
+                vect_com = 'cfp.vect(u=g, v=h'
+
             for arg in vect_args:
-                vect_com += ', ' + arg + "='" + str(vect_args[arg]) + "'"
+                if arg != 'title':
+                    vect_com += ', ' + arg + "=" + str(vect_args[arg])
+                else:
+                    vect_com += ', ' + arg + "='" + str(vect_args[arg]) + "'"
             vect_com += ')'
             com += vect_com
+            if plotvars.plot_type == 'Contour and vector':
+                com += '\ncfp.gclose()'
 
-            print('### Code to make the plot is ###', com)
+            if plotvars.plot_type == 'Contour':
+                print('### Code to make the plot is ###', com)
+            else:
+                print('### Code to make the plot is ###', com_con, com)
+
+
 
             cfp.vect(u=u, v=v, **vect_args)
 
 
+            if plotvars.plot_type == 'Contour and vector':
+                cfp.gclose()
 
 
 
@@ -1663,9 +1681,9 @@ class Cfview(QMainWindow):
         self.vector_x_indexLabel, self.vector_x_indexComboBox,
         self.vector_y_indexLabel, self.vector_y_indexComboBox]
 
-        # Clear vector comboboxes and repopulate
+        # Clear contour and vector comboboxes and repopulate
+        self.contour_indexComboBox.clear()
         self.vector_x_indexComboBox.clear()
-        self.vector_y_indexComboBox.clear()
         self.vector_y_indexComboBox.clear()
 
         for i in np.arange(len(plotvars.fields)):
@@ -1693,7 +1711,6 @@ class Cfview(QMainWindow):
 
 
         if text == 'Contour and vector':
-            print('Contours and vectors not implemented yet')
             self.contour_type_ComboBox.setVisible(True)
             self.line_type_ComboBox.setVisible(False)
             for obj in objs:
@@ -2129,7 +2146,7 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 2.0.0</b><p>'
+            html += '<b>This is version 2.3.1</b><p>'
             html += 'cfview is a netCDF and Met Ofice file format data analysis and viewer for the atmospheric sciences '
             html += 'and is intended to be an xconv+ replacement.<p>'
             html += 'cfview uses:<br>'
@@ -2139,7 +2156,7 @@ class Cfview(QMainWindow):
             html += 'http://ajheaps.github.io/cf-plot<P>'
             html += '<b>PyQt5</b> - GUI toolkit<p>'
             html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS 2021'
+            html += '&#169; NCAS CMS August 2021'
             self.about_help = Help(html)
             self.about_help.show()
 
@@ -5660,28 +5677,8 @@ class Cf_funcs():
         return field_widget_names, field_widget_title
     
 
-    def selected_dims(cfview_parent):
-        # Return the selected length of the data in the axes
-        #self.cfview_parent = cfview_parent
 
-        nx = len(cfview_parent.xlist.selectedItems())
-        ny = len(cfview_parent.ylist.selectedItems())
-        nz = len(cfview_parent.zlist.selectedItems())
-        nt = len(cfview_parent.tlist.selectedItems())
-
-        if plotvars.collapse_x != 'Off':
-            nx = 1
-        if plotvars.collapse_y != 'Off':
-            ny = 1
-        if plotvars.collapse_z != 'Off':
-            nz = 1
-        if plotvars.collapse_t != 'Off':
-            nt = 1
-
-        return nx, ny, nz, nt
-
-
-    def selected_dims2(index):
+    def selected_dims(index):
         # Return the selected length of the data in the axes
 
         # Extract the dimensions and collapses for this field
@@ -5728,72 +5725,7 @@ class Cf_funcs():
 
 
 
-
-
-    def subspace_args(cfview_parent):
-
-        subspace_args = {}
-
-        f = deepcopy(plotvars.fields[plotvars.index_number])
-        nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(f)
-        dim_sizes = [nx, ny, nz, nt]
-        dims = ['X', 'Y', 'Z', 'T']
-
-        lists = [cfview_parent.xlist.selectedItems(), cfview_parent.ylist.selectedItems(),\
-                 cfview_parent.zlist.selectedItems(), cfview_parent.tlist.selectedItems()]
-
-        collapses = [plotvars.collapse_x, plotvars.collapse_y,\
-                     plotvars.collapse_z, plotvars.collapse_t]
-
-        for i in np.arange(4):
-            vals = []
-            for j in np.arange(len(lists[i])):
-                vals.append(str(lists[i][j].text()))
-
-
-            if plotvars.plot_type == 'Contour':
-                if any(dim == dims[i].lower() for dim in plotvars.contour_type):
-                    pass
-                else:
-                    if collapses[i] == 'Off':
-                        if dim_sizes[i] > 1:
-                            vals = [vals[0]]
-
-            if plotvars.plot_type == 'Line':
-                mydim = str(cfview_parent.line_type_ComboBox.currentText())
-                if any(dim == dims[i].lower() for dim in [mydim]):
-                    pass
-                else:
-                    if collapses[i] == 'Off':
-                        if dim_sizes[i] > 1:
-                            vals = [vals[0]]
-
-
-
-            if len(vals) != dim_sizes[i]:
-                if len(vals) == 1:
-
-                    if collapses[i] == 'Off':
-                        if dims[i] != 'T':
-                            subspace_args[dims[i]] = float(vals[0])
-                        else:
-                            subspace_args[dims[i]] = cf.dt(vals[0])
-                else:
-                    if dims[i] != 'T':
-                        # cf.wi needs to go from min to max but the widget return
-                        # goes in order of selection
-                        val1 = np.min(np.array(vals).astype(np.float64))
-                        val2 = np.max(np.array(vals).astype(np.float64))
-                        subspace_args[dims[i]] = cf.wi(val1, val2)
-                    else:
-                        val1 = min(vals)
-                        val2 = max(vals)
-                        subspace_args[dims[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
-
-        return subspace_args
-
-
-    def subspace_args2(index):
+    def subspace_args(cfview_parent, index):
 
         subspace_args = {}
 
@@ -5806,12 +5738,6 @@ class Cf_funcs():
         dim_vals = plotvars.stored_dimensions['f' + str(index)]
         collapses = plotvars.stored_collapses['f' + str(index)] 
 
-
-        #lists = [cfview_parent.xlist.selectedItems(), cfview_parent.ylist.selectedItems(),\
-        #         cfview_parent.zlist.selectedItems(), cfview_parent.tlist.selectedItems()]
-
-        #collapses = [plotvars.collapse_x, plotvars.collapse_y,\
-        #             plotvars.collapse_z, plotvars.collapse_t]
 
         for i in np.arange(4):
             vals = []
@@ -5833,9 +5759,7 @@ class Cf_funcs():
                 vals.append(str(val))
 
 
-
-
-            if plotvars.plot_type in ['Contour', 'Vector', 'Contour and Vector'] :
+            if plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector'] :
                 if any(dim == dims[i].lower() for dim in plotvars.contour_type):
                     pass
                 else:
@@ -5845,7 +5769,6 @@ class Cf_funcs():
 
             if plotvars.plot_type == 'Line':
                 mydim = str(cfview_parent.line_type_ComboBox.currentText())
-                print('subspace_args - mydim is ', mydim)
                 if any(dim == dims[i].lower() for dim in [mydim]):
                     pass
                 else:
@@ -5948,6 +5871,9 @@ class Cf_funcs():
         else:
             com = ''
 
+        if plotvars.plot_type == 'Contour and vector' and var_index == 0:
+            com += 'cfp.gopen()\n'
+
         if index is None:
             index = plotvars.index_number
         f = deepcopy(plotvars.fields[index])
@@ -5964,7 +5890,6 @@ class Cf_funcs():
         else:
             file = plotvars.file_selected
             com += var + " = cf.read(" + str(file) + ")[" + str(index) +']\n'
-
 
         # Check for bounds if a collapse is required
         # and add them if they are missing
@@ -5985,11 +5910,8 @@ class Cf_funcs():
                         com += 'bounds = coord.create_bounds()\n'
                         com += 'coord.set_bounds(bounds)\n\n'
 
-
-
         if com_subspace != '':
             com += var + ' = ' + var + '.subspace(' + com_subspace + ')\n'
-
 
         if com_collapse != '':
             com += var + ' = ' + var + '.collapse(' + com_collapse + ', weights=True)\n'
@@ -6266,14 +6188,11 @@ class Line_window(QWidget):
 
 
     def data_limits(self, text):
-        print('in data_limits')
 
         if self.user_data_limitsCheckBox.isChecked():
             text = 'user'
 
-
         plotvars.line_limits = text
-        print('text is ', text)
 
         objs = [self.xminTextBox, self.xmaxTextBox, self.yminTextBox, self.ymaxTextBox,\
                 self.xminLabel, self.xmaxLabel, self.yminLabel, self.ymaxLabel]
