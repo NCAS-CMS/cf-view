@@ -66,7 +66,12 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                line_title='', line_width='1.0', line_marker = '', line_markersize='',\
                line_markeredgecolor='', line_markeredgewidth='', line_limits='automatic',\
                vector_title='', vector_scale=100, vector_stride='', vector_pts='',\
-               vector_key_length=10, vector_pivot='middle')
+               vector_key_length=10, vector_pivot='middle', \
+               trajectory_title='', trajectory_marker_shape='o', trajectory_marker_size='5',\
+               trajectory_marker_face_colour='red', trajectory_marker_edge_colour='green', \
+               trajectory_line_style='solid', trajectory_line_colour='blue', \
+               trajectory_line_width='1.0', trajectory_vector=False, trajectory_legend=False,\
+               trajectory_date_min='', trajectory_date_max='')
 
 
 cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
@@ -116,16 +121,6 @@ def my_excepthook(type, value, tback):
     sys.__excepthook__(type, value, tback)
 
 sys.excepthook = my_excepthook
-
-
-
-
-
-
-
-
-
-
 
 
 class Cfview(QMainWindow):
@@ -200,6 +195,7 @@ class Cfview(QMainWindow):
         setup.addAction("contours")
         setup.addAction("lines")
         setup.addAction("vectors")
+        setup.addAction("trajectories")
         setup.addAction("map")
         setup.addAction("colour scale")
         setup.addAction("contour levels")
@@ -223,7 +219,12 @@ class Cfview(QMainWindow):
         plotButton.clicked.connect(self.plot)
 
         reset_dimensionButton = QPushButton("Reset Dimensions")
-        reset_dimensionButton.clicked.connect(lambda: self.dim_reset('reset'))
+        reset_dimensionButton.clicked.connect(lambda: self.dim_traj_reset('reset'))
+
+
+        reset_tracksButton = QPushButton("Reset Tracks")
+        reset_tracksButton.clicked.connect(lambda: self.dim_traj_reset('reset'))
+
 
 
         # Plot type combobox
@@ -232,6 +233,7 @@ class Cfview(QMainWindow):
         plot_type_ComboBox.addItem('Vector')
         plot_type_ComboBox.addItem('Contour and vector')
         plot_type_ComboBox.addItem('Line')
+        plot_type_ComboBox.addItem('Trajectory')
         plot_type_ComboBox.activated[str].connect(self.plot_type)
 
 
@@ -322,9 +324,10 @@ class Cfview(QMainWindow):
             field_titles = QLabel(field_widget_title)
 
             for i in np.arange(len(f)):
-                #print('field_widget_names , i are ', field_widget_names[i], i) 
                 QListWidgetItem(field_widget_names[i], fieldlist) 
             fieldlist.setCurrentRow(0)
+
+            field_titles.setText(field_widget_title)
 
 
         fieldlist.setCurrentRow(0)
@@ -341,14 +344,30 @@ class Cfview(QMainWindow):
         messagesLabel.setAlignment(Qt.AlignCenter)
 
 
-
-
         # Dimension lists
         dimension_titles = QLabel('Dimension view')
+        reset_tracksButton.setVisible(False)
+        reset_dimensionButton.setVisible(True)
+        if plotvars.file_selected is not None:
+            #if hasattr(f[0], 'featureType'):
+            if f[0].get_property('featureType', False) is not False:
+                if f[0].featureType == 'trajectory':
+                    dimension_titles.setText('Trajectory number')
+                    plotvars.plot_type = 'Trajectory'
+                    plot_type_ComboBox.setCurrentIndex(4)
+                    dimLabel.setVisible(False)
+                    xRadioButton.setVisible(False)
+                    yRadioButton.setVisible(False)
+                    zRadioButton.setVisible(False)
+                    tRadioButton.setVisible(False)
+                    reset_tracksButton.setVisible(True)
+                    reset_dimensionButton.setVisible(False)
+
         if plotvars.file_selected is not None:
             nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f[0])
             dims_field = [nx, ny, nz, nt, x, y, z, t]
-            
+
+
         xlist = QListWidget()
         ylist = QListWidget() 
         zlist = QListWidget()
@@ -359,8 +378,6 @@ class Cfview(QMainWindow):
         for i in np.arange(4):
             dim_lists[i].setSelectionMode(QListWidget.ExtendedSelection)
             dim_lists[i].setFont(custom_font_fixed_width)
-            #dim_lists[i].setCurrentRow(0)
-            #dim_lists[i].selectAll()
             dim_lists[i].itemSelectionChanged.connect(self.reset_field_title)
 
             if plotvars.file_selected is not None:
@@ -502,8 +519,7 @@ class Cfview(QMainWindow):
         rightHbox3.addWidget(zRadioButton)
         rightHbox3.addWidget(tRadioButton)
         rightHbox3.addWidget(reset_dimensionButton)
-
-
+        rightHbox3.addWidget(reset_tracksButton)
 
 
         leftHbox3.addWidget(sort_byLabel)
@@ -523,7 +539,9 @@ class Cfview(QMainWindow):
 
 
         self.field_titles = field_titles
+        self.dimension_titles = dimension_titles
         self.fieldlist = fieldlist
+        self.plot_type_ComboBox = plot_type_ComboBox
         self.xlist = xlist
         self.ylist = ylist
         self.zlist = zlist
@@ -549,7 +567,9 @@ class Cfview(QMainWindow):
         self.zlist_collapse.setVisible(False)
         self.tlist_collapse.setVisible(False)
 
-
+        self.dimLabel = dimLabel
+        self.reset_dimensionButton = reset_dimensionButton
+        self.reset_tracksButton = reset_tracksButton
         self.xRadioButton = xRadioButton
         self.yRadioButton = yRadioButton
         self.zRadioButton = zRadioButton
@@ -571,13 +591,13 @@ class Cfview(QMainWindow):
         self.indexCheckBox = indexCheckBox
         self.fieldCheckBox = fieldCheckBox
         self.search_fieldsTextbox = search_fieldsTextbox
-        self.reset_dimensionButton = reset_dimensionButton
 
         self.cfview_defaults = None  # No external window yet.
         self.contour_window = None  # No external window yet.
         self.contour_levels = None  # No external window yet.
         self.line_window = None  # No external window yet.
         self.vector_window = None  # No external window yet.
+        self.trajectory_window = None  # No external window yet.
         self.colour_scale = None  # No external window yet.
         self.map_window = None  # No external window yet.
         self.data_window = None  # No external window yet.
@@ -588,6 +608,9 @@ class Cfview(QMainWindow):
 
         self.output_terminal_textEdit = output_terminal_textEdit
 
+        # Reset the field title
+        if plotvars.file_selected is not None:
+            self.reset_field_title()
 
         palette = QPalette()    
         palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
@@ -670,75 +693,79 @@ class Cfview(QMainWindow):
         try:
             if path != '':
                 f = cf.read(path)
-
-                plotvars.file_selected = path
-
-                self.fieldlist.clear()
-                self.search_fieldsTextbox.clear()
-                plotvars.index_number = 0
-                plotvars.fields = f
-                plotvars.field_widget_indicies = None
-
-                field_widget_names, field_widget_title = Cf_funcs.fields_list(fields=f, order=plotvars.field_widget_listing)
-
-                # Set the stored_dimensions
-                # -1 indicates that the dimension is unchanged
-                plotvars.stored_dimensions = {}
-                plotvars.stored_collapses = {}
-                if plotvars.file_selected is not None:
-                    for i in np.arange(len(f)):
-                        plotvars.stored_dimensions['f' + str(i)] = {'x': -1, 'y': -1, 'z': -1, 't': -1}
-                        plotvars.stored_collapses['f' + str(i)] = {'x': 'Off', 'y': 'Off', 'z': 'Off', 't': 'Off'}
-                        plotvars.stored_collapse_values['f' + str(i)] = {'x': False, 'y': False, 'z': False, 't': False}
-
-                for i in np.arange(len(f)):
-                    QListWidgetItem(field_widget_names[i], self.fieldlist) 
-                self.fieldlist.setCurrentRow(0) 
-
-                self.field_titles.setText(field_widget_title)
-
-                # Reset the dimension lists
-                self.xlist.clear()
-                self.xlist_collapse.clear()
-                if f[0].has_construct('X'):
-                    xvals = f[0].coord('X').array
-                    for xval in xvals:
-                        QListWidgetItem(str(xval), self.xlist) 
-                    self.xlist.selectAll()
-
-                self.ylist.clear()
-                self.ylist_collapse.clear()
-                if f[0].has_construct('Y'):
-                    yvals = f[0].coord('Y').array
-                    for yval in yvals:
-                        QListWidgetItem(str(yval), self.ylist) 
-                    self.ylist.selectAll()
-
-                self.zlist.clear()
-                self.zlist_collapse.clear()
-                if f[0].has_construct('Z'):
-                    zvals = f[0].coord('Z').array
-                    for zval in zvals:
-                        QListWidgetItem(str(zval), self.zlist) 
-                    self.zlist.selectAll()
-
-                self.tlist.clear()
-                self.tlist_collapse.clear()
-                if f[0].has_construct('T'):
-                    tvals = f[0].coord('T').dtarray
-                    for tval in tvals:
-                        QListWidgetItem(str(tval), self.tlist) 
-                    self.tlist.selectAll()
-
-
-                # Reset lists and check boxes
-                self.dim_reset('reset')
-
-                # Print which file has been opened in the messages window
-                print('File read: ' + str(path))
-
         except ValueError:
             print('file not a valid, netCDF, PP or fields file')
+            return
+
+
+        plotvars.file_selected = path
+
+
+        #if hasattr(f[0], 'featureType'):
+        if f[0].get_property('featureType', False) is not False:
+            if f[0].featureType == 'trajectory':
+                self.dimension_titles.setText('Trajectory number')
+                self.plot_type_ComboBox.setCurrentIndex(4)
+                plotvars.plot_type='Trajectory'
+                self.dimLabel.setVisible(False)
+                self.xRadioButton.setVisible(False)
+                self.yRadioButton.setVisible(False)
+                self.zRadioButton.setVisible(False)
+                self.tRadioButton.setVisible(False)
+                self.reset_tracksButton.setVisible(True)
+                self.reset_dimensionButton.setVisible(False)
+        else:
+            self.dimension_titles.setText('Dimension view')
+            self.plot_type_ComboBox.setCurrentIndex(0)
+            plotvars.plot_type = 'Contour'
+            self.dimLabel.setVisible(True)
+            self.xRadioButton.setVisible(True)
+            self.yRadioButton.setVisible(True)
+            self.zRadioButton.setVisible(True)
+            self.tRadioButton.setVisible(True)
+            self.reset_tracksButton.setVisible(False)
+            self.reset_dimensionButton.setVisible(True)
+
+
+
+
+        self.fieldlist.clear()
+        self.search_fieldsTextbox.clear()
+        plotvars.index_number = 0
+        plotvars.fields = f
+        plotvars.field_widget_indicies = None
+
+        field_widget_names, field_widget_title = Cf_funcs.fields_list(fields=f, order=plotvars.field_widget_listing)
+
+        # Set the stored_dimensions
+        # -1 indicates that the dimension is unchanged
+        plotvars.stored_dimensions = {}
+        plotvars.stored_collapses = {}
+        if plotvars.file_selected is not None:
+            for i in np.arange(len(f)):
+                plotvars.stored_dimensions['f' + str(i)] = {'x': -1, 'y': -1, 'z': -1, 't': -1}
+                plotvars.stored_collapses['f' + str(i)] = {'x': 'Off', 'y': 'Off', 'z': 'Off', 't': 'Off'}
+                plotvars.stored_collapse_values['f' + str(i)] = {'x': False, 'y': False, 'z': False, 't': False}
+
+        for i in np.arange(len(f)):
+            QListWidgetItem(field_widget_names[i], self.fieldlist) 
+        self.fieldlist.setCurrentRow(0) 
+
+        self.field_titles.setText(field_widget_title)
+
+      
+
+
+
+
+
+
+
+
+        # Print which file has been opened in the messages window
+        print('File read: ' + str(path))
+
+
 
 
 
@@ -1518,6 +1545,236 @@ class Cfview(QMainWindow):
             if plotvars.plot_type == 'Contour and vector':
                 cfp.gclose()
 
+        if plotvars.plot_type == 'Trajectory':
+
+            traj_args = {}
+            com_traj = 'import cf\n'
+            com_traj += 'import cfplot as cfp\n'
+
+            index = plotvars.index_number
+
+            if isinstance(plotvars.file_selected, str):
+                file = plotvars.file_selected.split('/')[-1]
+                com_traj += "f = cf.read('" + str(file) + "')[" + str(index) +']\n'
+            else:
+                file = plotvars.file_selected
+                com_traj +=  "f = cf.read(" + str(file) + ")[" + str(index) +']\n'
+            
+
+
+            # Check if a date range has been specified
+            if plotvars.trajectory_date_min != ''  or plotvars.trajectory_date_max != '':
+                ref_time = f.construct('T').units
+                if hasattr(f.construct('T'), 'calendar'):
+                    ref_calendar = f.construct('T').calendar
+                else:
+                    ref_calendar = 'standard'
+                time_units = cf.Units(ref_time, ref_calendar)
+
+                try:
+                    tmin = cf.Data(cf.dt(plotvars.trajectory_date_min), units=time_units)
+                except:
+                    print('Error in trajectory minimum time')
+                    return
+
+                try:
+                    tmax = cf.Data(cf.dt(plotvars.trajectory_date_max), units=time_units)
+                except:
+                    print('Error in trajectory maximum time')
+                    return
+                
+                print('times are ', type(tmin), tmin, tmin.array)
+
+                if tmax.array <= tmin.array:
+                    print('Error - Trajectory maximum time must be grater than trajectory minimum time')
+                    return
+
+
+                f = f.subspace(T=cf.wi(tmin.dtarray, tmax.dtarray))
+                com_traj += 'f = f.subspace(T=cf.wi(' + str(tmin.dtarray) + ', '
+                com_traj += str(tmax.dtarray) + ')\n'
+
+
+
+
+
+            # Map settings
+            # Reset map
+            cfp.mapset()
+
+            if plotvars.proj == 'cyl':
+                # Check inputs are numbers
+                vals = [plotvars.lonmin, plotvars.lonmax, plotvars.latmin, plotvars.latmax]
+                vals_okay, errstr = Data_check.test_numbers(vals)
+                if not vals_okay:
+                    print('Error in cylindrical projection limits\n' + errstr)
+                    return
+
+                # Check lonmin < lonmax
+                vals = [plotvars.lonmin, plotvars.lonmax]
+                vals_okay, errstr = Data_check.test_ascending(vals)
+                if not vals_okay:
+                    myerr = 'Error in cylindrical projection longitude limits\n'
+                    myerr += 'lonmax must be > lonmin\n'
+                    print(myerr)
+                    return
+
+                # Check latmin < latmax
+                vals = [plotvars.latmin, plotvars.latmax]
+                vals_okay, errstr = Data_check.test_ascending(vals)
+                if not vals_okay:
+                    myerr = 'Error in cylindrical projection latitude limits\n'
+                    myerr += 'latmax must be > latmin\n'
+                    print(myerr)
+                    return
+
+
+                if float(plotvars.lonmin) != -180.0 or float(plotvars.lonmax) != 180 or \
+                   float(plotvars.latmin) != -90.0 or float(plotvars.latmax) != 90:
+                    com_traj += 'cfp.mapset(lonmin=' + str(plotvars.lonmin) + ', '
+                    com_traj += 'lonmax=' + str(plotvars.lonmax) + ', '
+                    com_traj += 'latmin=' + str(plotvars.latmin) + ', '
+                    com_traj += 'latmax=' + str(plotvars.latmax) + ')\n'
+                    cfp.mapset(float(plotvars.lonmin), float(plotvars.lonmax), \
+                               float(plotvars.latmin), float(plotvars.latmax))
+
+
+
+            if plotvars.proj == 'npstere' or plotvars.proj == 'spstere':
+                # Check inputs are numbers
+                vals = [plotvars.boundinglat]
+                vals_okay, errstr = Data_check.test_numbers(vals)
+                if not vals_okay:
+                    print('Error in bounding latitude\n' + errstr)
+                    return
+
+                vals = [plotvars.lon_0]
+                vals_okay, errstr = Data_check.test_numbers(vals)
+                if not vals_okay:
+                    print('Error in longitude centre of map domain\n' + errstr)
+                    return
+
+
+                cfp.mapset(proj=plotvars.proj, boundinglat=float(plotvars.boundinglat),\
+                           lon_0 = float(plotvars.lon_0))
+
+                com_traj += 'cfp.mapset(proj=' + plotvars.proj
+                if str(plotvars.boundinglat) != '0':
+                    com_traj += ', boundinglat=' + str(plotvars.boundinglat)
+                if str(plotvars.lon_0) != '0':
+                    com_traj += ', lon_0=' + plotvars.lon_0
+                com_traj += ')\n'
+                
+
+
+            if plotvars.trajectory_legend:
+                if plotvars.levs_set:
+
+                    vals = [plotvars.levs_min, plotvars.levs_max, plotvars.levs_step]
+
+                    print('vals are', vals)
+                    # Check all values are numbers
+                    vals_okay, errstr = Data_check.test_numbers(vals)
+                    if not vals_okay:
+                        print('Error in evenly spaced contour levels\n' + errstr)
+                        return
+
+                    # Check min < max
+                    vals_okay, errstr = Data_check.test_val0_lt_val1([vals[0], vals[1]])
+                    if not vals_okay:
+                        print('contour level error\n' + errstr)
+                        return
+    
+                    # Check step > 0
+                    vals_okay, errstr = Data_check.test_val_gt_zero(vals[2])
+                    if not vals_okay:
+                        print('contour level step must be greater than zero\n')
+                        return
+
+                    # Test for ints or floats
+                    all_ints, errstr = Data_check.test_integers(vals)
+
+                    # Set up levels and add to the com_con code
+                    if all_ints:
+                        cfp.levs(min=int(vals[0]), max=int(vals[1]), step=int(vals[2]))
+                    else:
+                        cfp.levs(min=float(vals[0]), max=float(vals[1]), step=float(vals[2]))
+                    com_traj += 'cfp.levs(min=' + vals[0] + ', max=' + vals[1] + ', step=' + vals[2] + ')\n'
+
+                else:
+                    print('Error - no levels set for the legend')
+                    print('Enter min, max and step in the contour levels set-up menu\n')
+                    return
+
+            # Assemble trajectory dictionary
+            if plotvars.trajectory_title != '':
+                traj_args['title'] = plotvars.trajectory_title
+            if plotvars.trajectory_marker_shape != 'o':
+                traj_args['marker'] = plotvars.trajectory_marker_shape
+            if plotvars.trajectory_marker_size != '5':
+                traj_args['markersize'] = Data_check.test_type(plotvars.trajectory_marker_size)
+            if plotvars.trajectory_marker_face_colour != 'red':
+                traj_args['markerfacecolor'] = plotvars.trajectory_marker_face_colour
+            if plotvars.trajectory_marker_edge_colour != 'green':
+                traj_args['markeredgecolor'] = plotvars.trajectory_marker_edge_colour
+            if plotvars.trajectory_line_style != 'solid':
+                traj_args['linestyle'] = plotvars.trajectory_line_style
+            if plotvars.trajectory_line_colour != 'blue':
+                traj_args['linecolor'] = plotvars.trajectory_line_colour
+            if plotvars.trajectory_line_width != '1.0':
+                traj_args['linewidth'] = Data_check.test_type(plotvars.trajectory_line_width)
+            if plotvars.trajectory_vector:
+                traj_args['vector'] = True
+            if plotvars.trajectory_legend:
+                traj_args['legend'] = True
+
+
+            # Calculate selected tracks
+            selected_tracks = self.xlist.selectedItems()
+            tracks = []
+            tracks_all = True
+            for j in np.arange(len(selected_tracks)):
+                tracks.append(int(selected_tracks[j].text()))
+
+            if len(tracks) < self.xlist.count():
+                tracks_all = False
+                tracks = sorted(tracks)
+                tracks_contig = True
+                if tracks[0] + len(tracks) -1 != tracks[-1]:
+                    tracks_contig = False
+
+
+            # Assemble code to make plot
+            com_traj += 'cfp.traj(f'
+            if tracks_all is False:
+                if tracks_contig:
+                    if len(tracks) == 1:
+                        com_traj += '[' + str(tracks[0]) + ', :]'
+                    else:
+                        com_traj += '['+ str(tracks[0]) + ':' + str(tracks[-1] + 1) + ', :]'
+                else:
+                    track_subspace_str = '[['
+                    for track in tracks:
+                        track_subspace_str += str(track) + ','
+                    track_subspace_str = track_subspace_str[0:-1] + '],:]'
+                    com_traj += track_subspace_str
+
+
+            for arg in traj_args:
+                if arg != 'title':
+                    com_traj += ', ' + arg + "=" + str(traj_args[arg])
+                else:
+                    com_traj += ', ' + arg + "='" + str(traj_args[arg]) + "'"
+            com_traj += ')'
+
+            if tracks_all:
+                cfp.traj(f, **traj_args)
+            else:
+                cfp.traj(f[tracks, :], **traj_args)
+
+
+            print('*** Code to make plot is ***')
+            print(com_traj)
 
 
 
@@ -1600,7 +1857,7 @@ class Cfview(QMainWindow):
         self.reset_field_title()
 
 
-    def dim_reset(self, option):
+    def dim_traj_reset(self, option):
 
         # Clear the dimension lists and reset the collapse combos to be 'Off'
         f = deepcopy(plotvars.fields[plotvars.index_number])
@@ -1630,14 +1887,20 @@ class Cfview(QMainWindow):
         self.collapse_yLabel.setPalette(pal)
 
         # Repopulate the dimension lists
-        for i in np.arange(4):
-            if f.has_construct(dims[i]):
-                if i <3:
-                    vals = f.coord(dims[i]).array
-                else:
-                    vals = f.coord(dims[i]).dtarray
-                for val in vals:
-                    QListWidgetItem(str(val), lists_dim[i]) 
+        nx, ny, nz, nt, xvals, yvals, zvals, tvals = Cf_funcs.field_dims(field=f)
+
+        for xval in xvals:
+            QListWidgetItem(str(xval), self.xlist) 
+
+        for yval in yvals:
+            QListWidgetItem(str(yval), self.ylist) 
+
+        for zval in zvals:
+            QListWidgetItem(str(zval), self.zlist) 
+
+        for tval in tvals:
+            QListWidgetItem(str(tval), self.tlist) 
+
         self.xlist.selectAll()
         self.ylist.selectAll()
         self.zlist.selectAll()
@@ -1667,6 +1930,8 @@ class Cfview(QMainWindow):
 
         # Reset the field title
         self.reset_field_title()
+
+
 
     def contour_type(self, text):
         # Set the contour plot type 
@@ -1969,9 +2234,16 @@ class Cfview(QMainWindow):
 
     def reset_field_title(self):
 
+
         # Return if no fieldlist at this time
         if not hasattr(self, 'fieldlist'):
             return
+
+        # Check if this field is a trajectory
+        traj = False
+        f = deepcopy(plotvars.fields[plotvars.index_number])
+        if f.get_property('featureType', False) is not False:
+            traj = True
 
         # Reset the dimension sizes in the field string 
         selected = self.fieldlist.selectedItems()
@@ -1984,6 +2256,7 @@ class Cfview(QMainWindow):
             nt_length = plotvars.nt_length
 
             mylen = 6 + nx_length + 1 + ny_length + 1 + nz_length + 1 + nt_length + 1
+
             field_title = selected[0].text()[mylen:]
             index = selected[0].text()[0:6]
 
@@ -2013,7 +2286,6 @@ class Cfview(QMainWindow):
 
                 if collapses[i] != 'Off':
                     dims[i] = 1
-
     
             new_title = index 
             new_title += str(dims[0]) +  (nx_length + 1 - len(str(dims[0]))) * ' '
@@ -2021,6 +2293,23 @@ class Cfview(QMainWindow):
             new_title += str(dims[2]) +  (nz_length + 1 - len(str(dims[2]))) * ' '
             new_title += str(dims[3]) +  (nt_length + 1 - len(str(dims[3]))) * ' '
             new_title += field_title
+
+
+            # Find the field widget titles
+            field_widget_names, field_widget_title = Cf_funcs.fields_list(fields=[f], order=plotvars.field_widget_listing)
+
+            # Make a different title if this field is a trajectory
+            if traj:
+                #field_widget_names, field_widget_title = Cf_funcs.fields_list(fields=[f], order=plotvars.field_widget_listing)
+                field_title = field_widget_names[0].split(' ')[-1]
+
+                new_title = index + str(dims[0])
+                new_title += (nx_length + 1 - len(str(dims[0]))) * ' ' + 4 * ' '
+                new_title += field_title
+
+                    
+
+            self.field_titles.setText(field_widget_title)
 
             selected[0].setText(new_title)
 
@@ -2125,7 +2414,10 @@ class Cfview(QMainWindow):
                 self.vector_window = Vector_window()
             self.vector_window.show()
 
-
+        if value.text() == 'trajectories':
+            if self.trajectory_window is None:
+                self.trajectory_window = Trajectory_window()
+            self.trajectory_window.show()
 
 
 
@@ -2146,7 +2438,7 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 2.3.1</b><p>'
+            html += '<b>This is version 2.5.0</b><p>'
             html += 'cfview is a netCDF and Met Ofice file format data analysis and viewer for the atmospheric sciences '
             html += 'and is intended to be an xconv+ replacement.<p>'
             html += 'cfview uses:<br>'
@@ -2156,7 +2448,7 @@ class Cfview(QMainWindow):
             html += 'http://ajheaps.github.io/cf-plot<P>'
             html += '<b>PyQt5</b> - GUI toolkit<p>'
             html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS August 2021'
+            html += '&#169; NCAS CMS October 2021'
             self.about_help = Help(html)
             self.about_help.show()
 
@@ -5445,8 +5737,11 @@ class Cf_funcs():
                       'minutes', 'min', 'mins', 'second', 'seconds', 'sec',
                       'secs', 's']
 
+        dims_list = list(field.dimension_coordinates())
+
         # Extract coordinate data if a matching CF set of units is found
-        for mydim in list(field.dimension_coordinates()):
+        #for mydim in list(field.dimension_coordinates()):
+        for mydim in dims_list:
             units = getattr(field.construct(mydim), 'units', False)
             if units in lon_units:
                 if x is None:
@@ -5462,10 +5757,9 @@ class Cf_funcs():
                     t = field.construct(mydim).dtarray
 
         # Extract coordinate data from variable name if not already assigned
-        for mydim in list(field.dimension_coordinates()):
+        #for mydim in list(field.dimension_coordinates()):
+        for mydim in dims_list:
             name = Cf_funcs.cf_var_name(field=field, dim=mydim)[0]
-
-            #print('name is ', name)
 
             if name[0:3] == 'lon':
                 if x is None:
@@ -5508,6 +5802,21 @@ class Cf_funcs():
         else:
             nt = np.size(t)
 
+
+        # Test for trajectory data
+        #if hasattr(field, 'featureType'):
+        if field.get_property('featureType', False) is not False:
+            if field.featureType == 'trajectory':
+                nx = np.shape(field.auxiliary_coordinate('longitude').array)[0]
+                ny = np.shape(field.auxiliary_coordinate('latitude').array)[0]
+                nt = np.shape(field.auxiliary_coordinate('time').array)[0]
+
+                x = np.arange(nx)
+                y = np.arange(ny)
+                t = np.arange(nt)
+
+                #print('in field_dims - field is ', field)
+                #print('in field_dims nx, x are', nx, x)
 
         return (nx, ny, nz, nt, x, y, z, t)
 
@@ -5567,6 +5876,16 @@ class Cf_funcs():
           widget_names
         """
 
+            
+
+
+        # Check for a trajectory field
+        traj = False
+        f = deepcopy(plotvars.fields[plotvars.index_number])
+        if f.get_property('featureType', False) is not False:
+            if f[0].featureType == 'trajectory':     
+                traj = True
+
 
         if order_changed:
             field_widget_names = plotvars.field_widget_names
@@ -5614,20 +5933,32 @@ class Cf_funcs():
 
             # Work out the widget title
             field_widget_title ='index '
-            field_widget_title += 'nx' + (nx_length - 1) * ' '
-            field_widget_title += 'ny' + (ny_length - 1) * ' '
-            field_widget_title += 'nz' + (nz_length - 1) * ' '
-            field_widget_title += 'nt' + (nt_length - 1) * ' '
+
+  
+
+            if traj:
+                field_widget_title += 'tracks' + (nx_length - 1) * ' '
+            else:
+                field_widget_title += 'nx' + (nx_length - 1) * ' '
+                field_widget_title += 'ny' + (ny_length - 1) * ' '
+                field_widget_title += 'nz' + (nz_length - 1) * ' '
+                field_widget_title += 'nt' + (nt_length - 1) * ' '
+
             field_widget_title += 'field name'
+
+
 
             # Work out the widget names
             for i in np.arange(len(fields)):
                 field_widget_name = index_list[i] + (6 -len(index_list[i])) * ' '
                 field_widget_name += nx_list[i] + (nx_length + 1 - len(nx_list[i])) * ' '
-                field_widget_name += ny_list[i] + (ny_length + 1 - len(ny_list[i])) * ' '
-                field_widget_name += nz_list[i] + (nz_length + 1 - len(nz_list[i])) * ' '
-                field_widget_name += nt_list[i] + (nt_length + 1 - len(nt_list[i])) * ' '
+                if plotvars.plot_type != 'Trajectory':
+                    field_widget_name += ny_list[i] + (ny_length + 1 - len(ny_list[i])) * ' '
+                    field_widget_name += nz_list[i] + (nz_length + 1 - len(nz_list[i])) * ' '
+                    field_widget_name += nt_list[i] + (nt_length + 1 - len(nt_list[i])) * ' '
+                
                 field_widget_name += names_list[i]
+                    
                 field_widget_names.append(field_widget_name)
 
         plotvars.field_widget_names = field_widget_names
@@ -5674,8 +6005,10 @@ class Cf_funcs():
 
 
         plotvars.field_widget_title = field_widget_title
+        #print('field_widget_title is ', field_widget_title)
         return field_widget_names, field_widget_title
     
+
 
 
     def selected_dims(index):
@@ -5727,7 +6060,7 @@ class Cf_funcs():
 
     def subspace_args(cfview_parent, index):
 
-        subspace_args = {}
+        args = {}
 
         f = deepcopy(plotvars.fields[index])
         nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(f)
@@ -5782,22 +6115,22 @@ class Cf_funcs():
 
                     if collapses[dims[i].lower()] == 'Off':
                         if dims[i] != 'T':
-                            subspace_args[dims[i]] = float(vals[0])
+                            args[dims[i]] = float(vals[0])
                         else:
-                            subspace_args[dims[i]] = cf.dt(vals[0])
+                            args[dims[i]] = cf.dt(vals[0])
                 else:
                     if dims[i] != 'T':
                         # cf.wi needs to go from min to max but the widget return
                         # goes in order of selection
                         val1 = np.min(np.array(vals).astype(np.float64))
                         val2 = np.max(np.array(vals).astype(np.float64))
-                        subspace_args[dims[i]] = cf.wi(val1, val2)
+                        args[dims[i]] = cf.wi(val1, val2)
                     else:
                         val1 = min(vals)
                         val2 = max(vals)
-                        subspace_args[dims[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
+                        args[dims[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
 
-        return subspace_args
+        return args
 
 
 
@@ -6422,6 +6755,291 @@ class Vector_window(QWidget):
             self.line_help = Help(html)
 
         self.line_help.show()
+
+
+
+class Trajectory_window(QWidget):
+    '''popup window for changing trajectory defaults'''
+
+    def __init__(self):
+        super(Trajectory_window, self).__init__()
+        self.initUI()
+
+
+    def initUI(self):
+
+        # Set up the bottom buttons
+        resetButton = QPushButton("Reset")
+        resetButton.clicked.connect(self.reset)
+
+        helpButton = QPushButton("Help")
+        helpButton.clicked.connect(self.help)
+
+        quitButton = QPushButton("Quit")
+        quitButton.clicked.connect(self.close)
+
+        # Text box labels
+        trajectory_titleLabel = QLabel('title')
+        trajectory_marker_shapeLabel = QLabel('Marker shape')
+        trajectory_marker_sizeLabel = QLabel('Marker size')
+        trajectory_marker_face_colourLabel = QLabel('Marker face colour')
+        trajectory_marker_edge_colourLabel = QLabel('Marker edge colour')
+        trajectory_line_colourLabel = QLabel('Line colour')
+        trajectory_line_styleLabel = QLabel('Line style')
+        trajectory_line_widthLabel = QLabel('Line width')
+        date_description = 'Specify a plotting date range\n'
+        date_description += 'Dates are of the form YYYY-MM-DD HH:MM:SS\n'
+        date_description += 'with the HH:MM:SS being optional'
+        trajectory_date_descriptionLabel = QLabel(date_description)
+        trajectory_date_minLabel = QLabel('Date minimum')
+        trajectory_date_maxLabel = QLabel('Date maximum')
+
+        # Text boxes
+        trajectory_titleTextBox = QLineEdit()
+        trajectory_titleTextBox.setText('')
+        trajectory_titleTextBox.textChanged.connect(lambda: self.textbox_changed('title'))
+
+        trajectory_marker_shapeTextBox = QLineEdit()
+        trajectory_marker_shapeTextBox.setText(plotvars.trajectory_marker_shape)
+        trajectory_marker_shapeTextBox.textChanged.connect(lambda: self.textbox_changed('marker_shape'))
+
+        trajectory_marker_sizeTextBox = QLineEdit()
+        trajectory_marker_sizeTextBox.setText(plotvars.trajectory_marker_size)
+        trajectory_marker_sizeTextBox.textChanged.connect(lambda: self.textbox_changed('marker_size'))
+
+        trajectory_marker_face_colourTextBox = QLineEdit()
+        trajectory_marker_face_colourTextBox.setText(plotvars.trajectory_marker_face_colour)
+        trajectory_marker_face_colourTextBox.textChanged.connect(lambda: self.textbox_changed('marker_face_colour'))
+
+        trajectory_marker_edge_colourTextBox = QLineEdit()
+        trajectory_marker_edge_colourTextBox.setText(plotvars.trajectory_marker_edge_colour)
+        trajectory_marker_edge_colourTextBox.textChanged.connect(lambda: self.textbox_changed('marker_edge_colour'))
+
+        trajectory_line_colourTextBox = QLineEdit()
+        trajectory_line_colourTextBox.setText(plotvars.trajectory_line_colour)
+        trajectory_line_colourTextBox.textChanged.connect(lambda: self.textbox_changed('line_colour'))
+
+        trajectory_line_widthTextBox = QLineEdit()
+        trajectory_line_widthTextBox.setText(plotvars.trajectory_line_width)
+        trajectory_line_widthTextBox.textChanged.connect(lambda: self.textbox_changed('line_width'))
+
+        trajectory_date_minTextBox = QLineEdit()
+        trajectory_date_minTextBox.setText('')
+        trajectory_date_minTextBox.textChanged.connect(lambda: self.textbox_changed('date_min'))
+
+        trajectory_date_maxTextBox = QLineEdit()
+        trajectory_date_maxTextBox.setText('')
+        trajectory_date_maxTextBox.textChanged.connect(lambda: self.textbox_changed('date_max'))
+
+
+
+        # Combo boxes
+        trajectory_line_style_ComboBox = QComboBox()
+        trajectory_line_style_ComboBox.addItem('solid')
+        trajectory_line_style_ComboBox.addItem('dashed')
+        trajectory_line_style_ComboBox.addItem('dashdot')
+        trajectory_line_style_ComboBox.addItem('dotted')
+        trajectory_line_style_ComboBox.activated[str].connect(self.trajectory_line_style)
+
+
+        # Tick boxes
+
+        trajectory_vectorCheckBox = QCheckBox("Vector")
+        trajectory_vectorCheckBox.setChecked(False)
+        trajectory_vectorCheckBox.clicked.connect(self.item_clicked)
+
+
+        trajectory_legendCheckBox = QCheckBox("Legend")
+        trajectory_legendCheckBox.setChecked(False)
+        trajectory_legendCheckBox.clicked.connect(self.item_clicked)
+
+
+        self.trajectory_titleTextBox = trajectory_titleTextBox
+        self.trajectory_marker_shapeTextBox = trajectory_marker_shapeTextBox
+        self.trajectory_marker_sizeTextBox = trajectory_marker_sizeTextBox
+        self.trajectory_marker_face_colourTextBox = trajectory_marker_face_colourTextBox
+        self.trajectory_marker_edge_colourTextBox = trajectory_marker_edge_colourTextBox
+        self.trajectory_line_colourTextBox = trajectory_line_colourTextBox
+        self.trajectory_line_widthTextBox = trajectory_line_widthTextBox
+        self.trajectory_line_style_ComboBox = trajectory_line_style_ComboBox
+        self.trajectory_vectorCheckBox = trajectory_vectorCheckBox
+        self.trajectory_legendCheckBox = trajectory_legendCheckBox
+        self.trajectory_date_minTextBox = trajectory_date_minTextBox
+        self.trajectory_date_maxTextBox = trajectory_date_maxTextBox
+
+
+        # Set the layout
+        vbox = QVBoxLayout()
+
+
+        hbox_title = QHBoxLayout()
+        hbox_title.addWidget(trajectory_titleLabel)
+        hbox_title.addWidget(trajectory_titleTextBox)
+        vbox.addLayout(hbox_title)
+
+        vbox.addWidget(HLine())
+
+        hbox_marker_shape = QHBoxLayout()
+        hbox_marker_shape.addWidget(trajectory_marker_shapeLabel)
+        hbox_marker_shape.addWidget(self.trajectory_marker_shapeTextBox)
+        vbox.addLayout(hbox_marker_shape)
+
+        hbox_marker_size = QHBoxLayout()
+        hbox_marker_size.addWidget(trajectory_marker_sizeLabel)
+        hbox_marker_size.addWidget(self.trajectory_marker_sizeTextBox)
+        vbox.addLayout(hbox_marker_size)
+
+        hbox_marker_face_colour = QHBoxLayout()
+        hbox_marker_face_colour.addWidget(trajectory_marker_face_colourLabel)
+        hbox_marker_face_colour.addWidget(self.trajectory_marker_face_colourTextBox)
+        vbox.addLayout(hbox_marker_face_colour)
+
+        hbox_marker_edge_colour = QHBoxLayout()
+        hbox_marker_edge_colour.addWidget(trajectory_marker_edge_colourLabel)
+        hbox_marker_edge_colour.addWidget(self.trajectory_marker_edge_colourTextBox)
+        vbox.addLayout(hbox_marker_edge_colour)
+
+        vbox.addWidget(HLine())
+
+        hbox_line_colour = QHBoxLayout()
+        hbox_line_colour.addWidget(trajectory_line_colourLabel)
+        hbox_line_colour.addWidget(self.trajectory_line_colourTextBox)
+        vbox.addLayout(hbox_line_colour)
+
+        hbox_line_width = QHBoxLayout()
+        hbox_line_width.addWidget(trajectory_line_widthLabel)
+        hbox_line_width.addWidget(self.trajectory_line_widthTextBox)
+        vbox.addLayout(hbox_line_width)
+
+        hbox_line_style = QHBoxLayout()
+        hbox_line_style.addWidget(trajectory_line_styleLabel)
+        hbox_line_style.addWidget(self.trajectory_line_style_ComboBox)
+        vbox.addLayout(hbox_line_style)
+
+        vbox.addWidget(HLine())
+
+        vbox.addWidget(trajectory_vectorCheckBox)
+        vbox.addWidget(trajectory_legendCheckBox)
+
+        vbox.addWidget(HLine())
+
+        vbox.addWidget(trajectory_date_descriptionLabel)
+
+        hbox_date_min = QHBoxLayout()
+        hbox_date_min.addWidget(trajectory_date_minLabel)
+        hbox_date_min.addWidget(trajectory_date_minTextBox)
+        vbox.addLayout(hbox_date_min)
+
+        hbox_date_max = QHBoxLayout()
+        hbox_date_max.addWidget(trajectory_date_maxLabel)
+        hbox_date_max.addWidget(trajectory_date_maxTextBox)
+        vbox.addLayout(hbox_date_max)
+
+        vbox.addWidget(HLine())
+
+
+        # The buttons
+        hbox_buttons = QHBoxLayout()
+        vbox.addLayout(hbox_buttons)
+        hbox_buttons.addWidget(resetButton)
+        hbox_buttons.addWidget(helpButton)
+        hbox_buttons.addWidget(quitButton)
+        vbox.addLayout(hbox_buttons)
+
+
+        self.trajectory_help = None  # No external window yet.
+
+        self.setWindowTitle('trajectory plot settings')
+        self.setLayout(vbox)
+
+        # Set theme and font
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        self.setPalette(palette)
+
+        custom_font = QFont(plotvars.font, plotvars.fontsize)
+        self.window().setFont(custom_font)
+
+
+        self.show()
+
+
+    def textbox_changed(self, text):
+
+        textbox = getattr(self, 'trajectory_' + text + 'TextBox') 
+        setattr(plotvars, 'trajectory_' + text, textbox.text()) 
+
+    def trajectory_line_style(self, text):
+        # Set line type
+        plotvars.trajectory_line_style = text
+
+    def item_clicked(self, item):
+        plotvars.trajectory_vector = self.trajectory_vectorCheckBox.isChecked()
+        plotvars.trajectory_legend = self.trajectory_legendCheckBox.isChecked()
+
+    def reset(self):
+
+        # Reset vector options
+       
+        self.trajectory_titleTextBox.setText('')
+        self.trajectory_marker_shapeTextBox.setText('o')
+        self.trajectory_marker_sizeTextBox.setText('5')
+        self.trajectory_marker_face_colourTextBox.setText('red')
+        self.trajectory_marker_edge_colourTextBox.setText('green')
+        self.trajectory_line_colourTextBox.setText('blue')
+        self.trajectory_line_widthTextBox.setText('1.0')
+        self.trajectory_line_style_ComboBox.setCurrentIndex(0)
+        self.trajectory_legendCheckBox.setChecked(False)
+        self.trajectory_date_minTextBox.setText('')
+        self.trajectory_date_maxTextBox.setText('')
+
+        plotvars.trajectory_title = ''
+        plotvars.trajectory_marker_shape = 'o'
+        plotvars.trajectory_marker_size = '5'
+        plotvars.trajectory_marker_face_colour = 'red'
+        plotvars.trajectory_marker_edge_colour = 'green'
+        plotvars.trajectory_line_colour = 'blue'
+        plotvars.trajectory_line_width = '1.0'
+        plotvars.trajectory_line_style ='-'
+        plotvars.trajectory_legend = False
+        plotvars.trajectory_date_min = ''
+        plotvars.trajectory_date_max = ''
+
+
+    def help(self):
+
+        if self.trajectory_help is None:
+
+            html = '<body><h2>Trajectory plot options</h2>'
+            html += '<h3>Trajectory properties</h3>'
+            html += '<b>title</b> The title of the plot<br>'
+            html += '<b>marker shape</b> Marker shape - default is a circle<br>'
+            html += '<b>marker size</b> Marker size<br>'
+            html += '<b>face colour</b> Marker face colour<br>'
+            html += '<b>edge colour</b> Marker edge colour<br>'
+            html += '<b>line colour</b> Line colour<br>'
+            html += '<b>line style</b> Line style - default is solid<br>'
+            html += '<b>line width</b> Line width<br>'
+            html += '<b>Vector direction</b> direction of the vector<br>'
+            html += '<b>Legend</b> include a legend<br>'
+
+            html += '<br>Marker options - https://matplotlib.org/stable/api/markers_api.html<br>'
+            html += '<br>Line colours  - https://matplotlib.org/stable/gallery/color/named_colors.html<br>'
+
+
+
+
+            self.line_help = Help(html)
+
+        self.line_help.show()
+
 
 
 
