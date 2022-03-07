@@ -12,11 +12,14 @@ from PyQt5.QtWidgets import QApplication, QLabel, QCheckBox, QFileDialog, QDialo
 from PyQt5.QtWidgets import QComboBox, QListWidget, QListWidgetItem, QHBoxLayout, QVBoxLayout, QWidget, QPushButton
 from PyQt5.QtWidgets import QLineEdit, QTextEdit, QSlider, QMenu, QAction, QFontDialog, QMenuBar
 from PyQt5.QtWidgets import QMainWindow, QFrame, QSizePolicy, QScrollBar, QScrollArea, QFormLayout, QGroupBox, QTableWidget
-from PyQt5.QtWidgets import QTableWidgetItem, QTableView, QSlider, QAbstractScrollArea
+from PyQt5.QtWidgets import QTableWidgetItem, QTableView, QSlider, QAbstractScrollArea, QSpacerItem, QHeaderView
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QAbstractTableModel, QVariant, QCoreApplication
-from PyQt5.QtGui import QFont, QPalette, QColor, QTextDocument, QPixmap, QStandardItemModel, QFontDatabase, QFontMetrics
+from PyQt5.QtGui import QFont, QPalette, QColor, QTextDocument, QPixmap, QImage, QStandardItemModel, QFontDatabase, QFontMetrics
 from copy import deepcopy
 from functools import partial
+from PIL import Image, ImageDraw
+from PIL.ImageQt import ImageQt
+import csv
 
 
 
@@ -61,7 +64,7 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                highlight_colour=cols[3], text_colour=cols[4], windowtext_colour=cols[5],\
                text_colour_insensitive = '#708090', font="DejaVu Sans", font_mono='DejaVu Sans Mono',\
                fontsize=15, fill=True, blockfill=False, lines=False, line_labels=False, titles=True,\
-               write_defaults=False, collapse_types=None, line_colour = 'C0',\
+               write_defaults=False, collapse_types=None, line_type='x', line_colour = 'C0',\
                line_style='solid', line_xmin=None, line_xmax=None, line_ymin=None, line_ymax=None,\
                line_title='', line_width='1.0', line_marker = '', line_markersize='',\
                line_markeredgecolor='', line_markeredgewidth='', line_limits='automatic',\
@@ -71,7 +74,8 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                trajectory_marker_face_colour='red', trajectory_marker_edge_colour='green', \
                trajectory_line_style='solid', trajectory_line_colour='blue', \
                trajectory_line_width='1.0', trajectory_vector=False, trajectory_legend=False,\
-               trajectory_date_min='', trajectory_date_max='', dim_names = ['x', 'y', 'z', 't'])
+               trajectory_date_min='', trajectory_date_max='', dim_names = ['x', 'y', 'z', 't'],\
+               code_output=True, data_source_list=None, terminal_output=False, next_field_index=0)
 
 
 cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
@@ -134,6 +138,18 @@ class Cfview(QMainWindow):
     def __init__(self, filename, defaults, parent=None):
         super(Cfview, self).__init__()
         plotvars.file_selected = filename
+        
+        # Set the file string in plotvars
+        if len(plotvars.file_selected) == 1:
+             plotvars.file_read_str = "'"+ plotvars.file_selected[0] + "'"
+        else:
+            fstring = "['"
+            for i in np.arange(len(plotvars.file_selected)):
+                fstring += plotvars.file_selected[i] + "', '"
+            fstring = fstring[:-4] + "']"
+            plotvars.file_read_str = fstring 
+        
+        # Set self.parent to self
         self.parent = self
 
         # Read in the defaults file if it exists
@@ -173,11 +189,6 @@ class Cfview(QMainWindow):
 
     def initUI(self):
 
-        # Set standard out to go to EmittingStream
-        #sys.stdout = EmittingStream(textWritten=self.output_terminal_written)
-
-        QCoreApplication.setAttribute(Qt.AA_DontUseNativeDialogs)
-
         # Add a top menu bar
         bar = self.menuBar()
         # Turn off Mac bar relocation 
@@ -209,9 +220,8 @@ class Cfview(QMainWindow):
         setup.triggered.connect(self.menu)
 
         view = bar.addMenu("View")
-        view.addAction("code")
         view.addAction("data")
-        view.addAction("names")
+        view.addAction("properties")
         view.addAction("transform")
         view.triggered.connect(self.menu)
 
@@ -267,6 +277,7 @@ class Cfview(QMainWindow):
         line_type_ComboBox.addItem('y')
         line_type_ComboBox.addItem('z')
         line_type_ComboBox.addItem('t')
+        line_type_ComboBox.activated[str].connect(self.line_type)
         self.line_type_ComboBox = line_type_ComboBox
 
         # Dimension selection
@@ -334,6 +345,9 @@ class Cfview(QMainWindow):
         if plotvars.file_selected is not None:
             f = cf.read(plotvars.file_selected)
             plotvars.fields = f
+            plotvars.data_source_list = []
+            for i in np.arange(len(f)):
+                plotvars.data_source_list.append(plotvars.file_selected)
 
             field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=f, order=plotvars.field_widget_listing)
             field_titles = QLabel(field_widget_title)
@@ -347,6 +361,8 @@ class Cfview(QMainWindow):
 
         fieldlist.setCurrentRow(0)
         fieldlist.itemSelectionChanged.connect(self.fieldnumber)
+        
+        plotvars.next_field_index = len(f)
 
         # Set fixed width font for field titles
         custom_font_fixed_width = QFont(plotvars.font_mono, plotvars.fontsize)
@@ -622,7 +638,20 @@ class Cfview(QMainWindow):
         # Reset the field title
         if plotvars.file_selected is not None:
             self.reset_field_title()
+            
+        # Set plotvars.dim_names based on the first field and label the collapse dimensions with them
+        Cf_funcs.field_dims(field=f[0])
+        dims = plotvars.dim_names
+            
+        labels = [self.collapse_xLabel, self.collapse_yLabel, self.collapse_zLabel, self.collapse_tLabel]
+        for i in np.arange(4):
+           dim = dims[i]
+           if len(dim) == 1:
+               dim = dim.upper()
+               
+           labels[i].setText(dim)
 
+        # Interface colour settings
         palette = QPalette()    
         palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
         palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
@@ -661,9 +690,16 @@ class Cfview(QMainWindow):
         self.field_titles.setFont(custom_font_mono)
         self.fieldlist.setFont(custom_font_mono)
 
-        # Set standard out to go to EmittingStream
-        sys.stdout = EmittingStream(textWritten=self.output_terminal_written)
-
+        # Set stdout and stderr to go to EmittingStream
+        if not plotvars.terminal_output:
+            sys.stdout = EmittingStream(textWritten=self.output_terminal_written)
+            sys.stderr = EmittingStream(textWritten=self.output_terminal_written)
+        else:
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
+            
+        #sys.stdout = EmittingStream(textWritten=self.output_terminal_written)
+        #sys.stderr = EmittingStream(textWritten=self.output_terminal_written)           
 
         # Set window size and show the window
         self.setGeometry(0, 0, 1280, 1060)
@@ -680,7 +716,7 @@ class Cfview(QMainWindow):
         dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         #dialog.setOption(QCoreApplication.AA_DontUseNativeDialogs, True)
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
-        dialog.setNameFilters(["netCDF Files (*.nc)", "Met Office PP Files (*.pp)", "All Files (*.*)"])
+        dialog.setNameFilters(["(*.nc *.pp)", "(*.nc)", "(*.pp)", "(*.*)"])
         dialog.setFileMode(QFileDialog.ExistingFiles)
 
  
@@ -701,17 +737,22 @@ class Cfview(QMainWindow):
         path =  ''
         if dialog.exec_() == QDialog.Accepted:
             path =  dialog.selectedFiles()
-
-
+        
         try:
             if path != '':
                 f = cf.read(path)
+            else:
+                print("\nNo file selected\n")
+                return
         except ValueError:
             print('file not a valid, netCDF, PP or fields file')
             return
 
 
         plotvars.file_selected = path
+        plotvars.data_source_list = []
+        for i in np.arange(len(f)):
+            plotvars.data_source_list.append(plotvars.file_selected)
 
 
         #if hasattr(f[0], 'featureType'):
@@ -747,6 +788,7 @@ class Cfview(QMainWindow):
         plotvars.index_number = 0
         plotvars.fields = f
         plotvars.field_widget_indicies = None
+        plotvars.next_field_index = len(f)
 
         field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=f, order=plotvars.field_widget_listing)
 
@@ -768,7 +810,15 @@ class Cfview(QMainWindow):
 
       
 
-
+        # Set the file string in plotvars
+        if len(plotvars.file_selected) == 1:
+             plotvars.file_read_str = "'" + plotvars.file_selected[0] + "'"
+        else:
+            fstring = "['"
+            for i in np.arange(len(plotvars.file_selected)):
+                fstring += plotvars.file_selected[i] + "', '"
+            fstring = fstring[:-4] + "']"
+            plotvars.file_read_str = fstring 
 
 
 
@@ -821,9 +871,9 @@ class Cfview(QMainWindow):
 
         # Assemble cf-python code to write the file
         com = 'import cf\n'
-      
-        com += "f = cf.read('"+ plotvars.file_selected + "')\n"
-        com += 'write_fields = []\n'
+        com += "f = cf.read(" + plotvars.file_read_str + ")\n\n"
+        com += '# Create a list of fields to be saved'
+        com += '\nsave_fields = []\n'
 
         # Assemble the selected field indicies from the field titles
         selected = self.fieldlist.selectedItems()
@@ -831,17 +881,25 @@ class Cfview(QMainWindow):
         for i in np.arange(len(selected)):
             field_title = selected[i].text()
             indicies.append(int(field_title.split()[0]))
-        print('selected indicies are ', indicies)
 
-        dims = ['X', 'Y', 'Z', 'T']
+        dims_regular = ['X', 'Y', 'Z', 'T']
+        dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
 
-        write_fields = []
+
+        save_fields = []
 
         # Set the data file
         f = plotvars.fields
 
         # Loop over the selected fields
         for index in np.arange(len(indicies)):
+        
+            if plotvars.data_source_list[indicies[index]] == 'Changed':
+                com +="# See previous code for how to change this field's attributes\n"
+            if plotvars.data_source_list[indicies[index]] == 'Computed':
+                com +='# See previous code for how to compute this field\n'
+            if plotvars.data_source_list[indicies[index]] == 'Copied':
+                com +='# See previous code for how this field was copied\n'
 
             # Form the subspace dictionary
             stored = plotvars.stored_dimensions['f' + str(indicies[index])]
@@ -854,13 +912,13 @@ class Cfview(QMainWindow):
             nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=field)
             orig_vals = [nx, ny, nz, nt]
 
-            for i in np.arange(4):
+            for i in np.arange(len(dims)):
                 # dim_indicies = -1 means no user change to this dimension
-                dim_indicies = stored[dims[i].lower()]
-                if i <= 2:
-                    dim_vals = field.coord(dims[i]).array
-                else:
+                dim_indicies = stored[dims_regular[i].lower()]
+                if field.coord(dims[i]).T:
                     dim_vals = field.coord(dims[i]).dtarray
+                else:
+                    dim_vals = field.coord(dims[i]).array
 
 
                 if dim_indicies != -1:
@@ -899,8 +957,8 @@ class Cfview(QMainWindow):
             collapse_str = ''
             stored = plotvars.stored_collapses['f' + str(indicies[index])] 
             for i in np.arange(4):
-                 if stored[dims[i].lower()] != 'Off':
-                     collapse_str += dims[i] + ': ' + stored[dims[i].lower()] + ' '
+                 if stored[dims_regular[i].lower()] != 'Off':
+                     collapse_str += dims[i] + ': ' + stored[dims_regular[i].lower()] + ' '
             if len(collapse_str) > 0:
                 if collapse_str[-1] == ' ':
                     collapse_str = collapse_str[:-1]
@@ -912,20 +970,23 @@ class Cfview(QMainWindow):
 
             if len(collapse_str) > 0:
                 field = field.collapse(collapse_str)
-                write_fields.append(field)
+                save_fields.append(field)
                 com += "field = field.collapse('" + collapse_str + "')\n" 
 
-            write_fields.append(field)
-            com += 'write_fields.append(field)\n' 
+            save_fields.append(field)
+            com += 'save_fields.append(field)\n' 
 
 
 
         # Write the netCDF file
-        cf.write(write_fields, path)
+        cf.write(save_fields, path)
 
         # Show the cf-python code
-        com += "cf.write(write_fields, '" + path + "')"
-        print('cf-python code to write file is:', com)
+        com += '\n#Save the data\n'
+        com += "cf.write(save_fields, '" + path + "')"
+        
+        if plotvars.code_output:
+           print('### Code to write file is ###\n', com)
 
 
         
@@ -946,10 +1007,9 @@ class Cfview(QMainWindow):
 
         # Make a copy of the field for plotting
         f = deepcopy(plotvars.fields[index])
-
-        #dims_new = Cf_funcs.find_dim_names(f)
-        #print('dims_new are ', type(dims_new), dims_new)
-        #dims = dims_new
+        
+        # Reset the file title in case the user has changed the field properties
+        self.reset_field_title()
 
         # Check data and subspace if necessary
         subspace_args = {}
@@ -1176,34 +1236,34 @@ class Cfview(QMainWindow):
 
 
 
-                # Assemble the cscale command
-                # Reset cscale
-                cfp.cscale()
+            # Assemble the cscale command
+            # Reset cscale
+            cfp.cscale()
 
-                cscale_args = {}
-                if plotvars.cscale != 'viridis':
-                    cscale_args['scale'] = plotvars.cscale
-                if plotvars.cscale_ncols != '':
-                    cscale_args['ncols'] = int(plotvars.cscale_ncols)
-                if plotvars.cscale_above != '':
-                    cscale_args['above'] = int(plotvars.cscale_above)
-                if plotvars.cscale_below != '':
-                    cscale_args['below'] = int(plotvars.cscale_below)
-                if plotvars.cscale_white != '':
-                    cscale_args['white'] = white_vals
-                if plotvars.cscale_reverse_set:
-                    cscale_args['reverse'] = True
+            cscale_args = {}
+            if plotvars.cscale != 'viridis':
+                cscale_args['scale'] = plotvars.cscale
+            if plotvars.cscale_ncols != '':
+                cscale_args['ncols'] = int(plotvars.cscale_ncols)
+            if plotvars.cscale_above != '':
+                cscale_args['above'] = int(plotvars.cscale_above)
+            if plotvars.cscale_below != '':
+                cscale_args['below'] = int(plotvars.cscale_below)
+            if plotvars.cscale_white != '':
+                cscale_args['white'] = white_vals
+            if plotvars.cscale_reverse_set:
+                cscale_args['reverse'] = True
 
-                if len(cscale_args) > 0:
-                    cfp.cscale(**cscale_args)
-                    com_cscale = 'cfp.cscale('
-                    for key in cscale_args:
-                        if key == 'scale':
-                            com_cscale += "cscale='" + str(cscale_args[key]) + "',"
-                        else: 
-                            com_cscale += str(key) + '=' + str(cscale_args[key]) + ','
-                    com_cscale = com_cscale[:-1] + ')\n'
-                    com_con += com_cscale
+            if len(cscale_args) > 0:
+                cfp.cscale(**cscale_args)
+                com_cscale = 'cfp.cscale('
+                for key in cscale_args:
+                    if key == 'scale':
+                        com_cscale += "cscale='" + str(cscale_args[key]) + "',"
+                    else: 
+                        com_cscale += str(key) + '=' + str(cscale_args[key]) + ','
+                com_cscale = com_cscale[:-1] + ')\n'
+                com_con += com_cscale
             
 
 
@@ -1327,8 +1387,9 @@ class Cfview(QMainWindow):
                 cfp.gopen()
 
             if plotvars.plot_type != 'Contour and vector':
-                print('### Code to make the plot is ###')
-                print(com_con)
+                if plotvars.code_output:
+                    print('### Code to make the plot is ###\n', com_con)
+                    
 
             cfp.con(f, **con_args)
     
@@ -1336,21 +1397,20 @@ class Cfview(QMainWindow):
             # Make a line plot
 
             # Check selected data has enough items to make a line plot
-            mydim = str(self.line_type_ComboBox.currentText())
-            dims = ['x', 'y', 'z', 't']
-            index = dims.index(mydim)
-            nx, ny, nz, nt = Cf_funcs.selected_dims(index)
-            dimvals = [nx, ny, nz, nt]
+            #mydim = str(self.line_type_ComboBox.currentText())
+            mydim = plotvars.line_type
+            if mydim in ['x', 'y', 'z', 't']:
+                mydim = mydim.upper()
+            else:
+                mydim = 'dimensioncoordinate' + mydim[-1]
+            
 
-            if dimvals[index] < 2:
+            if np.size(f.coord(mydim).array) < 2:
                 errstr = '\nLine plot error - not enough data to make requested '
                 errstr += mydim + ' line plot\n'
                 errstr += 'Need a minimum of two values along this dimension\n'
                 errstr += 'Field dimensions are\n'
-                errstr += 'nx = ' + str(nx) + '\n'
-                errstr += 'ny = ' + str(ny) + '\n'
-                errstr += 'nz = ' + str(nz) + '\n'
-                errstr += 'nt = ' + str(nt) + '\n'
+                print('There are ', str(np.size(f.coord(mydim).array)) + 'points in this axis')
                 print(errstr)
                 return
 
@@ -1402,7 +1462,7 @@ class Cfview(QMainWindow):
                 com_line += 'ymax=' + plotvars.line_ymax + ')\n'
 
               
-            # Make the line plot
+            # Make the line plot            
             if len(subspace_args) > 0:
                 f = f.subspace(**subspace_args)
 
@@ -1419,13 +1479,16 @@ class Cfview(QMainWindow):
                     if arg == 'thickness':
                         com_line += ', thickness =' + str(line_args[arg])
                     else:
-                        com_line += ', ' + arg + "='" + str(line_args[arg]) + "'"
-
+                        if line_args[arg] not in [True, False]:
+                            com_line += ', ' + arg + "='" + str(line_args[arg]) + "'"
+                        else:
+                            com_line += ', ' + arg + "=" + str(line_args[arg])
 
 
             com_line += ')'
 
-            print('### Code to make plot is ### \n', com_line)
+            if plotvars.code_output:
+                print('### Code to make plot is ###\n', com_line)
             
 
         if plotvars.plot_type == 'Vector' or plotvars.plot_type =='Contour and vector':
@@ -1433,19 +1496,29 @@ class Cfview(QMainWindow):
 
             # Reject plot if other than x-y at present
             if plotvars.contour_type != 'x-y':
-                print('Only longitude-latitude vector plots are possible at present')
+                print('Only longitude-latitude vector plots are supported at present')
                 return
-
 
             index_x = self.vector_x_indexComboBox.currentIndex()
             index_y = self.vector_y_indexComboBox.currentIndex()
+            
+            # Check dimensions have X and Y 
+            data_okay = True
+            if 'X' not in dims or 'Y' not in dims:
+                print("Error - need both 'X' and 'Y' dimensions to make a longitude-latitude vector plot\n")
+                return
+            
+            
+            
+            
 
             # Check selected data has enough items to be a vector plot
             # First the x component
             nx, ny, nz, nt = Cf_funcs.selected_dims(index_x)
             dim_sizes = [nx, ny, nz, nt]
 
-            for i in np.arange(4):
+
+            for i in np.arange(2):
                 if any(dim == dims[i].lower() for dim in plotvars.contour_type):
                     if dim_sizes[i] < 2:
 
@@ -1465,7 +1538,7 @@ class Cfview(QMainWindow):
             nx, ny, nz, nt = Cf_funcs.selected_dims(index_y)
             dim_sizes = [nx, ny, nz, nt]
 
-            for i in np.arange(4):
+            for i in np.arange(2):
                 if any(dim == dims[i].lower() for dim in plotvars.contour_type):
                     if dim_sizes[i] < 2:
 
@@ -1535,7 +1608,13 @@ class Cfview(QMainWindow):
                     return
                 vect_args['pts'] = int(float(plotvars.vector_pts))
          
-
+         
+            com = ''
+            if plotvars.plot_type =='Contour and vector':
+                com += com_con + '\n\n'
+                
+                
+                
             # Generate code to make the plot
            
             # Get the subspace and collapse commands
@@ -1550,7 +1629,9 @@ class Cfview(QMainWindow):
             else:
                 com_u = Cf_funcs.generate_code(ucom_subspace, ucom_collapse, index=index_x, var_index=1)
                 com_v = Cf_funcs.generate_code(vcom_subspace, vcom_collapse, index=index_y, var_index=2)
-            com = com_u + com_v
+                
+            
+            com += com_u + com_v
 
             # Assemble the cfp.vect command
             if plotvars.plot_type == 'Vector':
@@ -1563,15 +1644,17 @@ class Cfview(QMainWindow):
                     vect_com += ', ' + arg + "=" + str(vect_args[arg])
                 else:
                     vect_com += ', ' + arg + "='" + str(vect_args[arg]) + "'"
-            vect_com += ')'
+            vect_com += ')'      
+            
+            
             com += vect_com
+                      
             if plotvars.plot_type == 'Contour and vector':
                 com += '\ncfp.gclose()'
 
-            if plotvars.plot_type == 'Contour':
-                print('### Code to make the plot is ###', com)
-            else:
-                print('### Code to make the plot is ###', vect_com)
+            if plotvars.code_output:
+                print('### Code to make the plot is ###\n', com)
+
 
 
 
@@ -1588,15 +1671,7 @@ class Cfview(QMainWindow):
             com_traj += 'import cfplot as cfp\n'
 
             index = plotvars.index_number
-
-            if isinstance(plotvars.file_selected, str):
-                file = plotvars.file_selected.split('/')[-1]
-                com_traj += "f = cf.read('" + str(file) + "')[" + str(index) +']\n'
-            else:
-                file = plotvars.file_selected
-                com_traj +=  "f = cf.read(" + str(file) + ")[" + str(index) +']\n'
-            
-
+            com_traj += "f = cf.read(" + plotvars.file_read_str + ")[" + str(index) +']\n\n'
 
             # Check if a date range has been specified
             if plotvars.trajectory_date_min != ''  or plotvars.trajectory_date_max != '':
@@ -1808,9 +1883,9 @@ class Cfview(QMainWindow):
             else:
                 cfp.traj(f[tracks, :], **traj_args)
 
+            if plotvars.code_output:
+                print('*** Code to make plot is ***\n', com_traj)
 
-            print('*** Code to make plot is ***')
-            print(com_traj)
 
 
 
@@ -1894,13 +1969,41 @@ class Cfview(QMainWindow):
 
         # Reset the field titles
         self.reset_field_title()
+        
+        # Reset field names if names_window is open
+        if self.names_window is not None:
+            self.names_window.reset()
+            
+        # Reset dimension collapse method names if transform_window is open
+        if self.transform_window is not None:
+            dims = plotvars.dim_names
+            
+            labels = [self.collapse_xLabel, self.collapse_yLabel, self.collapse_zLabel, self.collapse_tLabel]
+            for i in np.arange(4):
+                dim = dims[i]
+                if len(dim) == 1:
+                    dim = dim.upper()
+               
+                labels[i].setText(dim)
+               
+            # Change the sensitivity of interpolation etc based on whether 'X' and 'Y' are available
+            if 'x' in dims and 'y' in dims:
+                self.transform_window.valid_lon_lat(True)
+            else:
+                self.transform_window.valid_lon_lat(False)
+                
+                
+                
+        # Reset table data if data window is open
+        if self.data_window is not None:
+            Populate_table(self.data_window, initial = False)
 
 
     def dim_traj_reset(self, option):
         '''
          Reset the dimension or trajectory selection to all
         '''
-
+        
         # Clear the dimension lists and reset the collapse combos to be 'Off'
         f = deepcopy(plotvars.fields[plotvars.index_number])
         lists_dim = [self.xlist, self.ylist, self.zlist, self.tlist]
@@ -1981,6 +2084,19 @@ class Cfview(QMainWindow):
         '''
 
         plotvars.contour_type = text
+        
+        # Reset table data if data window is open
+        if self.data_window is not None:
+            Populate_table(self.data_window, initial = False)
+
+
+    def line_type(self, text):
+        '''
+         Set the line plot type in plotvars
+        '''
+
+        plotvars.line_type = text
+
 
 
     def plot_type(self, text):
@@ -2118,10 +2234,8 @@ class Cfview(QMainWindow):
 
 
         # Set collapse in the stored_collapses
-        ## print('collapse_type idim and collapse are ', dims[idim], collapse)
         plotvars.stored_collapses[field_key][dims[idim]] = collapse
 
-        ## print('idim is ', idim)
 
         lists_collapse[idim].clear()
         for val in vals:
@@ -2173,6 +2287,11 @@ class Cfview(QMainWindow):
 
         # Reset the field title
         self.reset_field_title()
+        
+        
+        # Reset table data if data window is open
+        if self.data_window is not None:
+            Populate_table(self.data_window, initial = False)
 
 
     def collapse_area(self, text):
@@ -2267,7 +2386,7 @@ class Cfview(QMainWindow):
         self.indexCheckBox.setChecked(ticked_state[0])
         self.fieldCheckBox.setChecked(ticked_state[1])
         self.fieldlist.clear()
-
+        
         field_widget_names, field_widget_title = Cf_funcs.fields_list(self, order=plotvars.field_widget_listing,
                                                 order_changed=True)
 
@@ -2281,7 +2400,6 @@ class Cfview(QMainWindow):
         '''
          change field list based on search
         '''
-
         field_widget_names, field_widget_title = Cf_funcs.fields_list(self, order=plotvars.field_widget_listing,
                                                  order_changed=True, search=text)
 
@@ -2299,7 +2417,7 @@ class Cfview(QMainWindow):
         '''
 
         self.output_terminal_textEdit.append(text)
-        #print('text is ', text)
+
 
 
     def reset_field_title(self):
@@ -2307,9 +2425,10 @@ class Cfview(QMainWindow):
          Reset the field title
         '''
 
-        # Return if no fieldlist at this time
-        if not hasattr(self, 'fieldlist'):
+        # Return if no fieldlist or if plotvars.fields is None
+        if not hasattr(self, 'fieldlist') or plotvars.fields is None:
             return
+
 
         # Check if this field is a trajectory
         traj = False
@@ -2368,11 +2487,11 @@ class Cfview(QMainWindow):
 
 
             # Find the field widget titles
-            field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=[f], order=plotvars.field_widget_listing)
+            field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=[f], \
+                                                     order=plotvars.field_widget_listing, call='reset_field_title')
 
             # Make a different title if this field is a trajectory
             if traj:
-                #field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=[f], order=plotvars.field_widget_listing)
                 field_title = field_widget_names[0].split(' ')[-1]
 
                 new_title = index + str(dims[0])
@@ -2384,6 +2503,10 @@ class Cfview(QMainWindow):
             self.field_titles.setText(field_widget_title)
 
             selected[0].setText(new_title)
+
+        # Reset table data if data window is open
+        if self.data_window is not None:
+            Populate_table(self.data_window, initial = False)
 
 
 
@@ -2401,12 +2524,17 @@ class Cfview(QMainWindow):
             selected = self.fieldlist.selectedItems()
 
             if len(selected) == 0:
+                print('\nNo fields selected for copy\n')
                 return
+                
+            if len(selected) > 1:
+                print("\nOnly copying the first selected field\n")
 
             # Only copy the first selected field
             selected = selected[0]
             index = plotvars.index_number
-            next = len(plotvars.fields)
+            next = self.fieldlist.count()
+            
             new_name = selected.text()
             QListWidgetItem(deepcopy(new_name), self.fieldlist)
             plotvars.stored_dimensions['f' + str(next)] = deepcopy(plotvars.stored_dimensions['f' + str(index)])
@@ -2416,21 +2544,20 @@ class Cfview(QMainWindow):
 
             # Set the new index number
             index_length = plotvars.index_length
-            new_title = str(next) + (6 - len(str(next))) * ' ' + selected.text()[6:]
+            
+            new_title = str(plotvars.next_field_index) + (6 - len(str(plotvars.next_field_index))) * ' ' + selected.text()[6:]
 
             self.fieldlist.item(next).setText(new_title)
 
-
-
+            # Set a new line in plotvars.data_source_list
+            plotvars.data_source_list.append('Copied')
+            plotvars.next_field_index += 1
 
         if value.text() == 'Delete selected fields':
             while len(self.fieldlist.selectedIndexes()) > 0:
                 index = int(self.fieldlist.currentItem().text().split(' ')[0])
-                print('index is ', index)
                 plotvars.fields[index].standard_name = 'deleted'
-                print('selected index test was ', self.fieldlist.currentItem().text())
                 self.fieldlist.currentItem().setText('deleted')
-                print('selected index test is now ', self.fieldlist.currentItem().text())
                 self.fieldlist.takeItem(self.fieldlist.selectedIndexes()[0].row())
 
             
@@ -2457,38 +2584,38 @@ class Cfview(QMainWindow):
 
         if value.text() == 'contour levels':
             if self.contour_levels is None:
-                self.contour_levels = Contour_levels_window()
+                self.contour_levels = Contour_levels_window(self.parent)
             self.contour_levels.show()
 
         if value.text() == 'colour scale':
             if self.colour_scale is None:
-                self.colour_scale = Colour_scale_window()
+                self.colour_scale = Colour_scale_window(self.parent)
             self.colour_scale.show()
 
 
         if value.text() == 'map':
             if self.map_window is None:
-                self.map_window = Map_window()
+                self.map_window = Map_window(self.parent)
             self.map_window.show()
 
         if value.text() == 'contours':
             if self.contour_window is None:
-                self.contour_window = Contour_window()
+                self.contour_window = Contour_window(self.parent)
             self.contour_window.show()
 
         if value.text() == 'lines':
             if self.line_window is None:
-                self.line_window = Line_window()
+                self.line_window = Line_window(self.parent)
             self.line_window.show()
 
         if value.text() == 'vectors':
             if self.vector_window is None:
-                self.vector_window = Vector_window()
+                self.vector_window = Vector_window(self.parent)
             self.vector_window.show()
 
         if value.text() == 'trajectories':
             if self.trajectory_window is None:
-                self.trajectory_window = Trajectory_window()
+                self.trajectory_window = Trajectory_window(self.parent)
             self.trajectory_window.show()
 
 
@@ -2498,7 +2625,7 @@ class Cfview(QMainWindow):
                 self.data_window = Data_window(self.parent)
             self.data_window.show()
 
-        if value.text() == 'names':
+        if value.text() == 'properties':
             if self.names_window is None:
                 self.names_window = Names_window(self.parent)
             self.names_window.show()
@@ -2506,11 +2633,11 @@ class Cfview(QMainWindow):
         if value.text() == 'transform':
             if self.transform_window is None:
                 self.transform_window = Transform_window(self.parent)
-            self.transform_window.window.show()
+            self.transform_window.show()
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 2.5.0</b><p>'
+            html += '<b>This is version 2.7.0</b><p>'
             html += 'cfview is a netCDF and Met Ofice file format data analysis and viewer for the atmospheric sciences '
             html += '<p>'
             html += 'cfview uses:<br>'
@@ -2520,7 +2647,7 @@ class Cfview(QMainWindow):
             html += 'http://ajheaps.github.io/cf-plot<P>'
             html += '<b>PyQt5</b> - GUI toolkit<p>'
             html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS October 2021'
+            html += '&#169; NCAS CMS March 2022'
             self.about_help = Help(html)
             self.about_help.show()
 
@@ -2576,14 +2703,10 @@ class Cfview(QMainWindow):
 class Cfview_defaults_window(QWidget):
     '''popup window for editing cfview defaults'''
 
-    def __init__(self, cfview_parent):
+    def __init__(self, parent):
         super(Cfview_defaults_window, self).__init__()
 
-        # Set the parent of cfview to this Window
-        #self.cfview = cfview(filename='ggap2.nc', parent=self)
-
-        self.cfview_parent = cfview_parent
-
+        self.parent = parent
         self.initUI()
 
 
@@ -2597,7 +2720,7 @@ class Cfview_defaults_window(QWidget):
         saveButton = QPushButton("Save defaults to file:")
         saveButton.clicked.connect(self.save)
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Interface colour themes
         themeComboBox = QComboBox()
@@ -2653,11 +2776,23 @@ class Cfview_defaults_window(QWidget):
 
         font_monoComboBox.setCurrentIndex(index)
         font_monoComboBox.highlighted[str].connect(self.font_mono)
+        
+        # Code output tick box
+        code_outputCheckBox = QCheckBox("Output code")
+        code_outputCheckBox.setChecked(plotvars.code_output)
+        code_outputCheckBox.clicked.connect(self.code_output)
+        
+         # Terminal output tick box
+        terminal_outputCheckBox = QCheckBox("Output messages to terminal")
+        terminal_outputCheckBox.setChecked(plotvars.terminal_output)
+        terminal_outputCheckBox.clicked.connect(self.terminal_output)       
 
 
         # Create layout
         vbox = QVBoxLayout()
 
+        vbox.addWidget(QLabel('Interface options'))
+        
         hbox_font = QHBoxLayout()
         font_Label = QLabel('Main font:')
         hbox_font.addWidget(font_Label)
@@ -2682,6 +2817,15 @@ class Cfview_defaults_window(QWidget):
         hbox_theme.addWidget(themeComboBox)
         vbox.addLayout(hbox_theme)
 
+        vbox.addWidget(HLine())
+
+        vbox.addWidget(code_outputCheckBox)
+        
+        vbox.addWidget(terminal_outputCheckBox)
+
+        vbox.addWidget(HLine())
+
+
         # Save text boxes
         saveTextBox = QLineEdit()
         saveTextBox.setText('~/.cfview_defaults')
@@ -2703,6 +2847,8 @@ class Cfview_defaults_window(QWidget):
         self.font_Slider = font_Slider
         self.font_monoComboBox = font_monoComboBox
         self.fontComboBox = fontComboBox
+        self.code_outputCheckBox = code_outputCheckBox
+        self.terminal_outputCheckBox = terminal_outputCheckBox
         self.setWindowTitle('cfview defaults')
 
         self.setLayout(vbox)
@@ -2798,7 +2944,7 @@ class Cfview_defaults_window(QWidget):
         palette.setColor(QPalette.Text,  QColor(text))    
         palette.setColor(QPalette.WindowText, QColor(windowtext))
         self.setPalette(palette)
-        self.cfview_parent.window().setPalette(palette)
+        self.parent.window().setPalette(palette)
 
 
     def fontsize(self):
@@ -2806,21 +2952,21 @@ class Cfview_defaults_window(QWidget):
         value = self.font_Slider.value()
         font = QFont(plotvars.font, value)
 
-        self.cfview_parent.window().setFont(font)
+        self.parent.window().setFont(font)
         plotvars.fontsize = value
         self.font_size_Label.setText('Font size: ' + str(value))
 
         font = QFont(plotvars.font_mono, plotvars.fontsize)
-        self.cfview_parent.window().field_titles.setFont(font)
-        self.cfview_parent.window().fieldlist.setFont(font)
-
+        self.parent.window().fieldlist.setFont(font)
+        
+        self.parent.window().field_titles.setFont(font)
+        self.parent.window().fieldlist.setFont(font)
 
     def font_main(self, value):
 
         plotvars.font = value
         font = QFont(plotvars.font, plotvars.fontsize)
-        self.cfview_parent.window().setFont(font)
-
+        self.parent.window().setFont(font)
 
     def font_mono(self, value):
 
@@ -2828,9 +2974,27 @@ class Cfview_defaults_window(QWidget):
         font = QFont(plotvars.font_mono, plotvars.fontsize)
 
         # Set mono font for field titles and field list
-        self.cfview_parent.window().field_titles.setFont(font)
-        self.cfview_parent.window().fieldlist.setFont(font)
+        self.parent.window().field_titles.setFont(font)
+        self.parent.window().fieldlist.setFont(font)
 
+
+    def code_output(self):
+        if self.code_outputCheckBox.isChecked():
+            plotvars.code_output = True
+        else:
+            plotvars.code_output = False
+            
+            
+    def terminal_output(self):
+        if self.terminal_outputCheckBox.isChecked():
+            plotvars.terminal_output = True
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
+        else:
+            plotvars.terminal_output = False        
+            sys.stdout = EmittingStream(textWritten=self.parent.output_terminal_written)
+            sys.stderr = EmittingStream(textWritten=self.parent.output_terminal_written)
+            
 
     def reset(self):
         # Reset to defaults
@@ -2850,9 +3014,8 @@ class Cfview_defaults_window(QWidget):
                 index = fonts.index(font)
                 self.fontComboBox.setCurrentIndex(index)
                 plotvars.font = font
-        #self.font_main(plotvars.font)
         font = QFont(plotvars.font, plotvars.fontsize)
-        self.cfview_parent.window().setFont(font)
+        self.parent.window().setFont(font)
 
 
         # Mono font
@@ -2862,25 +3025,30 @@ class Cfview_defaults_window(QWidget):
                 index = fonts.index(font)
                 plotvars.font_mono = font
                 self.font_monoComboBox.setCurrentIndex(index)
-        #self.font_mono(plotvars.font_mono)
         font = QFont(plotvars.font_mono, plotvars.fontsize)
-        self.cfview_parent.window().field_titles.setFont(font)
-        self.cfview_parent.window().fieldlist.setFont(font)
+        self.parent.window().field_titles.setFont(font)
+        self.parent.window().fieldlist.setFont(font)
 
         # Reset the theme
         self.theme('BlueMono')
         self.themeComboBox.setCurrentIndex(0)
 
+        # Code output is True
+        self.code_outputCheckBox.setChecked(True)
+        plotvars.code_output = True
+        
+         # Terminal output is True
+        self.terminal_outputCheckBox.setChecked(False)
+        plotvars.terminal_output = True       
+        
 
     def save(self):
-        print('In save -  file is ', self.saveTextBox.text())
-
 
         # Ask to clobber existing file
         full_path = os.path.expanduser(self.saveTextBox.text())
         self.savefile = full_path
         check = os.path.isfile(full_path) 
-        print('check is ', check)
+        
         if check:
             html = ''
             html += '<body>The file ' + full_path + ' already exists'
@@ -2895,9 +3063,6 @@ class Cfview_defaults_window(QWidget):
             plotvars.write_defaults = True
             
         Save_defaults(self.savefile)
-
-
-
 
 
     def help(self):
@@ -2920,6 +3085,13 @@ class Cfview_defaults_window(QWidget):
             self.defaults_help = Help(html)
 
         self.defaults_help.show()
+        
+        
+    def closeEvent(self, event):
+        # Close self.parent.cfview_defaults_window
+        self.parent.cfview_defaults_window = None
+        self.close()
+        
 
 
 class Clobber_file(QWidget):
@@ -3002,11 +3174,10 @@ class Save_defaults():
 
     def save(self):
         if plotvars.write_defaults:
-            print('writing file')
+        
             plotvars.write_defaults = False
 
             datafile = open(self.savefile, 'w')
-
             datafile.write('### cfview defaults file ###\n\n')
             datafile.write('background_colour ' + plotvars.background_colour + '\n')
             datafile.write('button_colour ' + plotvars.button_colour + '\n')
@@ -3018,11 +3189,12 @@ class Save_defaults():
             datafile.write('font_mono ' + plotvars.font_mono + '\n')
             datafile.write('fontsize ' + str(plotvars.fontsize) + '\n')
             datafile.write('fill ' + str(plotvars.fill) + '\n')
+            datafile.write('code_output ' + str(plotvars.code_output) + '\n')
+            datafile.write('terminal_output ' + str(plotvars.terminal_output) + '\n')
             datafile.write('blockfill ' + str(plotvars.blockfill) + '\n')
             datafile.write('lines ' + str(plotvars.lines) + '\n')
             datafile.write('line_labels ' + str(plotvars.line_labels) + '\n')
             datafile.write('titles ' + str(plotvars.titles) + '\n')
-
             datafile.close()
 
 
@@ -3030,8 +3202,10 @@ class Save_defaults():
 class Contour_levels_window(QWidget):
     '''popup window for editing contour level defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Contour_levels_window, self).__init__()
+
+        self.parent = parent
         self.initUI()
 
 
@@ -3045,7 +3219,7 @@ class Contour_levels_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Labels
         automatic_Label = QLabel('Automatic levels')
@@ -3250,6 +3424,12 @@ class Contour_levels_window(QWidget):
         self.levs_stepTextbox.setText('')
         self.levs_manualTextbox.setText('')
         plotvars.levs_set = False
+        
+        
+    def extension_type(self, text):
+
+        plotvars.levs_extend_lower = self.extension_lowerCheck.isChecked()
+        plotvars.levs_extend_upper = self.extension_upperCheck.isChecked()
 
 
     def help(self):
@@ -3273,11 +3453,15 @@ class Contour_levels_window(QWidget):
 
         self.contour_levels_help.show()
 
+    def closeEvent(self, event):
+        # Close self.parent.contour_levels_window
+        self.parent.contour_levels_window = None
+        self.close()
 
-    def extension_type(self, text):
 
-        plotvars.levs_extend_lower = self.extension_lowerCheck.isChecked()
-        plotvars.levs_extend_upper = self.extension_upperCheck.isChecked()
+
+
+
 
 
 
@@ -3359,8 +3543,10 @@ class HLine(QFrame):
 class Colour_scale_window(QWidget):
     '''popup window for changing colour scale defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Colour_scale_window, self).__init__()
+        
+        self.parent = parent
         self.initUI()
 
 
@@ -3374,7 +3560,7 @@ class Colour_scale_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
 
 
@@ -3489,14 +3675,47 @@ class Colour_scale_window(QWidget):
             getattr(self, scale + 'CheckBox').setChecked(False)
             getattr(self, scale + 'CheckBox').clicked.connect(partial(self.scale_changed, plotvars.cscales[i]))
 
+
+            # Make an image of the colour scale defined in cf-plot colourmaps directory
+            width = 750
+            height = 13
+
+            img  = Image.new( mode = "RGB", size = (width, height), color = (255, 255, 255) )
+            
+            if cfp.__file__[-11:] == '__init__.py':
+                rgb = cfp.__file__[:-11] + 'colourmaps/' + scale + '.rgb'
+            else:
+                rgb = cfp.__file__[:-9] + 'colourmaps/' + scale + '.rgb'    
+                
+            rgb_vals = []
+            with open(rgb, newline='', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    vals = row[0].split()
+                    rgb_vals.append([int(vals[0]), int(vals[1]), int(vals[2])])
+
+
+            step = width/len(rgb_vals)
+
+            for row in np.arange(len(rgb_vals)):
+                idraw = ImageDraw.Draw(img)
+                idraw.rectangle((row*step, 0, (row+1)*step, height), fill=tuple(rgb_vals[row]))
+
             image = QLabel()
-            pixmap = QPixmap('colour_scales/' + scale + '.png')
+
+            r, g, b = img.split()
+            im = Image.merge("RGB", (b, g, r))
+            
+            im2 = im.convert("RGBA")
+            data = im2.tobytes("raw", "RGBA")
+            qim = QImage(data, im.size[0], im.size[1], QImage.Format_ARGB32)
+            pixmap = QPixmap.fromImage(qim)
             image.setPixmap(pixmap)
 
             formLayout.addRow(getattr(self, scale + 'CheckBox'), image)
 
 
-        self.viridisCheckBox.setChecked(True)
+        #self.viridisCheckBox.setChecked(True)
 
         groupBox.setLayout(formLayout)
         #vbox_scale.setLayout(formLayout)
@@ -3617,16 +3836,14 @@ class Colour_scale_window(QWidget):
         for scale in plotvars.cscales:
             getattr(self, scale + 'CheckBox').setChecked(False)
 
-        self.viridisCheckBox.setChecked(True)
+        #self.viridisCheckBox.setChecked(True)
         plotvars.cscale = 'viridis'
         plotvars.cscale_reverse_set = False
         plotvars.cscale_white = ''
         plotvars.cscale_ncols = ''
         plotvars.cscale_above = ''
         plotvars.cscale_below = ''
-        print('In cscale reset')
-        print(plotvars.cscale, plotvars.cscale_reverse_set, plotvars.cscale_white, plotvars.cscale_ncols, plotvars.cscale_above, plotvars.cscale_below)
-
+        
         self.set_sensitive()
 
     def help(self):
@@ -3654,13 +3871,21 @@ class Colour_scale_window(QWidget):
             self.colour_scale_help = Help(html)
 
         self.colour_scale_help.show()
+        
+    def closeEvent(self, event):
+        # Close self.parent.colour_scale_window
+        self.parent.colour_scale_window = None
+        self.close()
+        
 
 
 class Map_window(QWidget):
     '''popup window for changing map defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Map_window, self).__init__()
+        
+        self.parent = parent
         self.initUI()
 
 
@@ -3674,7 +3899,7 @@ class Map_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
 
         # Text box labels
@@ -3941,7 +4166,6 @@ class Map_window(QWidget):
 
 
     def help(self):
-        print('in help')
 
         if self.map_help is None:
 
@@ -3974,13 +4198,21 @@ class Map_window(QWidget):
             self.map_help = Help(html)
 
         self.map_help.show()
+        
+        
+    def closeEvent(self, event):
+        # Close self.parent.colour_scale_window
+        self.parent.colour_scale_window = None
+        self.close()
 
 
 class Contour_window(QWidget):
     '''popup window for changing contour defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Contour_window, self).__init__()
+        
+        self.parent = parent
         self.initUI()
 
 
@@ -3994,7 +4226,7 @@ class Contour_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Text box labels
         titleLabel = QLabel('title')
@@ -4050,7 +4282,6 @@ class Contour_window(QWidget):
 
         # The buttons
         hbox_buttons = QHBoxLayout()
-        vbox.addLayout(hbox_buttons)
         hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(helpButton)
         hbox_buttons.addWidget(quitButton)
@@ -4153,7 +4384,10 @@ class Contour_window(QWidget):
         plotvars.text = ''
         plotvars.colorbar_orientation = None
 
+    def textbox_changed(self, text):
 
+        textbox = getattr(self, text + 'TextBox') 
+        setattr(plotvars, text, textbox.text()) 
 
 
     def help(self):
@@ -4171,10 +4405,10 @@ class Contour_window(QWidget):
         self.contour_help.show()
 
 
-    def textbox_changed(self, text):
-
-        textbox = getattr(self, text + 'TextBox') 
-        setattr(plotvars, text, textbox.text()) 
+    def closeEvent(self, event):
+        # Close self.parent.contour_window
+        self.parent.contour_window = None
+        self.close()
 
 
 
@@ -4193,6 +4427,15 @@ class TableModel(QAbstractTableModel):
 
 
     def data(self, index, role): 
+
+
+        # Align table text to the right
+        #if role == Qt.TextAlignmentRole and index.column() > 1:
+        #     https://stackoverflow.com/questions/38150196/how-to-align-column-of-qtableview
+        #     print('index.column to right' + str(index.column()))
+        #     return Qt.AlignRight
+        #return super(TableModel, self).data(index, role)
+
 
         try:
             v = float(self._datamax)
@@ -4215,6 +4458,7 @@ class TableModel(QAbstractTableModel):
                 return str(int(value))
             else:
                  return str(round(value, self._ndecs))
+                 
 
     def rowCount(self, index):
         return self._data.shape[0]
@@ -4223,8 +4467,6 @@ class TableModel(QAbstractTableModel):
         return self._data.shape[1]
 
     def headerData(self, section, orientation, role):
-        #if role != Qt.DisplayRole or orientation != Qt.Horizontal:
-        #    return QVariant()
 
         if role != Qt.DisplayRole:
             return QVariant()
@@ -4234,22 +4476,22 @@ class TableModel(QAbstractTableModel):
             for ix in np.arange(len(self._x)):
                 xlabels.append(str(self._x[ix]))
             return xlabels[section]
-
+                
         if orientation == Qt.Vertical:
             ylabels = []
             for iy in np.arange(len(self._y)):
                 ylabels.append(str(self._y[iy]))
             return ylabels[section]
- 
+    
 
 
 
 class Data_window(QWidget):
     '''popup window for viewing data'''
 
-    def __init__(self, cfview_parent):
+    def __init__(self, parent):
         super(Data_window, self).__init__()
-        self.cfview_parent = cfview_parent
+        self.parent = parent
         self.initUI()
 
     def initUI(self):
@@ -4265,16 +4507,18 @@ class Data_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Text box labels
         colouringLabel = QLabel('Data colouring:')
         ndecsLabel = QLabel('Number of decimal places: 2')
-        text_sizeLabel = QLabel('Text size: ')
+        column_widthLabel = QLabel('Column width: 10')
+        text_sizeLabel = QLabel('Text size: ' + str(plotvars.fontsize))
         dataminLabel = QLabel('Minimum')
         datamin_colourLabel = QLabel('Minimum Colour')
         datamaxLabel = QLabel('Maximum')
         datamax_colourLabel = QLabel('Maximum Colour')
+        titlesLabel = QLabel('')
 
         # Text boxes
         dataminTextBox = QLineEdit()
@@ -4302,53 +4546,23 @@ class Data_window(QWidget):
         text_sizeSlider.setMaximum(30)
         text_sizeSlider.setValue(plotvars.fontsize)
         text_sizeSlider.valueChanged.connect(self.value_changed)
-
-
-
         
-        # Make a copy of the field
-        index = plotvars.index_number
-        f = deepcopy(plotvars.fields[index])
-        data = f[0, 0, :, :].array.squeeze()
-        print('shape of data is ', np.shape(data))
-        x = f.coord('X').array         
-        y = f.coord('Y').array         
-
-
-        ndecs = 2
-
-        table = QTableView()
-
-        datamin = ''
-        datamax = ''
-        datamin_colour = ''
-        datamax_colour = ''
-
-
-        model = TableModel(data, x, y, ndecs, datamin, datamax, datamin_colour, datamax_colour)
-
-        table.setModel(model)
-
-
-
-
-        xlabels = []        
-        for ix in np.arange(len(x)):
-            xlabels.append(str(x[ix]))
-
-
-        ylabels = []        
-        for iy in np.arange(len(y)):
-            ylabels.append(str(y[iy]))
-
-
-        self.table = table
+        column_widthSlider = QSlider(Qt.Horizontal)
+        column_widthSlider.setMinimum(1)
+        column_widthSlider.setMaximum(30)
+        column_widthSlider.setValue(10)        
+        column_widthSlider.valueChanged.connect(self.set_column_width)
+        
+        self.width = 10
         self.ndecsLabel = ndecsLabel
         self.ndecsSlider = ndecsSlider
 
         self.text_sizeLabel = text_sizeLabel
         self.text_sizeSlider = text_sizeSlider
-
+        
+        self.column_widthLabel = column_widthLabel
+        self.column_widthSlider = column_widthSlider       
+        
         self.dataminLabel = dataminLabel
         self.datamaxLabel = datamaxLabel
         self.datamin_colourLabel = datamin_colourLabel
@@ -4359,15 +4573,24 @@ class Data_window(QWidget):
         self.datamin_colourTextBox = datamin_colourTextBox
         self.datamax_colourTextBox = datamax_colourTextBox
 
-        self.data = data
-        self.x = x
-        self.y = y
+        # Set the title labe in self
+        self.titlesLabel = titlesLabel
+        # Add the table     
+        table = QTableView()
+        self.table = table
+        
+        Populate_table(self)
+        
+        # Align column labels to the left
+        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft)
+        
 
 
 
 
 
         vbox = QVBoxLayout()
+        vbox.addWidget(titlesLabel)
 
         vbox.addWidget(table)
 
@@ -4376,6 +4599,11 @@ class Data_window(QWidget):
         sliders_hbox.addWidget(ndecsSlider)
         sliders_hbox.addWidget(text_sizeLabel)
         sliders_hbox.addWidget(text_sizeSlider)
+        sliders_hbox.addWidget(column_widthLabel)
+        sliders_hbox.addWidget(column_widthSlider)
+        
+        #horizontalSpacer = QSpacerItem(80, 40, QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #sliders_hbox.addItem(horizontalSpacer)
         vbox.addLayout(sliders_hbox)
 
         datacolours_hbox = QHBoxLayout()
@@ -4392,7 +4620,6 @@ class Data_window(QWidget):
 
         # The buttons
         hbox_buttons = QHBoxLayout()
-        vbox.addLayout(hbox_buttons)
         hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(plotButton)
         hbox_buttons.addWidget(helpButton)
@@ -4424,20 +4651,6 @@ class Data_window(QWidget):
         self.show()
 
 
-
-    def help(self):
-
-        if self.data_help is None:
-
-            html = ""
-            html += "<body><h2>Data viewing</h2>"
-            html += "Describe window and options "
-
-            self.contour_help = Help(html)
-
-        self.contour_help.show()
-
-
     def plot(self):
         selected = self.table.selectionModel().selectedIndexes()
 
@@ -4453,6 +4666,10 @@ class Data_window(QWidget):
             miny = min(yvals)
             maxy = max(yvals)
 
+
+            
+            
+            
             # Form the subspace dictionary from the currently selected data'''
             index = plotvars.index_number
             f = deepcopy(plotvars.fields[index])
@@ -4462,8 +4679,8 @@ class Data_window(QWidget):
             nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f)
             dim_sizes = [nx, ny, nz, nt]
             dims = ['X', 'Y', 'Z', 'T']
-            lists = [self.cfview_parent.xlist.selectedItems(), self.cfview_parent.ylist.selectedItems(),\
-                     self.cfview_parent.zlist.selectedItems(), self.cfview_parent.tlist.selectedItems()]
+            lists = [self.parent.xlist.selectedItems(), self.parent.ylist.selectedItems(),\
+                     self.parent.zlist.selectedItems(), self.parent.tlist.selectedItems()]
             collapses = [plotvars.collapse_x, plotvars.collapse_y,\
                      plotvars.collapse_z, plotvars.collapse_t]
             subspace_args ={}
@@ -4501,12 +4718,57 @@ class Data_window(QWidget):
                             val2 = max(vals)
                             subspace_args[dims[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
 
+            # Apply list subspace args
+            if len(subspace_args) > 0:
+                f = f.subspace(**subspace_args)
                 
-            print('in contour plot code 1')
+            mytypes = plotvars.contour_type.split('-')
+            myx = mytypes[0]
+            myy = mytypes[1]
+            if len(myx) == 1:
+                myx = myx.upper()
+            if len(myy) == 1:
+                myy = myy.upper()    
+            if myx[:3] == 'dim':
+                myx = 'dimensioncoordinate' + myx[-1]
+            if myy[:3] == 'dim':
+                myy = 'dimensioncoordinate' + myy[-1]                
+                
+            # Apply subspace based on cells selected
+            myxmin = f.coord(myx).array[minx]
+            myxmax = f.coord(myx).array[maxx]
+            if myxmin > myxmax:
+                myxmin, myxmax = myxmax, myxmin
+            myymin = f.coord(myy).array[miny]
+            myymax = f.coord(myy).array[maxy]  
+            if myymin > myymax:
+                myymin, myymax = myymax, myymin                      
+            
+            new_subspace_args = {}
+            if myxmin != myxmax:
+                new_subspace_args[myx] = cf.wi(myxmin, myxmax)
+            else:
+                new_subspace_args[myx] = myxmin
+            if myymin != myymax:
+                new_subspace_args[myy] = cf.wi(myymin, myymax)
+            else:
+                new_subspace_args[myy] = myymin    
+                           
+            if len(new_subspace_args) > 0:
+                f = f.subspace(**new_subspace_args)
+            
+            
+            # Apply collapse args
+            com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
 
+            if len(com_collapse) > 0:
+                f = f.collapse(com_collapse[1:-1])
+            
+            
+            
             plot_type = 'single point selected'
+            
             if maxx > minx and maxy > miny:
-                print('in contour plot code 1')
                 plot_type = 'contour'
                 con_args ={}
                 if plotvars.fill and not plotvars.lines:
@@ -4532,16 +4794,15 @@ class Data_window(QWidget):
                 if plotvars.contour_type[0] == 't':
                     con_args['swap_axes'] = True 
 
-                cfp.con(f[0, 0, miny:maxy, minx:maxx], **con_args)
+                cfp.con(f, **con_args)
 
             if maxx > minx and miny == maxy:
                 plot_type = 'line'
-                cfp.lineplot(f[0, 0, miny, minx:maxx ])
-
+                cfp.lineplot(f, titles=True)
+                
             if maxx == minx and maxy > miny:
                 plot_type = 'line'
-                cfp.lineplot(f[0, 0, miny:maxy, minx])
-            print('plot_type is ', plot_type)
+                cfp.lineplot(f, titles=True)
 
         else:
             print('\n\nError - No data selected\n\n')
@@ -4564,6 +4825,14 @@ class Data_window(QWidget):
 
 
 
+    def set_column_width(self, text):
+        # Set column width
+        
+        width = self.column_widthSlider.value()
+        self.column_widthLabel.setText('Column width: ' + str(width))
+        self.width = width
+        for i in np.arange(len(self.x)):
+            self.table.setColumnWidth(i, width*10)
 
 
     def value_changed(self, text):
@@ -4576,6 +4845,10 @@ class Data_window(QWidget):
 
         ndecs = int(self.ndecsSlider.value())
         self.ndecsLabel.setText('Number of decimal places: ' + str(ndecs))
+        
+        fontsize = int(self.text_sizeSlider.value())
+        self.text_sizeLabel.setText('Text size: ' + str(fontsize))    
+        
 
         model = TableModel(self.data, self.x, self.y, ndecs, datamin, datamax, datamin_colour, datamax_colour)
         self.table.setModel(model)
@@ -4583,30 +4856,136 @@ class Data_window(QWidget):
         custom_font = QFont(plotvars.font, int(self.text_sizeSlider.value()))
         self.table.setFont(custom_font)
 
-        #self.table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
-        #self.table.resizeColumnsToContents()  ## super slow resizing
 
-
-        font_metrics = QFontMetrics(QFont(plotvars.font, int(self.text_sizeSlider.value())))
-        data = np.round(self.data, ndecs)
-        if ndecs == 0:
-            data = data.astype(int)
-        mymin = str(np.min(data))
-        mymax = str(np.max(data))
-        max_len = max(len(mymin), len(mymax))
         
-        text_width = font_metrics.width('a' * max_len)
 
-        #self.table.horizontalHeader().setDefaultSectionSize(text_width * 1.4)
+
+    def help(self):
+
+        if self.data_help is None:
+
+            html = ""
+            html += "<body><h2>Data viewing</h2>"
+            html += "Data viewing is based on the dimensions specied in the contour plot type with the default being x-y.  "
+            html += "The field name, selected dimensions and plot type are displayed above the table of data."
+            html += "Options to select the number of decimal places, text size and column width are provided to allow "
+            html += "better visibilty of various data types.<p>"
+            html += "Data colouring options are available for colouring cells that have data above or below a certain threshold.<p>"
+            html += "To plot selected cells a line or area of data must be selected.<p>" 
+
+            self.data_help = Help(html)
+
+        self.data_help.show()
+
+
+    def closeEvent(self, event):
+        # Close self.parent.data_window
+        self.parent.data_window = None
+        self.close()
+
+
+
+
+class Populate_table():
+    '''Populate table in the data viewing widget'''
+
+    def __init__(self, parent, initial=True):
+        super(Populate_table, self).__init__()
+        self.parent = parent
+        self.initial = initial
+        self.change_table()
+        
+        
+    def change_table(self):
+   
+        # Set the field
+        f = plotvars.fields[plotvars.index_number]
+        
+        mytype = plotvars.contour_type.split('-')
+        myx = mytype[0]
+        myy = mytype[1]
+        if 'log(' in myy:
+            print('\n\nError - cannot have a log axis for data viewing\n\n')
+            return
+        if len(myx) == 1:
+            myx = myx.upper()
+        if len(myy) == 1:
+            myy = myy.upper()
+ 
+        
+        subspace_args = Cf_funcs.subspace_args(self.parent, plotvars.index_number)
+        
+        # Perform subspace
+        f = f.subspace(**subspace_args)
+        
+        com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
+
+        if len(com_collapse) > 0:
+            f = f.collapse(com_collapse[1:-1])
+        
+        data = f.array.squeeze()
+        
+            
+        if myx == 'T' or myy == 'T':
+           if not f.has_construct('T'):
+               print('\ndata viewing error - the is no time axis in this data\n')
+               return
+        
+        if myx == 'T':
+            x =f.coord(myx).dtarray
+        else:
+            x = f.coord(myx).array         
+            
+        if myy == 'T':
+            y = f.coord(myy).dtarray    
+        else:
+            y = f.coord(myy).array    
+        
+                
+        if len(x) <= 1 or len(y) <= 1:
+            if len(x) < 1:
+                print('\ndata viewing error - the length of the ' + myx + ' coordinate must be two or greater\n')
+            if len(y) < 1:
+                print('\ndata viewing error - the length of the ' + myy + ' coordinate must be two or greater\n')          
+            data = np.zeros([2,2])
+            x = ['no data returned', 'no data returned']
+            y = ['no data returned', 'no data returned']
+
+        
+        datamin = self.parent.dataminTextBox.text()
+        datamax = self.parent.datamaxTextBox.text()
+        datamin_colour = self.parent.datamin_colourTextBox.text()
+        datamax_colour = self.parent.datamax_colourTextBox.text()
+        ndecs = int(self.parent.ndecsSlider.value())
+
+
+        # Set the titles for the data
+        field_name = 'field name: ' + Cf_funcs.field_name(field=f)
+        dim_titles = cfp.generate_titles(f=f)
+        plot_type = 'plot type = ' + plotvars.contour_type
+        self.parent.titlesLabel.setText(field_name + '\n' + dim_titles + plot_type)
+        
+        model = TableModel(data, x, y, ndecs, datamin, datamax, datamin_colour, datamax_colour)
+
+
+        self.parent.table.setModel(model)
+        
+
+
+        self.parent.data = data
+        self.parent.x = x
+        self.parent.y = y
+
 
 
 class Names_window(QWidget):
     '''popup window for changing data name defaults'''
 
-    def __init__(self, cfview_parent):
+    def __init__(self, parent):
         super(Names_window, self).__init__()
-        self.cfview_parent = cfview_parent
+        self.parent = parent
         self.initUI()
+
 
     def initUI(self):
 
@@ -4614,19 +4993,29 @@ class Names_window(QWidget):
         saveButton = QPushButton("Save")
         saveButton.clicked.connect(self.save)
 
-        new_nameButton = QPushButton("New name")
-        new_nameButton.clicked.connect(self.new_name)
-
+        new_propertyButton = QPushButton("New property")
+        new_propertyButton.clicked.connect(self.new_property)
+        
+        resetButton = QPushButton("Reset")
+        resetButton.clicked.connect(self.reset)
+        
         helpButton = QPushButton("Help")
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
 
         # Set the layout
         vbox = QVBoxLayout()
+        vbox_names = QVBoxLayout()
+        
+        vbox.addLayout(vbox_names)
 
+        self.vbox = vbox
+        self.vbox_names = vbox_names
+        
+        
         # Set the field
         field = plotvars.fields[plotvars.index_number]
         self.field = field
@@ -4634,71 +5023,41 @@ class Names_window(QWidget):
         # Make a copy in self for the reset
         self.field = deepcopy(field)
 
-        # List of all variables
-        self.vardict = {}
-
-        formLayout = QFormLayout()
-        groupBox = QGroupBox('Data names')
-
-
-        names = sorted(field.properties())
-        for name in names:
-            print('processing', name)
-            val = str(field.properties()[name])
-            val_label = 'field_' + name
-            label = name + ':'
-            setattr(self, val_label + '_Label', QLabel(label))
-            setattr(self, val_label , QLineEdit())
-            getattr(self, val_label).setText(val)
-            getattr(self, val_label).setCursorPosition(0)
-            getattr(self, val_label).textChanged.connect(partial(self.textbox_changed, val_label))
-            formLayout.addRow(getattr(self, val_label + '_Label'), getattr(self, val_label))
-            self.vardict["field." + name] = val 
-
-        dims = ['X', 'Y', 'Z', 'T']
-        for dim in dims:
-            if field.has_construct(dim):
-                 nc = field.nc_get_variable(None)
-                 #names = ['standard_name', 'long_name', 'units']
-                 names = sorted(field.coord(dim).properties())
-                 for name in names:
-                     val = getattr(field.coord(dim), name, 'not set')
-                     if val != 'not set':
-                         val_label = 'coord_' + dim + '_' + name
-                         label = dim.lower() + '-dimension ' + name + ':'
-                         setattr(self, val_label + '_Label', QLabel(label))
-                         setattr(self, val_label , QLineEdit())
-                         getattr(self, val_label).setText(val)
-                         getattr(self, val_label).setCursorPosition(0)
-                         getattr(self, val_label).textChanged.connect(partial(self.textbox_changed, val_label))
-                         formLayout.addRow(getattr(self, val_label + '_Label'), getattr(self, val_label))
-                         self.vardict["coord.('"+ dim + "')." + name] = val 
-
-
-        groupBox.setLayout(formLayout)
+        # Populate the window with the field names
+        Populate_names(self, initial=True)
+        
+        
+        # Make a scrollable area for the names
+        groupBox = QGroupBox('')
+        groupBox.setLayout(vbox)
         scroll = QScrollArea()
         scroll.setWidget(groupBox)
         scroll.setWidgetResizable(True)
-        #scroll.setFixedHeight(600)
-        vbox.addWidget(scroll)
+        vscroll = scroll.verticalScrollBar()
+        container = QVBoxLayout()
+        container.addWidget(scroll)
 
- 
 
         # The buttons
         hbox_buttons = QHBoxLayout()
-        vbox.addLayout(hbox_buttons)
         hbox_buttons.addWidget(saveButton)
-        hbox_buttons.addWidget(new_nameButton)
+        hbox_buttons.addWidget(new_propertyButton)
+        hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(helpButton)
         hbox_buttons.addWidget(quitButton)
-        vbox.addLayout(hbox_buttons)
+        container.addLayout(hbox_buttons)
 
-        self.formLayout = formLayout
-        self.names_help = None  # No external window yet.
+        # No external window yet
+        self.names_help = None
+        
 
-        self.setWindowTitle('cfview data names')
-        self.setLayout(vbox)
-        self.new_name_window = None  # No external window yet.
+        self.setWindowTitle('properties')
+        self.scroll = scroll
+        self.vscroll = vscroll
+        self.setLayout(container)
+
+        
+        self.new_property_window = None  # No external window yet.
 
         # Set theme and font
         palette = QPalette()
@@ -4720,78 +5079,200 @@ class Names_window(QWidget):
 
 
 
+
+
+
     def save(self):
-        # save variable data names
+        # Save field if any changes have been made
 
-        print('in save')
-        print('save self.vardict is ', self.vardict)
-
+        # Initial check for change to vars that require a data reload
+        reload = False
+        data_changed = False
         for var in self.vardict:
-            mytype = var[:6]
+            
+            vals = self.vardict[var]
+            mytype = vals[0]
+            name = vals[1]
+            val = vals[2]
+            status = vals[3]
+        
+            if name in  ['_FillValue', 'missing_value', 'valid_min', 'valid_max', 'valid_range']:
+                if status != 'U':
+                    reload = True
+        
+            if status != 'U':
+                data_changed = True
+        
+        # Exit if no data has changed
+        if data_changed is False:
+            print('\nNo data changed\n\n')
+            return
+            
+            
+        # Set the data source to be 'Changed'
+        plotvars.data_source_list[plotvars.index_number] = 'Changed'
+        
+        # Set initial status of com
+        com = 'import cf\n'
+           
+        if reload:
+            com += "import numpy as np\n\n"
+            
+        com += "f = cf.read(" + plotvars.file_read_str + ")[" + str(plotvars.index_number) + "]\n\n"
+                                        
+        # A list of items to be deleted
+        deletion_list = []
+        
+        
+        # Main loop to change data and write code
+        for var in self.vardict:
+            
+            vals = self.vardict[var]
+            mytype = vals[0]
+            name = vals[1]
+            val = Data_check.test_type(vals[2])
+            status = vals[3]
 
-            myvar = var[6:]
-            # Change value to int, float if appropriate
-            val = Data_check.test_type(self.vardict[var])
+            # Strings for making code
+            mytype_str = "'" + mytype + "'"
+            if type(val) == str:
+                val_str = "'" + str(val) + "'"
+            else:
+                val_str = str(val)
+            name_str = "'" + name + "'"
+            
+            # Set masking data type values to be that of the data
+            if name in  ['_FillValue', 'missing_value', 'valid_min', 'valid_max']:
+                if self.field.dtype == 'float32':
+                   val = np.float32(val)
+                   val_str = 'np.float32(' + val_str + ')'
+                if self.field.dtype == 'float64':
+                   val = np.float64(val)  
+                   val_str = 'np.float64(' + val_str + ')'
+                   
+            # Check data if valid_range is set can be used
+            if name == 'valid_range':
+                val = vals[2]
+                print('valid_range ', val)
+                if val[0] != '[' or val[-1] != ']' or val.count(',') != 1:
+                    print('\nvalid_range error - must be a list with two values of form [val1, val2]\n')
+                    return
+                vstr = val[1:-1].split(',')
+                if self.field.dtype == 'float32':
+                    val = [np.float32(vstr[0]), np.float32(vstr[1])]
+                    val_str = '[' + 'np.float32(' + vstr[0] + '), np.float32(' + vstr[1] + ')]'
+                if self.field.dtype == 'float64':
+                    val = [np.float64(vstr[0]), np.float64(vstr[1])]
+                    val_str = '[' + 'np.float64(' + vstr[0] + '), np.float64(' + vstr[1] + ')]'
+                   
+                   
+            if status in ['C', 'D']:
+                if status == 'C':
+                    if mytype == 'field':
+                        if name == 'netCDF name':
+                            plotvars.fields[plotvars.index_number].nc_set_variable(val)
+                            com += "f.nc_set_variable(" + val_str  + ")\n"
+                        else:
+                            plotvars.fields[plotvars.index_number].set_property(name, val)
+                            com += "f.set_property(" + name_str  + ", " + val_str  + ")\n"
+                        
+                    else:
+                        if name == 'netCDF name':
+                            plotvars.fields[plotvars.index_number].coord(mytype).nc_set_variable(val)
+                            com += "f.coord(" + mytype_str + ").nc_set_variable(" + val_str  + ")\n"
+                        else:
+                            plotvars.fields[plotvars.index_number].coord(mytype).set_property(name, val)
+                            com += "f.coord(" + mytype_str + ").set_property(" + name_str  + ", " + val_str  + ")\n"
+                        
+                    # Reset the status field for this var
+                    self.vardict[var][3] = 'U'         
+                            
+                if status == 'D':                    
+                    if mytype == 'field':
+                        plotvars.fields[plotvars.index_number].del_property(name)
+                        deletion_list.append(mytype + '.' + name)
+                        com += "f.del_property(" + name_str + ")\n"
+                    else:
+                        plotvars.fields[plotvars.index_number].coord(mytype).del_property(name)
+                        deletion_list.append("coord.(" + mytype_str + ")" + "." + name)
+                        com += "f.coord(" + mytype_str + ")" + ".del_property(" + name_str + ")\n"
+                        
+                # Reset the status field for this var
+                self.vardict[var][3] = 'U'
+                           
+                    
+        # Delete any vardict entries that have been assigned 'D' for deletion
+        for item in deletion_list:
+            self.vardict.pop(item)
+               
+        # Reload data if one of masking properties has changed
+        if reload:
+            plotvars.fields[plotvars.index_number].apply_masking(inplace=True)
+            com += "\n# Apply  masking as one of "
+            com += "_FillValue, missing_value, valid_min, valid_max, valid_range "
+            com += "has changed\n"
+            com += "f.apply_masking(inplace=True)\n"
+               
 
-            if mytype == 'field.':
-
-                myvar = var[6:]
-                # Change string value to int, float if appropriate
-                val = Data_check.test_type(self.vardict[var])
-
-                if val == 'not set':
-                    pass
-                elif val == 'DELETE':
-                    plotvars.fields[plotvars.index_number].del_property(myvar)
-                else:
-                    plotvars.fields[plotvars.index_number].set_property(myvar, val)
-
-
-
-            if mytype == 'coord.':
-                myvar = var[12:]
-                dim = var[8]
-
-
-                # Change value to int, float if appropriate
-                val = Data_check.test_type(self.vardict[var])
-
-                if val == 'not set':
-                    pass
-                elif val == 'DELETE':
-                    plotvars.fields[plotvars.index_number].coord(dim).del_property(myvar)
-                else:
-                    plotvars.fields[plotvars.index_number].coord(dim).set_property(myvar, val)
-
+        
+        if plotvars.code_output:
+            print('### Code to change the data is ###\n', com)
 
         # Reset the field title
-        selected = self.cfview_parent.fieldlist.selectedItems()[0]
+        selected = self.parent.fieldlist.selectedItems()[0]
         title = selected.text()
         new_name = Cf_funcs.field_name(plotvars.fields[plotvars.index_number])
         title_new = title.replace(title.split(' ')[-1], '') + new_name
         selected.setText(title_new)
 
+        # Call fieldnumber to reset the field names
+        # in case dim2 -> X etc
+        self.parent.fieldnumber()
+        
 
+    def new_property(self):
+        # Pop-up for a new property 
 
-    def new_name(self):
-        print('in new_name')
-        # have a pop-up for a new name 
-
-        if self.new_name_window is None:
-            self.new_name_window = New_name_window(self)
-            self.new_name_window.show()
+        if self.new_property_window is None:
+            self.new_property_window = New_property_window(self)
+            self.new_property_window.show()
  
-
-
-
+        
+    def reset(self):
+        # Reset the main Name window based on the field
+        
+        # Delete all widgets in self.vbox_names
+        if self.vbox_names.count() > 2:
+            # Delete each widget in the layout one by one
+            # We only have labels and hboxes
+            while self.vbox_names.count():
+                item = self.vbox_names.takeAt(0)
+                
+                # Remove single Qlabels
+                if isinstance(item.widget(), QLabel):
+                    item.widget().setParent(None)
+                    self.vbox_names.removeItem(item)
+                    
+                # Remove QHBoxLayouts
+                if type(item) == QHBoxLayout:
+                    for i in reversed(range(item.count())):
+                        item_hbox = item.itemAt(i)
+                        item_hbox.widget().setParent(None)
+        
+        Populate_names(self, initial=True)
 
     def help(self):
 
         if self.names_help is None:
 
-            html = '<body><h2>Data names</h2>'
-            html += 'Editable names for the selected field'
-            html += 'To delete a name change the name value to DELETE'
+            html = "<body><h2>Properties</h2>"
+            html += "This window shows the properties for the field and dimensions as "
+            html += "editable values.  Properties can also be deleted by pressing the 'X' button "
+            html += "next to the property.  Changes to the in memory data are only made when the 'Save' "
+            html += "button is pressed.  When the 'Reset' button is pressed the values will revert to "
+            html += "the initial data values or the saved data values whichever are the most recent.<P>"
+            html += "To save the data to disk use the File -> Save option from the main cfview menu<P>" 
+          
 
             self.names_help = Help(html)
 
@@ -4799,23 +5280,312 @@ class Names_window(QWidget):
 
 
     def textbox_changed(self, text):
+        ''' Set value based on any text box change'''
 
-        if text[:6] == 'coord_':
-            textbox = getattr(self, text) 
-            mydict ="coord.('" + text[6] + "')." + text[8:]
-            self.vardict[mydict] = textbox.text()
+        if text[:5] == 'field':
+            var = 'field.' + text[5:]
 
-        if text[:6] == 'field_':
-            textbox = getattr(self, text) 
-            mydict ="field." + text[6:]
-            self.vardict[mydict] = textbox.text()
+        if text[:19] == 'dimensioncoordinate':
+            var = "coord.('" + text[:20] + "')." + text[20:]
+        
+        if text[0] in ['X', 'Y', 'Z', 'T']:
+            var = "coord.('" + text[0] + "')." + text[1:]
+            
+        # Change value and status to changed - 'C'
+        self.vardict[var][2] = getattr(self, text).text()
+        self.vardict[var][3] = 'C'    
 
 
-class New_name_window(QWidget):
-    '''Popup window for adding a new name'''
+        
+
+
+    def delete(self, text):
+
+        name = None
+
+        if text.split(' ')[0] in ['X', 'Y', 'Z', 'T']:
+           name = "coord.('" + text[0] + "')." + text[2:] 
+            
+        if text[: 19] == 'dimensioncoordinate':
+            name = "coord.('" + text[:20] + "')." + text[21:] 
+        
+        if text.split(' ')[0] == 'field':
+            name = 'field.' + text[6:]
+            
+        if name is not None:
+            delete_item = 'field.' + text
+            self.vardict[name][3] = 'D'
+        else:
+            print('Delete property - name not found - ', name)
+            return
+        
+
+        
+        # Delete all widgets in self.vbox_names
+        if self.vbox_names.count() > 2:
+            # Delete each widget in the layout one by one
+            # We only have labels and hboxes
+            while self.vbox_names.count():
+                item = self.vbox_names.takeAt(0)
+                
+                # Remove single Qlabels
+                if isinstance(item.widget(), QLabel):
+                    item.widget().setParent(None)
+                    self.vbox_names.removeItem(item)
+                    
+                # Remove QHBoxLayouts
+                if type(item) == QHBoxLayout:
+                    for i in reversed(range(item.count())):
+                        item_hbox = item.itemAt(i)
+                        item_hbox.widget().setParent(None)
+                    
+
+        # Populate the window with the changed field names
+        Populate_names(self, initial=False)
+        
+
+        
+    def closeEvent(self, event):
+        # Close self.parent.names_window
+        self.parent.names_window = None
+        self.close()
+        
+        
+
+class Populate_names():
+    '''Populate names into the name viewing widget'''
+
+    def __init__(self, parent, initial=True):
+        super(Populate_names, self).__init__()
+        self.parent = parent
+        self.initial = initial
+        self.add_names()
+        
+        
+    def add_names(self):
+   
+        # Set the field
+        field = plotvars.fields[plotvars.index_number]
+
+        if self.initial:
+        
+            # Dictionary of names
+            # vardict has the following variables:
+            # field. or dimension
+            # variable name
+            # value
+            # modification status - 'U' = unchanged, 'C' = changed, 'D' = deleted
+            vardict = {}
+
+        
+            # Work out the dimension names
+            # dims = of form X, Y, dimensioncoordinate2 etc
+            # dim_names = of form X, Y, dim2 etc
+            dims = plotvars.dim_names
+            dnames = deepcopy(dims)
+            for i in np.arange(len(dims)):
+                if dims[i][:3] == 'dim':
+                    dims[i] = 'dimensioncoordinate' + dims[i][-1]
+                if dims[i] in ['x', 'y', 'z', 't']:
+                    dims[i] = dims[i].upper()
+                    dnames[i] = dims[i].upper()
+
+
+            # Field netCDF name
+            vardict['field.netCDF name'] = ['field', 'netCDF name', field.nc_get_variable(), 'U']
+                    
+            # Field properties
+            names = sorted(field.properties())
+            for name in names:
+                vardict["field." + name] = ['field', name, field.properties()[name], 'U']
+        
+            # Dimension properties
+            for i in np.arange(len(dims)):
+                dim = dims[i]
+                dname = dnames[i]
+                if field.has_construct(dim):
+                    coord = field.coord(dim)
+                    nc_name = coord.nc_get_variable()  
+        
+                    # Add dimension netCDF name
+                    name = 'netCDF name'
+                    val_label = 'coord_' + dname + '_' + name
+                    label = dname + ' ' + name
+                    vardict["coord.('"+ dim + "')." + name] = [dim, 'netCDF name', coord.nc_get_variable(), 'U']
+                 
+                 
+                    # Add dimension properties
+                    dim_names = sorted(coord.properties())
+                    for name in dim_names:
+                        val = coord.get_property(name)
+                        val_label = 'coord_' + dname + '_' + name
+                        label = dname + ' ' + name
+                        vardict["coord.('"+ dim + "')." + name] = [dim, name, val, 'U']
+                
+        else:
+            # Retrieve the preformed vardict
+            vardict =  self.parent.vardict
+
+            # Rearrange vardict so that it is ordered by field and then dimensions
+            # Use a set of dictionaries 
+            dicts = [{}]
+            
+            mydims = Cf_funcs.find_dim_names(field)
+            for idict in np.arange(len(mydims)):
+                dicts.append({})
+
+            # Field dict
+            dicts[0]['field.netCDF name'] = vardict['field.netCDF name']
+            for var in vardict:
+                vals = vardict[var]
+                mytype = vals[0]
+                if mytype == 'field' and var != 'field.netCDF name':
+                    dicts[0][var] = vardict[var]
+                
+            # Dimension dicts
+            for j in np.arange(len(mydims)):
+                for var in vardict:
+                    vals = vardict[var]
+                    mydim = vals[0]
+
+                    if mydim in ['X', 'Y', 'Z', 'T', 'dimensioncoordinate3',\
+                                 'dimensioncoordinate2', 'dimensioncoordinate1',\
+                                 'dimensioncoordinate0']:
+
+                        if mydim == mydims[j]:
+                            dicts[j + 1][var]  = vardict[var]
+            
+            
+            # Reassemble and order so that the netCDF name is at the top of the lists of field and dimensions
+            new_dict = {}
+            
+            for idict in np.arange(len(mydims) + 1):
+                dicts[idict] = dict(sorted(dicts[idict].items())) 
+
+                # Add the netCDF name at the top of the field and dimension lists
+                first_key = list(dicts[idict].keys())[0]
+                
+                vals = dicts[idict][first_key]
+                if vals[0] == 'field':
+                    netcdf_name = 'field.netCDF name'
+                else:
+                    netcdf_name = "coord.('" + dicts[idict][first_key][0] + "').netCDF name"
+                        
+                new_dict[netcdf_name]= dicts[idict][netcdf_name]
+                     
+                for var in dicts[idict]:
+                    if dicts[idict][var][1] != 'netCDF name':                        
+                        new_dict[var]= dicts[idict][var]
+                                                
+
+            # Store new vardict
+            self.vardict = new_dict
+            vardict = self.vardict
+            
+            
+            # Delete all items in self.parent.vbox_names
+            if self.parent.vbox_names.count() > 2:
+                # Delete each widget in the layout one by one
+                # We only have labels and hboxes
+                while self.parent.vbox_names.count():
+                    item = self.parent.vbox_names.takeAt(0)
+                
+                    # Remove single Qlabels
+                    if isinstance(item.widget(), QLabel):
+                        item.widget().setParent(None)
+                        self.parent.vbox_names.removeItem(item)
+                    
+                    # Remove QHBoxLayouts
+                    if type(item) == QHBoxLayout:
+                        for i in reversed(range(item.count())):
+                            item_hbox = item.itemAt(i)
+                            item_hbox.widget().setParent(None)
+            
+
+        # Populate self.parent.vbox_names based on vardict
+        i = 0
+        dim_present = ''
+        
+        for var in vardict:
+        
+            vals = vardict[var]
+
+            mytype = vals[0]
+            name = vals[1]
+            val = vals[2]
+            status = vals[3]
+            
+
+            val_label = vals[0] + name
+            mydim = ''
+            
+
+            if mytype[:-1] == 'dimensioncoordinate':
+                mydim = 'dim' + mytype[-1]
+            if mytype in ['X', 'Y', 'Z', 'T']:
+                mydim = mytype
+                
+
+            label = name + ':'
+            
+            # Add headers
+            if i == 0:
+                getattr(self.parent, 'vbox_names').addWidget(QLabel('Field properties'))
+                
+
+            if mydim in ['X', 'Y', 'Z', 'T', 'dim3', 'dim2', 'dim1', 'dim0']:
+                if mydim != dim_present:
+                    dim_present = mydim
+                    getattr(self.parent, 'vbox_names').addWidget(QLabel(''))
+                    getattr(self.parent, 'vbox_names').addWidget(QLabel('Dimension ' + mydim + ' properties'))
+                
+                
+            # Add if status is not deleted
+            if status != 'D':
+            
+                myhbox = QHBoxLayout()
+                
+                # Add label
+                myhbox.addWidget(QLabel(label))
+                
+                # Add editable value
+                val_edit = QLineEdit()
+                val_edit.setText(str(val))
+                val_edit.setCursorPosition(0)
+                val_edit.textChanged.connect(partial(self.parent.textbox_changed, val_label))
+                setattr(self.parent, val_label, val_edit)
+                myhbox.addWidget(val_edit)
+                
+                # Property delete button 
+                # Do not add for netCDF name properties
+                if label[-12:-1] != 'netCDF name':
+                    my_delete_button = QPushButton('X')
+                    my_delete_button.clicked.connect(partial(self.parent.delete, mytype + ' ' + name))
+                    myhbox.addWidget(my_delete_button)
+                
+                # Add to box_names
+                self.parent.vbox_names.addLayout(myhbox)
+            
+            i = i + 1
+            
+        # Align to the top of the properties window
+        if not self.initial:
+            self.parent.vscroll.setSliderPosition(0)
+            
+            
+        # Set vardict in the parent
+        self.parent.vardict = vardict
+
+
+
+
+
+
+class New_property_window(QWidget):
+    '''Popup window for adding a new property'''
 
     def __init__(self, parent):
-        super(New_name_window, self).__init__()
+        super(New_property_window, self).__init__()
         self.parent = parent
         self.initUI()
 
@@ -4827,7 +5597,7 @@ class New_name_window(QWidget):
         helpButton = QPushButton("Help")
         helpButton.clicked.connect(self.help)
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         fieldRadioButton = QRadioButton("field")
         xRadioButton = QRadioButton("x")
@@ -4835,15 +5605,39 @@ class New_name_window(QWidget):
         zRadioButton = QRadioButton("z")
         tRadioButton = QRadioButton("t")
         fieldRadioButton.clicked.connect(lambda: self.button_changed('field'))
+
         xRadioButton.clicked.connect(lambda: self.button_changed('x'))
         yRadioButton.clicked.connect(lambda: self.button_changed('y'))
         zRadioButton.clicked.connect(lambda: self.button_changed('z'))
         tRadioButton.clicked.connect(lambda: self.button_changed('t'))
+        
+        #Set radio buttons to be initially invisible
+        radiobuttons = [xRadioButton, yRadioButton, zRadioButton, tRadioButton]
+        for i in np.arange(4):
+            radiobuttons[i]. setVisible(False)
+            
+            
+        # Change radio button names based on field dimension names and make visible
+        field = self.parent.field
+        mydims = Cf_funcs.find_dim_names(field)
+
+        for i in np.arange(len(mydims)):
+            if mydims[i] in ['X', 'Y', 'Z', 'T']:
+                mydims[i] = mydims[i].lower()
+            if mydims[i][:19] == 'dimensioncoordinate':
+                mydims[i] = 'dim' + mydims[i][-1]
+            radiobuttons[i].setText(mydims[i])
+            radiobuttons[i].setVisible(True)    
+                
+        
+        
+        
+        
         fieldRadioButton.setChecked(True)
 
 
 
-        nameLabel = QLabel('New name')
+        nameLabel = QLabel('New property')
         nameTextbox = QLineEdit()
 
         valueLabel = QLabel('Value')
@@ -4887,7 +5681,7 @@ class New_name_window(QWidget):
         self.tRadioButton = tRadioButton
 
 
-        self.new_name_help =  None  # No external window yet.
+        self.new_property_help =  None  # No external window yet.
 
         palette = QPalette()    
         palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
@@ -4905,67 +5699,64 @@ class New_name_window(QWidget):
         self.window().setFont(custom_font)
 
         self.setFixedWidth(600)
+        self.setWindowTitle('cfview - create new properties')
 
         self.show()
 
     def apply(self):
 
         name = self.nameTextbox.text()
-        val = self.valueTextbox.text()
+        if len(name) == 1:
+            name = 'dimension ' + name
 
-        print('self.parent.vardict is ', self.parent.vardict)
+        val = Data_check.test_type(self.valueTextbox.text())
 
         if self.fieldRadioButton.isChecked():
             if 'field.' + name in self.parent.vardict:
                 print('Error - ' + name + ' already exists in the data')
                 return
 
-            val_label = 'field_' + name
-            label = name + ':'
-            setattr(self.parent, val_label + '_Label', QLabel(label))
-            setattr(self.parent, val_label , QLineEdit())
-            getattr(self.parent, val_label).setText(val)
-            getattr(self.parent, val_label).setCursorPosition(0)
-            getattr(self.parent, val_label).textChanged.connect(partial(self.parent.textbox_changed, val_label))
-            self.parent.formLayout.addRow(getattr(self.parent, val_label + '_Label'), getattr(self.parent, val_label))
-            self.parent.vardict["field." + name] = val 
-            print('self.parent.vardict is ', self.parent.vardict)
+            myvar = "field." + name
+            mytype = 'field'
+            
+            self.parent.vardict[myvar] = [mytype, name, val, 'C']
+            
+            
 
         else:
-            print('dimension name selected')
 
-            dims = ['X', 'Y', 'Z', 'T']
+
             if self.xRadioButton.isChecked():
-                dim = 'X'
+                dim = self.xRadioButton.text()
             if self.yRadioButton.isChecked():
-                dim = 'Y'
+                dim = self.yRadioButton.text()
             if self.zRadioButton.isChecked():
-                dim = 'Z'
+                dim = self.zRadioButton.text()
             if self.tRadioButton.isChecked():
-                dim = 'T'
+                dim = self.tRadioButton.text()
+                
+            mytype = deepcopy(dim)
+                
+            if dim in ['x', 'y', 'z', 't']:
+                dim = dim.upper()
+                mytype = mytype.upper()
+            if dim[:3] == 'dim':
+                dim = 'dimensioncoordinate' + dim[-1]
+                
+            myvar = "coord.('" + dim + "')." + name
+            
+            if myvar in self.parent.vardict:
+                print('Error - ' + dim + ' value ' + name + ' already exists in the data')
+                return
+
+            self.parent.vardict[myvar] = [dim, name, val, 'C']
+
+        # Set the data source to be 'Changed'
+        plotvars.data_source_list[plotvars.index_number] = 'Changed'
 
 
-            if self.parent.field.has_construct(dim):
-                myname = "coord.('" + dim + "')." + name
-                if myname in self.parent.vardict:
-                    print('Error - ' + myname + ' already exists in the data')
-                    return
-
-                val_label = 'coord_' + dim + '_' + name
-                label = dim.lower() + '-dimension ' + name + ':'
-                setattr(self.parent, val_label + '_Label', QLabel(label))
-                setattr(self.parent, val_label , QLineEdit())
-                getattr(self.parent, val_label).setText(val)
-                getattr(self.parent, val_label).setCursorPosition(0)
-                getattr(self.parent, val_label).textChanged.connect(partial(self.parent.textbox_changed, val_label))
-                self.parent.formLayout.addRow(getattr(self.parent, val_label + '_Label'), getattr(self.parent, val_label))
-                self.parent.vardict["coord.('"+ dim + "')." + name] = val 
-            else:
-                print("field doesn't have " + dim + " dimension")
-
-        print('self.parent.vardict is ', self.parent.vardict)
-
-
+        # Populate the window with the changed field names
+        Populate_names(self.parent, initial=False)
 
 
     def button_changed(self, text):
@@ -4996,50 +5787,64 @@ class New_name_window(QWidget):
 
 
 
+
+
     def help(self):
 
-        if self.new_name_help is None:
+        if self.new_property_help is None:
 
-            html = '<body><h2>New data name</h2>'
-            html += 'Editable new name for the selected field'
-
-
-            self.new_name_help = Help(html)
-
-        self.new_name_help.show()
+            html = '<body><h2>Add a new field property</h2>'
+            html += 'Add a new property and value for the field or dimensions'
 
 
+            self.new_property_help = Help(html)
+
+        self.new_property_help.show()
 
 
-#class Transform_window(QWidget):
-class Transform_window():
+    def closeEvent(self, event):
+        # Close new_property window
+        self.parent.new_property_window = None
+        self.close()
+        
+
+
+
+
+class Transform_window(QWidget):
     '''popup window for transforming data'''
 
-    def __init__(self, cfview_parent):
+
+    def __init__(self, parent):
         super(Transform_window, self).__init__()
-        self.cfview_parent = cfview_parent
+        self.parent = parent
         self.initUI()
 
 
     def initUI(self):
 
-
-        self.window = QMainWindow()
-        self.mainWidget = QWidget()
-        self.window.setCentralWidget(self.mainWidget)
-        self.vertical_layout_main = QVBoxLayout(self.mainWidget)       
+        # Set the layout
+        vbox = QVBoxLayout()
+        vbox_transform = QVBoxLayout()
+        vbox.addLayout(vbox_transform)
+        self.vbox = vbox
+        self.vbox_transform = vbox_transform
+        
+        # Make a scrollable area for the transforms
+        groupBox = QGroupBox('')
+        groupBox.setLayout(vbox)
         scroll = QScrollArea()
-
-        content_widget = QWidget()
-        scroll.setWidget(content_widget)
+        scroll.setWidget(groupBox)
         scroll.setWidgetResizable(True)
-
+        container = QVBoxLayout()
+        container.addWidget(scroll)
 
 
         # Labels
+        warningLabel1 = QLabel('Field has not got a recogised pair of longitudes and latitudes')
+        warningLabel2 = QLabel('Not all data transform functionality is available\n')
         collapseLabel = QLabel('Dimension collapse methods')
         anchorLabel = QLabel('Anchor in longitude:')
-        reverse_yLabel = QLabel('Reverse Y axis:')
         interpolationLabel = QLabel('Interpolation')
         interpolation_methodLabel = QLabel('Interpolation method:')
         lonminLabel = QLabel('lonmin:')
@@ -5070,7 +5875,7 @@ class Transform_window():
 
 
         # Check boxes
-        reverse_yCheckBox = QCheckBox("Reverse Y axis")
+        reverse_yCheckBox = QCheckBox("Reverse latitude axis")
         reverse_yCheckBox.setChecked(False)
         interp_regularCheckBox = QCheckBox("Regular grid")
         interp_regularCheckBox.setChecked(False)
@@ -5097,8 +5902,12 @@ class Transform_window():
         for i in np.arange(len(plotvars.fields)):
             source_ComboBox.addItem(str(i))
             destination_ComboBox.addItem(str(i))
-
-
+            
+        # Horizontal lines
+        hline1 = HLine()
+        hline2 = HLine()
+        hline3 = HLine()
+        
         # Buttons
         applyButton = QPushButton("Apply")
         applyButton.clicked.connect(self.apply)
@@ -5110,8 +5919,12 @@ class Transform_window():
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.window.close)
+        quitButton.clicked.connect(self.closeEvent)
 
+        
+        self.warningLabel1 = warningLabel1
+        self.warningLabel2 = warningLabel2
+        self.anchorLabel = anchorLabel
         self.anchorTextBox = anchorTextBox
         self.reverse_yCheckBox = reverse_yCheckBox
         self.lonminTextBox = lonminTextBox
@@ -5136,49 +5949,58 @@ class Transform_window():
         self.interp_to_anotherCheckBox = interp_to_anotherCheckBox
         self.source_ComboBox = source_ComboBox
         self.destination_ComboBox = destination_ComboBox
-
+        self.interpolationLabel = interpolationLabel
+        self.interpolation_methodLabel = interpolation_methodLabel
+        
+        self.hline1 = hline1
+        self.hline2 = hline2        
+        self.hline3 = hline3        
+        
         # Set the layout
 
-        vbox = QVBoxLayout(content_widget)
-
+        #vbox = QVBoxLayout(content_widget)
+        vbox.addWidget(warningLabel1)
+        vbox.addWidget(warningLabel2)
+        
         vbox.addWidget(collapseLabel)
 
         hbox_area_collapse = QHBoxLayout()
-        hbox_area_collapse.addWidget(self.cfview_parent.collapse_areaLabel)
-        hbox_area_collapse.addWidget(self.cfview_parent.collapse_areaComboBox)
+        hbox_area_collapse.addWidget(self.parent.collapse_areaLabel)
+        hbox_area_collapse.addWidget(self.parent.collapse_areaComboBox)
         vbox.addLayout(hbox_area_collapse)
 
         hbox_x_collapse = QHBoxLayout()
-        hbox_x_collapse.addWidget(self.cfview_parent.collapse_xLabel)
-        hbox_x_collapse.addWidget(self.cfview_parent.collapse_xComboBox)
+        hbox_x_collapse.addWidget(self.parent.collapse_xLabel)
+        hbox_x_collapse.addWidget(self.parent.collapse_xComboBox)
         vbox.addLayout(hbox_x_collapse)
 
         hbox_y_collapse = QHBoxLayout()
-        hbox_y_collapse.addWidget(self.cfview_parent.collapse_yLabel)
-        hbox_y_collapse.addWidget(self.cfview_parent.collapse_yComboBox)
+        hbox_y_collapse.addWidget(self.parent.collapse_yLabel)
+        hbox_y_collapse.addWidget(self.parent.collapse_yComboBox)
         vbox.addLayout(hbox_y_collapse)
 
         hbox_z_collapse = QHBoxLayout()
-        hbox_z_collapse.addWidget(self.cfview_parent.collapse_zLabel)
-        hbox_z_collapse.addWidget(self.cfview_parent.collapse_zComboBox)
+        hbox_z_collapse.addWidget(self.parent.collapse_zLabel)
+        hbox_z_collapse.addWidget(self.parent.collapse_zComboBox)        
         vbox.addLayout(hbox_z_collapse)
 
         hbox_t_collapse = QHBoxLayout()
-        hbox_t_collapse.addWidget(self.cfview_parent.collapse_tLabel)
-        hbox_t_collapse.addWidget(self.cfview_parent.collapse_tComboBox)
+        hbox_t_collapse.addWidget(self.parent.collapse_tLabel)
+        hbox_t_collapse.addWidget(self.parent.collapse_tComboBox)        
         vbox.addLayout(hbox_t_collapse)
-        vbox.addWidget(HLine())
+        
+        vbox.addWidget(hline1)
 
         # Anchor box
         hbox_anchor = QHBoxLayout()
         hbox_anchor.addWidget(anchorLabel)
         hbox_anchor.addWidget(anchorTextBox)
         vbox.addLayout(hbox_anchor)
-        vbox.addWidget(HLine())
+        vbox.addWidget(hline2)
 
         # Reverse y
         vbox.addWidget(reverse_yCheckBox)
-        vbox.addWidget(HLine())
+        vbox.addWidget(hline3)
 
         # Interpolation boxes
         vbox.addWidget(interpolationLabel)
@@ -5229,11 +6051,13 @@ class Transform_window():
         hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(helpButton)
         hbox_buttons.addWidget(quitButton)
-        vbox.addLayout(hbox_buttons)
+        container.addLayout(hbox_buttons)
 
         self.transform_help = None  # No external window yet.
 
-        self.window.setWindowTitle('cfview transform settings')
+        self.setWindowTitle('cfview transform settings')
+        self.scroll = scroll
+        self.setLayout(container)
 
 
 
@@ -5247,17 +6071,60 @@ class Transform_window():
         palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
         palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
         palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
-        self.window.setPalette(palette)
+        self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
-        self.window.setFont(custom_font)
+        self.setFont(custom_font)
 
         self.interp_regular('Off')
         self.interp_one_to_another('Off')
 
-        self.vertical_layout_main.addWidget(scroll)
-        self.window.show()
 
+        self.show()
+        
+        # Change the sensitivity of interpolation etc based on whether 'X' and 'Y' are available
+        dims = plotvars.dim_names
+        if 'x' in dims and 'y' in dims:
+            self.valid_lon_lat(True)
+        else:
+            self.valid_lon_lat(False)
+
+
+    def valid_lon_lat(self, val):
+        # Set widget visibilty based on whether lon and lat pairing are present in this field
+        
+        objs = [self.anchorLabel, self.anchorTextBox, self.parent.collapse_areaLabel, \
+                self.parent.collapse_areaComboBox, \
+                self.reverse_yCheckBox, self.interpolationLabel, self.interpolation_methodLabel, \
+                self.interp_regularCheckBox, self.lonminTextBox, \
+                self.lonmaxTextBox, self.lonstepTextBox, self.latminTextBox, self.latmaxTextBox, \
+                self.latstepTextBox,self.interpolation_ComboBox, self.reverse_yCheckBox, \
+                self.interp_regularCheckBox, self.interp_to_anotherCheckBox, self.lonminLabel, \
+                self.lonmaxLabel, self.lonstepLabel, self.latminLabel, self.latmaxLabel, \
+                self.latstepLabel, self.sourceLabel, self.destinationLabel, self.source_ComboBox, \
+                self.destination_ComboBox, self.hline1, self.hline2, self.hline3]
+
+
+        
+        if val:
+            self.warningLabel1.setVisible(False)
+            self.warningLabel2.setVisible(False)
+            for i in np.arange(len(objs)):
+                objs[i].setVisible(True)
+        else:
+            self.warningLabel1.setVisible(True)
+            self.warningLabel2.setVisible(True)
+            pal = QPalette(self.warningLabel1.palette())
+            pal.setColor(QPalette.WindowText, QColor(Qt.red))
+            self.warningLabel1.setPalette(pal) 
+            pal = QPalette(self.warningLabel2.palette())
+            pal.setColor(QPalette.WindowText, QColor(Qt.red))
+            self.warningLabel2.setPalette(pal)             
+            
+            for i in np.arange(len(objs)): 
+                objs[i].setVisible(False)
+                    
+                
 
 
     def interp_regular(self, text):
@@ -5331,9 +6198,12 @@ class Transform_window():
     def apply(self):
 
         com_interp = 'import cf\n'
-        com_interp += "f = cf.read('" + plotvars.file_selected 
-        com_interp += "')[" + str(plotvars.index_number) + "]\n"
-        com_okay = True
+        com_interp += "f = cf.read(" + plotvars.file_read_str + ")"
+        if self.interp_regularCheckBox.isChecked():
+            com_interp += "[" + str(plotvars.index_number) + "]"
+        com_interp += "\n"
+        
+        changes_made = False
 
         if self.anchorTextBox.text() != '':
 
@@ -5342,16 +6212,30 @@ class Transform_window():
 
             # Check data has an X dimension
             if f.has_construct('X'):
+            
+                # Check input is a number
+                valstr = self.anchorTextBox.text()
+                vals_okay, errstr = Data_check.test_numbers(valstr)
+                if not vals_okay:
+                    print('\n anchor value is not a number\n')
+                    return
+                    
+                val = Data_check.test_type(valstr)
+                
+            
                 if f.iscyclic('X') is False:
                     f.cyclic('X', period=360)
                     com_interp += "f.cyclic('X', period=360)\n"
-                f = f.anchor('X', float(self.anchorTextBox.text()))
-                com_interp += "f.anchor('X', " + str(float(self.anchorTextBox.text())) + ")\n"
-                plotvars.fields[plotvars.index_number] = f
-                self.cfview_parent.fieldnumber()
+                # We use a separate variable here as for some unknown reason if we do an inplace=True on f
+                # it returns an NoneType object
+                g = f.anchor('X', val)
+                com_interp += "f.anchor('X', " + str(float(self.anchorTextBox.text())) + ", inplace=True)\n"
+                plotvars.fields[plotvars.index_number] = g
+                self.parent.fieldnumber()
+                changes_made = True
             else:
                 print('Cannot anchor as X does not exist')
-                com_okay = False
+                return
 
 
         if self.reverse_yCheckBox.isChecked():
@@ -5363,10 +6247,11 @@ class Transform_window():
                 f = f.flip('Y')
                 com_interp += "f = f.flip('Y')\n"
                 plotvars.fields[plotvars.index_number] = f
-                self.cfview_parent.fieldnumber()
+                self.parent.fieldnumber()
+                changes_made = True
             else:
-                print('Y axis not present so reverse not possible')
-                com_okay = False
+                print('Latitude axis not present so reverse not possible')
+                return
 
 
         method = str(self.interpolation_ComboBox.currentText())
@@ -5414,13 +6299,38 @@ class Transform_window():
             # Regular user supplied grid
             if self.interp_regularCheckBox.isChecked():
                 # Extract values from the interface
-                lonmin = float(self.lonminTextBox.text())
-                lonmax = float(self.lonmaxTextBox.text())
-                lonstep = float(self.lonstepTextBox.text()) 
+                lonmin = Data_check.test_type(self.lonminTextBox.text())
+                lonmax = Data_check.test_type(self.lonmaxTextBox.text())
+                lonstep = Data_check.test_type(self.lonstepTextBox.text()) 
+                latmin = Data_check.test_type(self.latminTextBox.text())
+                latmax = Data_check.test_type(self.latmaxTextBox.text())
+                latstep = Data_check.test_type(self.latstepTextBox.text())
+
+                # Check inputs are numbers
+                vals_okay, errstr = Data_check.test_numbers([lonmin, lonmax, lonstep])
+                if not vals_okay:
+                    print('\nInterpolation input error - one of lonmin, lonmax, lonstep is not a number\n')
+                    return
+                
+                vals_okay, errstr = Data_check.test_numbers([latmin, latmax, latstep])
+                if not vals_okay:
+                    print('\nInterpolation input error - one of latmin, latmax, latstep is not a number\n')
+                    return
+                
+                # Check lonmax > lonmin and latmax > latmin
+                okay, errstr = Data_check.test_val0_lt_val1([lonmin, lonmax])
+                if not okay:
+                    print("\nInterpolation input error - lonmin must be less than lonmax\n")
+                    return
+                    
+                okay, errstr = Data_check.test_val0_lt_val1([latmin, latmax])
+                if not okay:
+                    print("\nInterpolation input error - latmin must be less than latmax\n")
+                    return
+                    
+                
+                
                 lonmax = lonmax + lonstep
-                latmin = float(self.latminTextBox.text())
-                latmax = float(self.latmaxTextBox.text())
-                latstep = float(self.latstepTextBox.text())
                 latmax = latmax + latstep
 
                 # Form the destination longitude coordinate
@@ -5435,7 +6345,7 @@ class Transform_window():
                 com_interp += "lons.standard_name = 'longitude'\n"
                 com_interp += "lon_bounds = lons.create_bounds()\n"
                 com_interp += "lons.set_bounds(lon_bounds)\n"
-                com_interp += "lons.cyclic('X'\n"
+                #com_interp += "lons.cyclic('X')\n"
 
                 # Form the latitude destination coordinate
                 lats = cf.DimensionCoordinate(data=cf.Data(np.arange(latmin, latmax, latstep), 'degrees_north'))
@@ -5447,52 +6357,38 @@ class Transform_window():
                 com_interp += str(latmax) + ", " + str(latstep) + "), 'degrees_north'))\n"
                 com_interp += "lats.standard_name = 'latitude'\n"
                 com_interp += "lat_bounds = lats.create_bounds(min=-90, max=90)\n"
-                com_interp += "lats.set_bounds(lat_bounds)\n"
+                com_interp += "lats.set_bounds(lat_bounds)\n\n"
 
 
                 # Regrid data
                 g = f.regrids({'longitude': lons, 'latitude': lats}, method=method)
                 com_interp += "g = f.regrids({'longitude': lons, 'latitude': lats}, method='" + method + "')\n"
-                print(com_interp)
 
-                # Set longitudes to be cyclic
-                g.cyclic('X')
-                com_interp += "g.cyclic('X')\n"
+                changes_made = True
 
-                plotvars.fields[plotvars.index_number] = g
-                self.cfview_parent.fieldnumber()
-
-
-            # Regular user supplied grid
+            # User supplied grid
             if self.interp_to_anotherCheckBox.isChecked():
-                print('regridding one to another')
+
                 f = deepcopy(plotvars.fields)
 
-                source = f[self.source_ComboBox.currentIndex()]
-                destination = f[self.destination_ComboBox.currentIndex()]
+                source_index = self.source_ComboBox.currentIndex()
+                destination_index = self.destination_ComboBox.currentIndex()
+
+                source = f[source_index]
+                destination = f[destination_index]
 
                 g =  source.regrids(destination, method=method)
-                print(g)
-
-                next = len(plotvars.stored_dimensions)
-
-                field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=[g], order=plotvars.field_widget_listing)
-                title = field_widget_names[0]
-                title = str(next) + (6 - len(str(next))) * ' ' + title[6:]
-                print('new title is ', title)
-
-                QListWidgetItem(title, self.cfview_parent.fieldlist) 
-                plotvars.stored_dimensions['f' + str(next)] = {'x': -1, 'y': -1, 'z': -1, 't': -1}
-                plotvars.stored_collapses['f' + str(next)] = {'x': 'Off', 'y': 'Off', 'z': 'Off', 't': 'Off'}
-                plotvars.stored_collapse_values['f' + str(next)] = {'x': False, 'y': False, 'z': False, 't': False}
-                plotvars.fields.append(g)
-
-
-
+                
+                com_interp = 'import cf\n'
+                com_interp += "f = cf.read(" + plotvars.file_read_str + ")]\n"
+                com_interp += "g = f[" + str(source_index) + "].regrids(f[" + str(destination_index) + "], method=" + method + ")"
+                
+                changes_made = True
+                
         if self.computationTextBox.text() != '':
 
             computation = self.computationTextBox.text()
-            print('computation is', computation)
+            com_interp += "\ng = " + computation + "\n"
 
             # Check for valid characters otherwise reject
             valid = 'f0123456789.()[]+-*/ '
@@ -5508,39 +6404,52 @@ class Transform_window():
             f = deepcopy(plotvars.fields)
 
             if okay:
-                g = eval(computation)
-
-                next = len(plotvars.stored_dimensions)
-                field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=[g], order=plotvars.field_widget_listing)
-                title = field_widget_names[0]
-                title = str(next) + (6 - len(str(next))) * ' ' + title[6:]
-                print('new title is ', title)
-
-                QListWidgetItem(title, self.cfview_parent.fieldlist) 
-                plotvars.stored_dimensions['f' + str(next)] = {'x': -1, 'y': -1, 'z': -1, 't': -1}
-                plotvars.stored_collapses['f' + str(next)] = {'x': 'Off', 'y': 'Off', 'z': 'Off', 't': 'Off'}
-                plotvars.stored_collapse_values['f' + str(next)] = {'x': False, 'y': False, 'z': False, 't': False}
-                plotvars.fields.append(g)
-
-                com_interp = 'import cf\n'
-                com_interp += "f = cf.read('" + plotvars.file_selected + "')\n"
-                com_interp += "g = " + computation + "\n"
+                g = eval(computation)                
+                changes_made = True
             else:
                 print('Field computation code is restricted to the characters ' + valid)
                 print('Found an invalid character in the input ',  invalid_str)
                 return
 
 
+        if changes_made: 
+            print('### Transform code is ###', com_interp)
+        else:
+            print('\nNo user transform data changes have been made\n')
+            return
 
-        if com_okay: 
-            print('Transform code is ', com_interp)
 
+        # Add a new field to the end of the field list
+        selected = self.parent.fieldlist.selectedItems()
+        index = plotvars.index_number
+        next = len(plotvars.fields)
+        if self.interp_regularCheckBox.isChecked() or self.computationTextBox.text() != '':
+            new_name = selected[0].text()
+        else:
+            source_int = int(self.source_ComboBox.currentText())
+            new_name = self.parent.fieldlist.item(source_int).text()
 
-
+        QListWidgetItem(deepcopy(new_name), self.parent.fieldlist)
+        plotvars.stored_dimensions['f' + str(next)] = deepcopy(plotvars.stored_dimensions['f' + str(index)])
+        plotvars.stored_collapses['f' + str(next)] = deepcopy(plotvars.stored_collapses['f' + str(index)])
+        plotvars.stored_collapse_values['f' + str(next)] = deepcopy(plotvars.stored_collapse_values['f' + str(index)])
+        plotvars.fields.append(g)
+        index_length = plotvars.index_length
+        new_title = str(next) + (6 - len(str(next))) * ' ' + new_name[6:]
+        self.parent.fieldlist.item(next).setText(new_title)
+        plotvars.data_source_list.append('interpolated')
+        plotvars.index_number = next
+        for myselect in selected:
+            myselect.setSelected(False)
+        self.parent.fieldlist.item(next).setSelected(True)
+         
+        if self.computationTextBox.text() != '':
+            self.parent.fieldlist.item(next).setText(new_title[:30] + 'computed field')
             
+        plotvars.next_field_index += 1
 
-
-
+        changes_made = True
+          
 
     def reset(self):
         # Reset widget values
@@ -5551,6 +6460,7 @@ class Transform_window():
         self.latmaxTextBox.setText('')
         self.latstepTextBox.setText('')
         self.anchorTextBox.setText('')
+        self.computationTextBox.setText('')
         self.reverse_yCheckBox.setChecked(False)
         self.interpolation_ComboBox.setCurrentIndex(0)
         self.interp_regular('Off')
@@ -5559,20 +6469,21 @@ class Transform_window():
         self.destination_ComboBox.setCurrentIndex(0)
         self.interp_regularCheckBox.setChecked(False)
         self.interp_to_anotherCheckBox.setChecked(False)
-        self.cfview_parent.collapse_areaComboBox.setCurrentIndex(0)
-        self.cfview_parent.collapse_xComboBox.setEnabled(True)
-        self.cfview_parent.collapse_yComboBox.setEnabled(True)
-        self.cfview_parent.collapse_areaComboBox.setCurrentIndex(0)
-        self.cfview_parent.collapse_xComboBox.setCurrentIndex(0)
-        self.cfview_parent.collapse_yComboBox.setCurrentIndex(0)
-        self.cfview_parent.collapse_zComboBox.setCurrentIndex(0)
-        self.cfview_parent.collapse_tComboBox.setCurrentIndex(0)
-        color = plotvars.text_colour
-        pal = QPalette(self.cfview_parent.collapse_xLabel.palette())
-        pal.setColor(QPalette.WindowText, QColor(color))
-        self.cfview_parent.collapse_xLabel.setPalette(pal)
-        self.cfview_parent.collapse_yLabel.setPalette(pal)
+        self.parent.collapse_areaComboBox.setCurrentIndex(0)
+        self.parent.collapse_xComboBox.setEnabled(True)
+        self.parent.collapse_yComboBox.setEnabled(True)
+        self.parent.collapse_areaComboBox.setCurrentIndex(0)
+        self.parent.collapse_xComboBox.setCurrentIndex(0)
+        self.parent.collapse_yComboBox.setCurrentIndex(0)
+        self.parent.collapse_zComboBox.setCurrentIndex(0)
+        self.parent.collapse_tComboBox.setCurrentIndex(0)        
         
+        color = plotvars.text_colour
+
+        pal = QPalette(self.parent.collapse_xLabel.palette())
+        pal.setColor(QPalette.WindowText, QColor(color))
+        self.parent.collapse_xLabel.setPalette(pal)
+        self.parent.collapse_yLabel.setPalette(pal)        
 
         # reset the plotvars collapse settings
         plotvars.collapse_x = 'Off'
@@ -5586,24 +6497,20 @@ class Transform_window():
             plotvars.stored_collapse_values[field_var][dims_small[i]] = False
 
         # Switch back to the appropriate dimension view
-        if self.cfview_parent.xRadioButton.isChecked():  
-            self.cfview_parent.xlist_collapse.setVisible(False)
-            self.cfview_parent.xlist.setVisible(True)
-        if self.cfview_parent.yRadioButton.isChecked():  
-            self.cfview_parent.ylist_collapse.setVisible(False)
-            self.cfview_parent.ylist.setVisible(True)
-        if self.cfview_parent.zRadioButton.isChecked():  
-            self.cfview_parent.zlist_collapse.setVisible(False)
-            self.cfview_parent.zlist.setVisible(True)
-        if self.cfview_parent.tRadioButton.isChecked():  
-            self.cfview_parent.tlist_collapse.setVisible(False)
-            self.cfview_parent.tlist.setVisible(True)
+        if self.parent.xRadioButton.isChecked():  
+            self.parent.xlist_collapse.setVisible(False)
+            self.parent.xlist.setVisible(True)
+        if self.parent.yRadioButton.isChecked():  
+            self.parent.ylist_collapse.setVisible(False)
+            self.parent.ylist.setVisible(True)
+        if self.parent.zRadioButton.isChecked():  
+            self.parent.zlist_collapse.setVisible(False)
+            self.parent.zlist.setVisible(True)
+        if self.parent.tRadioButton.isChecked():  
+            self.parent.tlist_collapse.setVisible(False)
+            self.parent.tlist.setVisible(True)            
+            
 
-
-        # Reset the field
-        f = cf.read(plotvars.file_selected)[plotvars.index_number]
-        plotvars.fields[plotvars.index_number] = f
-        self.cfview_parent.fieldnumber()
 
 
     def help(self):
@@ -5619,8 +6526,8 @@ class Transform_window():
             html += 'If a longitude axis exists roll the axis so that the given value lies in the first coordinate cell.'
             html += 'If the data not cyclic it will be made so'
 
-            html += '<h3>Reverse the Y axis</h3>'
-            html += 'Reverse the Y axis can be used to flip the Y axis values in cases where the data starts at the north pole.'
+            html += '<h3>Reverse the latitude axis</h3>'
+            html += 'Reverse the latitude axis can be used to flip the latitude axis values in cases where the data starts at the north pole.'
             html += 'Either direction is plotted corrrectly in cf-plot.'
 
             html += '<h3>Interpolation options</h3>'
@@ -5640,6 +6547,9 @@ class Transform_window():
 
             html += '<h3>Regrid from one field to another</h3>'  
             html += 'Select the source and destination field indicies to regrid one field to another.<p>'
+            
+            html += 'Note: Anchor in longitude, reversing the latitude axis and interpolation is only available for grids with '
+            html += 'recognizable longitude and latitude axes.<p.'
 
             html += '<h3>Field computation</h3>'  
             html += 'Type in the new field calculation, for example:<p>'
@@ -5657,6 +6567,12 @@ class Transform_window():
 
 
 
+    def closeEvent(self, event):
+        # Close self.parent.transform_window
+        self.parent.transform_window = None
+        self.close()
+        
+
 
 class Data_check():
 
@@ -5669,9 +6585,13 @@ class Data_check():
 
         try:
             a = float(val)
-            if int(a)/float(a) == 1:
-                return int(val)
-            if abs(a) > 1:
+            if a != 0.0:
+                if int(a)/float(a) == 1:
+                    return int(val)
+            else:
+                return int(0)
+                
+            if abs(a) > 0.0:
                 if a/int(a) > 1:
                     if plotvars.fields[plotvars.index_number].dtype == 'float32':
                         return np.float32(val)
@@ -5740,10 +6660,11 @@ class Data_check():
 
 class Cf_funcs():
 
-    def __init__(self):
-        pass
+    def __init__(self, parent):
+        super(Cf_funcs, self).__init__()
+        self.parent = parent
 
-
+        
     def field_name(field=None):
         '''Work out the field name'''
 
@@ -5760,7 +6681,6 @@ class Cf_funcs():
         if hasattr(field, 'standard_name'):
             name = field.standard_name
         return name
-
 
 
     def field_dims(field=None):
@@ -5898,20 +6818,22 @@ class Cf_funcs():
 
 
 
-    def fields_list(cfview_parent, fields=None, order=None, search=False, order_changed=False):
+    def fields_list(parent, fields=None, order=None, search=False, order_changed=False, call=None):
         """
          | fields_list - return the field list for populating the field list widget
          |               
-         | cfview_parent - the parent widget
          | fields = None - list of fields to examine
          | order = 'index' or 'field' - order the fields by supplied parameter
          | search = False - return named search
          | order_changed = False - order of the fields has changed.  Use the stored 
          |                 fields_list rather than recalculating.
+         | call = None - flag for when calling from reset_field_title.  When this is done
+         |               don't set plotvars.field_widget_names
          |
          :Returns:
           widget_names
-        """
+        """        
+        
 
         # Check for a trajectory field
         traj = False
@@ -5924,6 +6846,7 @@ class Cf_funcs():
         if order_changed:
             field_widget_names = plotvars.field_widget_names
             field_widget_title = plotvars.field_widget_title
+            
         else:
             names_list = []
             index_list = []
@@ -5978,8 +6901,8 @@ class Cf_funcs():
                 
                 dims = ['X', 'Y', 'Z', 'T']
                 dims_translate = ['nx', 'ny', 'nz', 'nt']
-                radio_buttons =  [cfview_parent.xRadioButton, cfview_parent.yRadioButton,\
-                                  cfview_parent.zRadioButton, cfview_parent.tRadioButton]
+                radio_buttons =  [parent.xRadioButton, parent.yRadioButton,\
+                                  parent.zRadioButton, parent.tRadioButton]
                 
                 # Reset the field title and dimension selction buttons using the stored 
                 # plotvars.dim_names values
@@ -5993,8 +6916,8 @@ class Cf_funcs():
                 
                     
                 # Reset the Contour plotting dimensions
-                contour_index = cfview_parent.contour_type_ComboBox.currentIndex()
-                cfview_parent.contour_type_ComboBox.clear()
+                contour_index = parent.contour_type_ComboBox.currentIndex()
+                parent.contour_type_ComboBox.clear()
                 c_options =[plotvars.dim_names[0] + '-' + plotvars.dim_names[1]]
                 c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[2])
                 c_options.append(plotvars.dim_names[0] + '-log(' + plotvars.dim_names[2] + ')')
@@ -6008,17 +6931,17 @@ class Cf_funcs():
                 c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[1])
                 c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[2])
                 c_options.append(plotvars.dim_names[3] + '-log(' + plotvars.dim_names[2] + ')')
-                cfview_parent.contour_type_ComboBox.addItems(c_options)
-                cfview_parent.contour_type_ComboBox.setCurrentIndex(contour_index)
-                plotvars.contour_type = str(cfview_parent.contour_type_ComboBox.currentText())
+                parent.contour_type_ComboBox.addItems(c_options)
+                parent.contour_type_ComboBox.setCurrentIndex(contour_index)
+                plotvars.contour_type = str(parent.contour_type_ComboBox.currentText())
 
                 # Reset the Line plotting dimensions
-                line_index = cfview_parent.line_type_ComboBox.currentIndex()
-                cfview_parent.line_type_ComboBox.clear()
+                line_index = parent.line_type_ComboBox.currentIndex()
+                parent.line_type_ComboBox.clear()
                 l_options =[plotvars.dim_names[0], plotvars.dim_names[1], plotvars.dim_names[2], plotvars.dim_names[3]]
-                cfview_parent.line_type_ComboBox.addItems(l_options)
-                cfview_parent.line_type_ComboBox.setCurrentIndex(line_index)          
-                plotvars.line_type = str(cfview_parent.line_type_ComboBox.currentText())
+                parent.line_type_ComboBox.addItems(l_options)
+                parent.line_type_ComboBox.setCurrentIndex(line_index)          
+                plotvars.line_type = str(parent.line_type_ComboBox.currentText())
                 
               
 
@@ -6039,7 +6962,9 @@ class Cf_funcs():
                     
                 field_widget_names.append(field_widget_name)
 
-        plotvars.field_widget_names = field_widget_names
+        # Only set plotvars.field_widget_names if the call doesn't come from reset_field_title
+        if call is None:
+            plotvars.field_widget_names = field_widget_names
 
 
         if order == 'index':
@@ -6083,7 +7008,8 @@ class Cf_funcs():
 
 
         plotvars.field_widget_title = field_widget_title
-
+        
+        
         return field_widget_names, field_widget_title
     
 
@@ -6146,7 +7072,7 @@ class Cf_funcs():
 
 
 
-    def subspace_args(cfview_parent, index):
+    def subspace_args(parent, index):
         """
          Work out the subspace args for the selected field
          Returns: subspace_args
@@ -6175,11 +7101,12 @@ class Cf_funcs():
             plot_dims = plotvars.contour_type.split('-')
 
         if plotvars.plot_type == 'Line':
-            plot_dims = plotvars.line_type 
+            plot_dims = [plotvars.line_type] 
+            
             
         # Remove any log(dim1) and leave dim1
         # Also convert the dimension name x to X
-        for i in np.arange(2):
+        for i in np.arange(np.size(plot_dims)):
             if plot_dims[i][0:4] == 'log(':
                 plot_dims[i] = plot_dims[i][4: -1]   
             if len(plot_dims[i]) == 1 :
@@ -6197,6 +7124,7 @@ class Cf_funcs():
                 dim_names[i] = dim_names[i].upper()
             if dim_names[i][0:3] == 'dim':
                 dim_names[i] = 'dimensioncoordinate' + dim_names[i][-1]
+                
 
         for i in np.arange(4):
 
@@ -6222,136 +7150,45 @@ class Cf_funcs():
             else:
                 
                 # Only execute code if the dimension exists in the data
-                # This is a throwback from having added nt=0 for example in a 3D data set with x, y, z 
+                # This is a throw back from having added nt=0 for example in a 3D data set with x, y, z 
                 # but no t dimension
+
+                collapses = plotvars.stored_collapses['f' + str(plotvars.index_number)]
+                
                 if f.has_construct(dim):
+                
                     # Only need to subspace if this dimension has more than one value
                     if np.size(f.coord(dim).array) > 1:
-                        # Calculate the first dimension index value
-                        if dim_vals[dimensions[i]] == -1:
-                            ind = 0
-                        else:
-                            ind = np.min(dim_vals[dimensions[i]]) 
-                        
-                        # Set the subspace value
-                        if dim != 'T':
-                            args[dim] = f.coord(dim).array[ind]
-                        else:
-                            args[dim] = f.coord(dim).dtarray[ind]
-
-
-        return args
-
-
-
-
-
-
-
-
-
-
-
-    def subspace_args_orig(cfview_parent, index):
-        """
-         Work out the subspace args for the selected field
-         Returns: subspace_args
-        """
-
-
-        args = {}
-
-        f = deepcopy(plotvars.fields[index])
-        nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(f)
-        dim_sizes = [nx, ny, nz, nt]
-        dims = ['X', 'Y', 'Z', 'T']
-        
-        field_dims = Cf_funcs.find_dim_names(f)
-        mycoords = list(field_dims)
-
-        # Extract the dimensions and collapses for this field
-        dim_vals = plotvars.stored_dimensions['f' + str(index)]
-        collapses = plotvars.stored_collapses['f' + str(index)] 
-
-        well_formed = Cf_funcs.check_well_formed(f)
-                
-        if well_formed:
-            number_of_dims = 4
-        else:
-            number_of_dims = len(mycoords)
-
-        
-        for i in np.arange(number_of_dims):
-            vals = []
-
-            # Select all indicies if stored value is -1
-            dim_indicies = dim_vals[dims[i].lower()]
-            if dim_indicies == -1:
-                dim_indicies = np.arange(dim_sizes[i])
-
-            # Order the dim indicies
-            dim_indicies.sort()
-
-            
-            for j in np.arange(len(dim_indicies)):
-                if i <= 2 or well_formed is False:
-                    if well_formed:
-                        val = f.coord(dims[i]).array[dim_indicies[j]]
-                    else:
-                        val = f.coord(mycoords[i]).array[dim_indicies[j]]
-                else:
-                    val = f.coord(dims[i]).dtarray[dim_indicies[j]]
-                vals.append(str(val))
-
-
-            if plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector'] :
-                if any(dim == dims[i].lower() for dim in plotvars.contour_type):
-                    pass
-                else:
-                    if collapses[dims[i].lower()] == 'Off':
-                        if dim_sizes[i] > 1:
-                            vals = [vals[0]]
-
-            if plotvars.plot_type == 'Line':
-                mydim = str(cfview_parent.line_type_ComboBox.currentText())
-                if any(dim == dims[i].lower() for dim in [mydim]):
-                    pass
-                else:
-                    if collapses[dims[i].lower()] == 'Off':
-                        if dim_sizes[i] > 1:
-                            vals = [vals[0]]
-
-
-            if len(vals) != dim_sizes[i]:
-                if len(vals) == 1:
-
-                    if collapses[dims[i].lower()] == 'Off':
-                        if dims[i] != 'T' or well_formed is False:
-                            if well_formed:
-                                args[dims[i]] = float(vals[0])
+                    
+                        # Only proceed if no collapse is specified
+                        if collapses[dimensions[i]] == 'Off': 
+                    
+                            # Calculate the first dimension index value
+                            if dim_vals[dimensions[i]] == -1:
+                                ind = 0
                             else:
-                                args[mycoords[i]] = float(vals[0])
-                                
-                        else:
-                            args[dims[i]] = cf.dt(vals[0])
-                else:
-                    if dims[i] != 'T' or well_formed is False:
-                        # cf.wi needs to go from min to max but the widget return
-                        # goes in order of selection
-                        val1 = np.min(np.array(vals).astype(np.float64))
-                        val2 = np.max(np.array(vals).astype(np.float64))
-                        if well_formed:
-                            args[dims[i]] = cf.wi(val1, val2)
-                        else:
-                            args[mycoords[i]] = cf.wi(val1, val2)
-                    else:
-                        val1 = min(vals)
-                        val2 = max(vals)
-                        args[dims[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
+                                ind = np.min(dim_vals[dimensions[i]]) 
                         
+                            # Set the subspace value
+                            if dim != 'T':
+                                args[dim] = f.coord(dim).array[ind]
+                            else:
+                                args[dim] = f.coord(dim).dtarray[ind]
+
 
         return args
 
+
+
+
+
+
+
+
+
+
+
+ 
 
 
     def com_subspace_collapse(subspace_args):
@@ -6427,7 +7264,7 @@ class Cf_funcs():
 
         if var_index == 0:
             com = 'import cf\n'
-            com += 'import cfplot as cfp\n'
+            com += 'import cfplot as cfp\n\n'
         else:
             com = ''
 
@@ -6443,13 +7280,21 @@ class Cf_funcs():
             var = variable_names[0]
         else:
             var = variable_names[var_index]
-
-        if isinstance(plotvars.file_selected, str):
-            file = plotvars.file_selected.split('/')[-1]
-            com += var + " = cf.read('" + str(file) + "')[" + str(index) +']\n'
-        else:
-            file = plotvars.file_selected
-            com += var + " = cf.read(" + str(file) + ")[" + str(index) +']\n'
+            
+        if plotvars.plot_type == 'Vector':
+            if var_index == 0:
+                com += '# U component\n'
+            if var_index == 1:
+                com += '# V component\n'
+                
+        if plotvars.plot_type == 'Contour and vector':
+            if var_index == 1:
+                com += '# U component\n'
+            if var_index == 2:
+                com += '# V component\n'               
+                
+            
+        com += var + " = cf.read(" + plotvars.file_read_str + ")[" + str(index) +']\n'
 
         # Check for bounds if a collapse is required
         # and add them if they are missing
@@ -6476,6 +7321,9 @@ class Cf_funcs():
 
         if com_collapse != '':
             com += var + ' = ' + var + '.collapse(' + com_collapse + ', weights=True)\n'
+            
+        if plotvars.plot_type in ['Vector', 'Contour and vector']:
+            com += '\n'
         
         return com
 
@@ -6543,8 +7391,9 @@ class Cf_funcs():
 class Line_window(QWidget):
     '''popup window for changing line defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Line_window, self).__init__()
+        self.parent = parent
         self.initUI()
 
 
@@ -6558,7 +7407,7 @@ class Line_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Text box labels
         titleLabel = QLabel('title')
@@ -6734,7 +7583,6 @@ class Line_window(QWidget):
 
         # The buttons
         hbox_buttons = QHBoxLayout()
-        vbox.addLayout(hbox_buttons)
         hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(helpButton)
         hbox_buttons.addWidget(quitButton)
@@ -6745,6 +7593,7 @@ class Line_window(QWidget):
 
         self.setWindowTitle('line plot settings')
         self.setLayout(vbox)
+        
 
         # Set theme and font
         palette = QPalette()
@@ -6834,10 +7683,6 @@ class Line_window(QWidget):
             obj.setPalette(pal)
 
 
-
-
-
-
     def help(self):
 
         if self.line_help is None:
@@ -6863,13 +7708,22 @@ class Line_window(QWidget):
             self.line_help = Help(html)
 
         self.line_help.show()
+        
+        
+    def closeEvent(self, event):
+        # Close self.parent.line_window
+        self.parent.line_window = None
+        self.close()
+        
+        
 
 
 class Vector_window(QWidget):
     '''popup window for changing vector defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Vector_window, self).__init__()
+        self.parent = parent
         self.initUI()
 
 
@@ -6883,7 +7737,7 @@ class Vector_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Text box labels
         vector_titleLabel = QLabel('title')
@@ -6962,7 +7816,6 @@ class Vector_window(QWidget):
 
         # The buttons
         hbox_buttons = QHBoxLayout()
-        vbox.addLayout(hbox_buttons)
         hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(helpButton)
         hbox_buttons.addWidget(quitButton)
@@ -7000,7 +7853,6 @@ class Vector_window(QWidget):
         setattr(plotvars, 'vector_' + text, textbox.text()) 
 
 
-
     def reset(self):
 
         # Reset vector options
@@ -7017,10 +7869,6 @@ class Vector_window(QWidget):
         plotvars.vector_pts = ''
         plotvars.vector_key_length = ''
         plotvars.vector_pivot = 'middle'
-
-
-
-
 
 
     def help(self):
@@ -7042,12 +7890,21 @@ class Vector_window(QWidget):
         self.line_help.show()
 
 
+    def closeEvent(self, event):
+        # Close parent.vector_window
+        self.parent.vector_window = None
+        self.close()
+
+
+
+
 
 class Trajectory_window(QWidget):
     '''popup window for changing trajectory defaults'''
 
-    def __init__(self):
+    def __init__(self, parent):
         super(Trajectory_window, self).__init__()
+        self.parent = parent
         self.initUI()
 
 
@@ -7061,7 +7918,7 @@ class Trajectory_window(QWidget):
         helpButton.clicked.connect(self.help)
 
         quitButton = QPushButton("Quit")
-        quitButton.clicked.connect(self.close)
+        quitButton.clicked.connect(self.closeEvent)
 
         # Text box labels
         trajectory_titleLabel = QLabel('title')
@@ -7225,7 +8082,6 @@ class Trajectory_window(QWidget):
 
         # The buttons
         hbox_buttons = QHBoxLayout()
-        vbox.addLayout(hbox_buttons)
         hbox_buttons.addWidget(resetButton)
         hbox_buttons.addWidget(helpButton)
         hbox_buttons.addWidget(quitButton)
@@ -7318,14 +8174,14 @@ class Trajectory_window(QWidget):
             html += '<br>Marker options - https://matplotlib.org/stable/api/markers_api.html<br>'
             html += '<br>Line colours  - https://matplotlib.org/stable/gallery/color/named_colors.html<br>'
 
-
-
-
             self.line_help = Help(html)
 
         self.line_help.show()
 
-
+    def closeEvent(self, event):
+        # Close parent.trajectory_window
+        self.parent.trajectory_window = None
+        self.close()
 
 
 def main(filename, defaults='~/.cfview_defaults'):
@@ -7345,11 +8201,6 @@ if __name__ == '__main__':
     if len(args.file) == 0:
         main(None, defaults=args.defaults)
     else:
-        #if len(args.file) > 1:
-        #    print('\nWarning - multiple files passed but only first file being used\n')
-
-        #main(args.file[0], defaults=args.defaults)
-
         main(args.file, defaults=args.defaults)
 
 
