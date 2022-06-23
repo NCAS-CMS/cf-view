@@ -3,6 +3,7 @@
 import cf
 import cfplot as cfp
 import numpy as np
+import numpy.ma as ma
 import os
 import sys
 import argparse
@@ -64,6 +65,7 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                highlight_colour=cols[3], text_colour=cols[4], windowtext_colour=cols[5],\
                text_colour_insensitive = '#708090', font="DejaVu Sans", font_mono='DejaVu Sans Mono',\
                fontsize=15, fill=True, blockfill=False, lines=False, line_labels=False, titles=True,\
+               blockfill_fast=False,\
                write_defaults=False, collapse_types=None, line_type='x', line_colour = 'C0',\
                line_style='solid', line_xmin=None, line_xmax=None, line_ymin=None, line_ymax=None,\
                line_title='', line_width='1.0', line_marker = '', line_markersize='',\
@@ -140,14 +142,15 @@ class Cfview(QMainWindow):
         plotvars.file_selected = filename
         
         # Set the file string in plotvars
-        if len(plotvars.file_selected) == 1:
-             plotvars.file_read_str = "'"+ plotvars.file_selected[0] + "'"
-        else:
-            fstring = "['"
-            for i in np.arange(len(plotvars.file_selected)):
-                fstring += plotvars.file_selected[i] + "', '"
-            fstring = fstring[:-4] + "']"
-            plotvars.file_read_str = fstring 
+        if plotvars.file_selected is not None:
+            if len(plotvars.file_selected) == 1:
+                plotvars.file_read_str = "'"+ plotvars.file_selected[0] + "'"
+            else:
+                fstring = "['"
+                for i in np.arange(len(plotvars.file_selected)):
+                    fstring += plotvars.file_selected[i] + "', '"
+                fstring = fstring[:-4] + "']"
+                plotvars.file_read_str = fstring 
         
         # Set self.parent to self
         self.parent = self
@@ -362,7 +365,8 @@ class Cfview(QMainWindow):
         fieldlist.setCurrentRow(0)
         fieldlist.itemSelectionChanged.connect(self.fieldnumber)
         
-        plotvars.next_field_index = len(f)
+        if plotvars.file_selected is not None:
+            plotvars.next_field_index = len(f)
 
         # Set fixed width font for field titles
         custom_font_fixed_width = QFont(plotvars.font_mono, plotvars.fontsize)
@@ -587,8 +591,7 @@ class Cfview(QMainWindow):
         self.collapse_yLabel = collapse_yLabel
         self.collapse_zLabel = collapse_zLabel
         self.collapse_tLabel = collapse_tLabel
-        #self.contour_type_ComboBox = contour_type_ComboBox
-        #self.line_type_ComboBox = line_type_ComboBox
+
 
         self.ylist.setVisible(False)
         self.zlist.setVisible(False)
@@ -640,7 +643,8 @@ class Cfview(QMainWindow):
             self.reset_field_title()
             
         # Set plotvars.dim_names based on the first field and label the collapse dimensions with them
-        Cf_funcs.field_dims(field=f[0])
+        if plotvars.file_selected is not None:
+            Cf_funcs.field_dims(field=f[0])
         dims = plotvars.dim_names
             
         labels = [self.collapse_xLabel, self.collapse_yLabel, self.collapse_zLabel, self.collapse_tLabel]
@@ -697,9 +701,7 @@ class Cfview(QMainWindow):
         else:
             sys.stdout = sys.__stdout__
             sys.stderr = sys.__stderr__
-            
-        #sys.stdout = EmittingStream(textWritten=self.output_terminal_written)
-        #sys.stderr = EmittingStream(textWritten=self.output_terminal_written)           
+                
 
         # Set window size and show the window
         self.setGeometry(0, 0, 1280, 1060)
@@ -895,7 +897,7 @@ class Cfview(QMainWindow):
         for index in np.arange(len(indicies)):
         
             if plotvars.data_source_list[indicies[index]] == 'Changed':
-                com +="# See previous code for how to change this field's attributes\n"
+                com +="# See previous code for how to change this field's properties\n"
             if plotvars.data_source_list[indicies[index]] == 'Computed':
                 com +='# See previous code for how to compute this field\n'
             if plotvars.data_source_list[indicies[index]] == 'Copied':
@@ -1066,6 +1068,7 @@ class Cfview(QMainWindow):
                 con_args['fill'] = False
                 con_args['lines'] = True
 
+
             if plotvars.blockfill and not plotvars.lines:
                 con_args['blockfill'] = True
                 con_args['lines'] = False
@@ -1073,6 +1076,15 @@ class Cfview(QMainWindow):
             if plotvars.blockfill and plotvars.lines:
                 con_args['blockfill'] = True
                 con_args['lines'] = True
+                    
+            if plotvars.blockfill_fast and not plotvars.lines:
+                con_args['blockfill_fast'] = True
+                con_args['lines'] = False
+
+            if plotvars.blockfill_fast and plotvars.lines:
+                con_args['blockfill_fast'] = True
+                con_args['lines'] = True                   
+                    
 
             if plotvars.lines and not plotvars.line_labels:
                 con_args['line_labels'] = False
@@ -1373,7 +1385,7 @@ class Cfview(QMainWindow):
                         com_con += ", '" + arg + '=' + str(con_args[arg]) + "'"
             com_con += ')'
     
-
+    
             if len(subspace_args) > 0:
                 f = f.subspace(**subspace_args)
 
@@ -1404,7 +1416,11 @@ class Cfview(QMainWindow):
             else:
                 mydim = 'dimensioncoordinate' + mydim[-1]
             
-
+            # Return if coordinate doesn't exist
+            if not f.has_construct(mydim):
+                print('lineplot error - coordinate ' + mydim + ' does not exist\n')
+                return
+                
             if np.size(f.coord(mydim).array) < 2:
                 errstr = '\nLine plot error - not enough data to make requested '
                 errstr += mydim + ' line plot\n'
@@ -1975,8 +1991,10 @@ class Cfview(QMainWindow):
             self.names_window.reset()
             
         # Reset dimension collapse method names if transform_window is open
-        if self.transform_window is not None:
+        #if self.transform_window is not None:
+        if True:
             dims = plotvars.dim_names
+            
             
             labels = [self.collapse_xLabel, self.collapse_yLabel, self.collapse_zLabel, self.collapse_tLabel]
             for i in np.arange(4):
@@ -1987,17 +2005,90 @@ class Cfview(QMainWindow):
                 labels[i].setText(dim)
                
             # Change the sensitivity of interpolation etc based on whether 'X' and 'Y' are available
-            if 'x' in dims and 'y' in dims:
-                self.transform_window.valid_lon_lat(True)
-            else:
-                self.transform_window.valid_lon_lat(False)
+            if self.transform_window is not None:
+                if 'x' in dims and 'y' in dims:
+                    self.transform_window.valid_lon_lat(True)
+                else:
+                    self.transform_window.valid_lon_lat(False)
                 
                 
                 
         # Reset table data if data window is open
         if self.data_window is not None:
             Populate_table(self.data_window, initial = False)
+            
+            
+        # Reset the Contour plotting dimensions
 
+        #print('dim_names are ', dim_names)
+        
+        contour_index = self.contour_type_ComboBox.currentIndex()
+        self.contour_type_ComboBox.clear()
+        c_options =[plotvars.dim_names[0] + '-' + plotvars.dim_names[1]]
+        c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[2])
+        c_options.append(plotvars.dim_names[0] + '-log(' + plotvars.dim_names[2] + ')')
+        c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[3])
+                
+        c_options.append(plotvars.dim_names[1] + '-' + plotvars.dim_names[2])
+        c_options.append(plotvars.dim_names[1] + '-log(' + plotvars.dim_names[2] + ')')
+        c_options.append(plotvars.dim_names[1] + '-' + plotvars.dim_names[3])
+                
+        c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[0])
+        c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[1])
+        c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[2])
+        c_options.append(plotvars.dim_names[3] + '-log(' + plotvars.dim_names[2] + ')')
+        self.contour_type_ComboBox.addItems(c_options)
+        self.contour_type_ComboBox.setCurrentIndex(contour_index)
+        plotvars.contour_type = str(self.contour_type_ComboBox.currentText())
+
+        # Reset the Line plotting dimensions
+        line_index = self.line_type_ComboBox.currentIndex()
+        self.line_type_ComboBox.clear()
+        l_options =[plotvars.dim_names[0], plotvars.dim_names[1], plotvars.dim_names[2], plotvars.dim_names[3]]
+        self.line_type_ComboBox.addItems(l_options)
+        self.line_type_ComboBox.setCurrentIndex(line_index)          
+        plotvars.line_type = str(self.line_type_ComboBox.currentText())
+
+
+        # If the data_window is open reset the data type dropdown 
+        if self.data_window:
+        
+            self.data_window.data_ComboBox.clear()
+            dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
+            options = []                            
+                            
+            for i in np.arange(len(dims)):     
+                for j in np.arange(len(dims)):    
+                    xtype = dims[i]
+                    if xtype[:19] == 'dimensioncoordinate':
+                        xtype = 'dim' + xtype[19:]
+                
+                    if len(dims) > 1:
+                        ytype = dims[j]
+                        if ytype[:19] == 'dimensioncoordinate':
+                            ytype = 'dim' + ytype[19:]                    
+                    
+                        if xtype != ytype:
+                            if xtype == 'Y' and ytype == 'X':
+                                pass
+                            else:
+                                options.append(xtype + '-' + ytype)
+                
+                    else:
+                        options.append(xtype)                        
+
+            self.data_window.data_ComboBox.addItems(options)
+
+
+
+
+
+
+
+        # Any other resets such as transform window collapses?
+        
+        
+        
 
     def dim_traj_reset(self, option):
         '''
@@ -2085,9 +2176,6 @@ class Cfview(QMainWindow):
 
         plotvars.contour_type = text
         
-        # Reset table data if data window is open
-        if self.data_window is not None:
-            Populate_table(self.data_window, initial = False)
 
 
     def line_type(self, text):
@@ -2708,6 +2796,10 @@ class Cfview_defaults_window(QWidget):
 
         self.parent = parent
         self.initUI()
+        
+        self.windows = ['trajectory_window', 'names_window', 'transform_window', 'vector_window',\
+                        'data_window', 'line_window', 'contour_window', 'map_window', \
+                        'colour_scale', 'contour_levels']
 
 
     def initUI(self):
@@ -2945,6 +3037,10 @@ class Cfview_defaults_window(QWidget):
         palette.setColor(QPalette.WindowText, QColor(windowtext))
         self.setPalette(palette)
         self.parent.window().setPalette(palette)
+        for window in self.windows: 
+            if getattr(self.parent, window):
+                getattr(self.parent, window).setPalette(palette)
+            
 
 
     def fontsize(self):
@@ -2961,12 +3057,14 @@ class Cfview_defaults_window(QWidget):
         
         self.parent.window().field_titles.setFont(font)
         self.parent.window().fieldlist.setFont(font)
+        
 
     def font_main(self, value):
 
         plotvars.font = value
         font = QFont(plotvars.font, plotvars.fontsize)
         self.parent.window().setFont(font)
+        
 
     def font_mono(self, value):
 
@@ -3079,7 +3177,7 @@ class Cfview_defaults_window(QWidget):
             html += 'names where the monospace font applies.'
             html += 'Interface colour schemes can be altered by manually editing the ~/.cfview_defaults file '
             html += 'and replacing the six main colour definitions.<p>'
-            html += 'Contour options for fill, blockfill, lines and line labels that are currently selected '
+            html += 'Contour options for fill, blockfill, blockfill_fast, lines and line labels that are currently selected '
             html += 'are also saved into the ~/.cfview_defaults file.'
 
             self.defaults_help = Help(html)
@@ -3192,6 +3290,7 @@ class Save_defaults():
             datafile.write('code_output ' + str(plotvars.code_output) + '\n')
             datafile.write('terminal_output ' + str(plotvars.terminal_output) + '\n')
             datafile.write('blockfill ' + str(plotvars.blockfill) + '\n')
+            datafile.write('blockfill_fast ' + str(plotvars.blockfill_fast) + '\n')
             datafile.write('lines ' + str(plotvars.lines) + '\n')
             datafile.write('line_labels ' + str(plotvars.line_labels) + '\n')
             datafile.write('titles ' + str(plotvars.titles) + '\n')
@@ -4242,8 +4341,8 @@ class Contour_window(QWidget):
 
 
 
-        types = ['fill', 'blockfill', 'lines', 'line_labels', 'colorbar', 'automatic', 'horizontal', 'vertical']
-        status = [True, False, False, False, True, True, False, False]
+        types = ['fill', 'blockfill', 'blockfill_fast', 'lines', 'line_labels', 'colorbar', 'automatic', 'horizontal', 'vertical']
+        status = [True, False, False, False, False, True, True, False, False]
         for i in np.arange(len(types)):
             setattr(self, types[i] + 'CheckBox', QCheckBox(types[i]))
             getattr(self, types[i] + 'CheckBox').setChecked(status[i])
@@ -4263,6 +4362,7 @@ class Contour_window(QWidget):
         hbox_types = QHBoxLayout()
         hbox_types.addWidget(self.fillCheckBox)
         hbox_types.addWidget(self.blockfillCheckBox)
+        hbox_types.addWidget(self.blockfill_fastCheckBox)
         hbox_types.addWidget(self.linesCheckBox)
         hbox_types.addWidget(self.line_labelsCheckBox)
         vbox.addLayout(hbox_types)
@@ -4318,11 +4418,21 @@ class Contour_window(QWidget):
 
         if text == 'fill' and val:
             plotvars.blockfill = False
+            plotvars.blockfill_fast = False
             self.blockfillCheckBox.setChecked(False)
+            self.blockfill_fastCheckBox.setChecked(False)
 
         if text == 'blockfill' and val:
             plotvars.fill = False
+            plotvars.blockfill_fast = False
             self.fillCheckBox.setChecked(False)
+            self.blockfill_fastCheckBox.setChecked(False)
+                        
+        if text == 'blockfill_fast' and val:
+            plotvars.fill = False
+            plotvars.blockfill = False
+            self.fillCheckBox.setChecked(False)           
+            self.blockfillCheckBox.setChecked(False)
 
         if text == 'lines' and not val:
             plotvars.line_labels = False
@@ -4369,6 +4479,7 @@ class Contour_window(QWidget):
         # reset contour options
         self.fillCheckBox.setChecked(True)
         self.blockfillCheckBox.setChecked(False)
+        self.blockfill_fastCheckBox.setChecked(False)
         self.linesCheckBox.setChecked(False)
         self.line_labelsCheckBox.setChecked(False)
         self.titleTextBox.setText('')
@@ -4379,6 +4490,7 @@ class Contour_window(QWidget):
 
         plotvars.fill = True
         plotvars.blockfill = False
+        plotvars.blockfill_fast = False
         plotvars.lines = False
         plotvars.line_labels = False
         plotvars.text = ''
@@ -4397,8 +4509,10 @@ class Contour_window(QWidget):
             html = '<body><h2>Contour options</h2>'
             html += 'Contour options of fill and blockfill are mutually exclusive.  If a '
             html += 'grid with lots of points in x and y is plotted then the blockfill '
-            html += 'grid will not be readily visible until the plot is zoomed in'
-            
+            html += 'grid will not be readily visible until the plot is zoomed in<p>'
+            html += 'blockfill_fast uses the matplotlib pcolormesh blockfill method which can produce '
+            html += 'different results from blackfill for low resolution data and for higher latitudes.'
+            html += 'It is though much faster for higher resolution data.'
 
             self.contour_help = Help(html)
 
@@ -4454,10 +4568,14 @@ class TableModel(QAbstractTableModel):
 
         if role == Qt.DisplayRole:
             value = self._data[index.row(), index.column()]
+            
+            if ma.is_masked(value):
+                return ''
+                
             if self._ndecs == 0:
                 return str(int(value))
             else:
-                 return str(round(value, self._ndecs))
+                return str(round(value, self._ndecs))
                  
 
     def rowCount(self, index):
@@ -4508,8 +4626,41 @@ class Data_window(QWidget):
 
         quitButton = QPushButton("Quit")
         quitButton.clicked.connect(self.closeEvent)
+        
+        # Plot type dropdown
+        data_ComboBox = QComboBox()
+        dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
+        
+        options = []
+        
+        for i in np.arange(len(dims)):     
+            for j in np.arange(len(dims)):    
+                xtype = dims[i]
+                if xtype[:19] == 'dimensioncoordinate':
+                    xtype = 'dim' + xtype[19:]
+                
+                if len(dims) > 1:
+                    ytype = dims[j]
+                    if ytype[:19] == 'dimensioncoordinate':
+                        ytype = 'dim' + ytype[19:]                    
+                    
+                    if xtype != ytype:
+                        if xtype == 'Y' and ytype == 'X':
+                            pass
+                        else:
+                            options.append(xtype + '-' + ytype)
+                
+                else:
+                    options.append(xtype)        
+                        
+                        
+                    
+        data_ComboBox.addItems(options)
+        data_ComboBox.currentTextChanged.connect(self.view_changed)
+        self.data_ComboBox = data_ComboBox
 
         # Text box labels
+        data_selectorLabel = QLabel('Data selection:')
         colouringLabel = QLabel('Data colouring:')
         ndecsLabel = QLabel('Number of decimal places: 2')
         column_widthLabel = QLabel('Column width: 10')
@@ -4573,8 +4724,16 @@ class Data_window(QWidget):
         self.datamin_colourTextBox = datamin_colourTextBox
         self.datamax_colourTextBox = datamax_colourTextBox
 
-        # Set the title labe in self
+        # Set the title label in self
         self.titlesLabel = titlesLabel
+        
+        # vbox for titles
+        vbox_titles = QVBoxLayout()
+        vbox_titles.setContentsMargins(0,0,0,0)
+        vbox_titles.setSpacing(0)
+        self.vbox_titles = vbox_titles
+
+
         # Add the table     
         table = QTableView()
         self.table = table
@@ -4585,14 +4744,21 @@ class Data_window(QWidget):
         table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft)
         
 
-
-
-
-
         vbox = QVBoxLayout()
+        
+        vbox.addLayout(vbox_titles)
+
+        
+        
         vbox.addWidget(titlesLabel)
 
         vbox.addWidget(table)
+
+        data_selectors = QHBoxLayout()
+        data_selectors.addWidget(data_selectorLabel)
+        data_selectors.addWidget(data_ComboBox)
+        data_selectors.addStretch(1)
+        vbox.addLayout(data_selectors)
 
         sliders_hbox = QHBoxLayout()
         sliders_hbox.addWidget(ndecsLabel)
@@ -4602,8 +4768,6 @@ class Data_window(QWidget):
         sliders_hbox.addWidget(column_widthLabel)
         sliders_hbox.addWidget(column_widthSlider)
         
-        #horizontalSpacer = QSpacerItem(80, 40, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        #sliders_hbox.addItem(horizontalSpacer)
         vbox.addLayout(sliders_hbox)
 
         datacolours_hbox = QHBoxLayout()
@@ -4651,6 +4815,9 @@ class Data_window(QWidget):
         self.show()
 
 
+    def view_changed(self, value):
+        Populate_table(self)
+
     def plot(self):
         selected = self.table.selectionModel().selectedIndexes()
 
@@ -4666,9 +4833,6 @@ class Data_window(QWidget):
             miny = min(yvals)
             maxy = max(yvals)
 
-
-            
-            
             
             # Form the subspace dictionary from the currently selected data'''
             index = plotvars.index_number
@@ -4678,19 +4842,53 @@ class Data_window(QWidget):
             # Form the subspace dictionary
             nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f)
             dim_sizes = [nx, ny, nz, nt]
-            dims = ['X', 'Y', 'Z', 'T']
+            dims = Cf_funcs.find_dim_names(f)
+            for i in np.arange(len(dims)):
+                if dims[i][:3] == 'dim':
+                    dims[i] = 'dimensioncoordinate' + dims[i][3:]
+
+
+            # Extract the selected plot type
+            mytypes = self.data_ComboBox.currentText().split('-')
+            myx = mytypes[0]
+            if myx[:3] == 'dim':
+                myx = 'dimensioncoordinate' + myx[3:]
+            if len(dims) == 1:
+                myx = dims[0]         
+            
+            if len(mytypes) == 2:
+                myy = mytypes[1]
+                if myy[:3] == 'dim':
+                    myy = 'dimensioncoordinate' + myy[3:]
+            else:
+                myy = 'one dimensional data'
+                       
+            
             lists = [self.parent.xlist.selectedItems(), self.parent.ylist.selectedItems(),\
                      self.parent.zlist.selectedItems(), self.parent.tlist.selectedItems()]
             collapses = [plotvars.collapse_x, plotvars.collapse_y,\
                      plotvars.collapse_z, plotvars.collapse_t]
             subspace_args ={}
-
+            
+            nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f)
+            
+            
+            dims_field = [self.parent.xRadioButton.text(), self.parent.yRadioButton.text(), \
+                          self.parent.zRadioButton.text(), self.parent.tRadioButton.text()]
+            for i in np.arange(4):
+                if len(dims_field[i]) == 1:
+                    dims_field[i] = dims_field[i].upper()
+                if dims_field[i][:3] == 'dim':
+                    dims_field[i] = 'dimensioncoordinate' + dims_field[i][3:]
+    
+                         
             for i in np.arange(4):
                 vals = []
                 for j in np.arange(len(lists[i])):
                     vals.append(str(lists[i][j].text()))
 
-                if any(dim == dims[i].lower() for dim in plotvars.contour_type):
+
+                if any(dim == dims_field[i] for dim in [myx, myy]):
                     if np.size(vals) < 2:
                         con_okay = False
                 else:
@@ -4702,43 +4900,58 @@ class Data_window(QWidget):
                     if len(vals) == 1:
 
                         if collapses[i] == 'Off':
-                            if dims[i] != 'T':
-                                subspace_args[dims[i]] = float(vals[0])
+                            if dims_field[i] != 'T':
+                                subspace_args[dims_field[i]] = float(vals[0])
                             else:
-                                subspace_args[dims[i]] = cf.dt(vals[0])
+                                subspace_args[dims_field[i]] = cf.dt(vals[0])
                     else:
-                        if dims[i] != 'T':
+                        if dims_field[i] != 'T':
                             # cf.wi needs to go from min to max but the widget return
                             # goes in order of selection
                             val1 = np.min(np.array(vals).astype(np.float))
                             val2 = np.max(np.array(vals).astype(np.float))
-                            subspace_args[dims[i]] = cf.wi(val1, val2)
+                            subspace_args[dims_field[i]] = cf.wi(val1, val2)
                         else:
                             val1 = min(vals)
                             val2 = max(vals)
-                            subspace_args[dims[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
+                            subspace_args[dims_field[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
 
             # Apply list subspace args
             if len(subspace_args) > 0:
                 f = f.subspace(**subspace_args)
                 
-            mytypes = plotvars.contour_type.split('-')
-            myx = mytypes[0]
-            myy = mytypes[1]
-            if len(myx) == 1:
-                myx = myx.upper()
-            if len(myy) == 1:
-                myy = myy.upper()    
-            if myx[:3] == 'dim':
-                myx = 'dimensioncoordinate' + myx[-1]
-            if myy[:3] == 'dim':
-                myy = 'dimensioncoordinate' + myy[-1]                
+                
+            # Apply collapse args
+            com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
+
+            if len(com_collapse) > 0:
+                f = f.collapse(com_collapse[1:-1])
+
+                           
                 
             # Apply subspace based on cells selected
             myxmin = f.coord(myx).array[minx]
             myxmax = f.coord(myx).array[maxx]
             if myxmin > myxmax:
                 myxmin, myxmax = myxmax, myxmin
+                
+            
+            # Form new_subspace_args    
+            new_subspace_args = {}
+            if myxmin != myxmax:
+                new_subspace_args[myx] = cf.wi(myxmin, myxmax)
+            else:
+                new_subspace_args[myx] = myxmin    
+                
+            if myy == 'one dimensional data':
+                if len(new_subspace_args) > 0:
+                    f = f.subspace(**new_subspace_args)
+                    
+                cfp.lineplot(f, titles=True)
+                return
+                
+                
+                
             myymin = f.coord(myy).array[miny]
             myymax = f.coord(myy).array[maxy]  
             if myymin > myymax:
@@ -4758,11 +4971,7 @@ class Data_window(QWidget):
                 f = f.subspace(**new_subspace_args)
             
             
-            # Apply collapse args
-            com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
 
-            if len(com_collapse) > 0:
-                f = f.collapse(com_collapse[1:-1])
             
             
             
@@ -4784,6 +4993,15 @@ class Data_window(QWidget):
                 if plotvars.blockfill and plotvars.lines:
                     con_args['blockfill'] = True
                     con_args['lines'] = True
+                    
+                if plotvars.blockfill_fast and not plotvars.lines:
+                    con_args['blockfill_fast'] = True
+                    con_args['lines'] = False
+
+                if plotvars.blockfill_fast and plotvars.lines:
+                    con_args['blockfill_fast'] = True
+                    con_args['lines'] = True                   
+                    
 
                 if plotvars.lines and not plotvars.line_labels:
                     con_args['line_labels'] = False
@@ -4817,11 +5035,14 @@ class Data_window(QWidget):
         # Reset data viewing values
 
         self.ndecsSlider.setValue(2)
+        self.column_widthSlider.setValue(10)
+        self.column_widthLabel.setText('Column width: 10')
         self.text_sizeSlider.setValue(plotvars.fontsize)
         self.datamin_colourTextBox.setText('blue')
         self.datamax_colourTextBox.setText('red')
         self.dataminTextBox.setText('')
         self.datamaxTextBox.setText('')
+        self.data_ComboBox.setCurrentIndex(0)
 
 
 
@@ -4900,20 +5121,24 @@ class Populate_table():
    
         # Set the field
         f = plotvars.fields[plotvars.index_number]
+
+        mytypes = self.parent.data_ComboBox.currentText().split('-')
+        if len(mytypes) == 2:
+            myx = mytypes[0]
+            myy = mytypes[1]
+        else:
+            myx = mytypes[0]
+            myy = 'one dimensional data'
+            
+            
+        if myx[:3] =='dim':
+            myx = 'dimensioncoordinate' + myx[3:]
+        if myy[:3] =='dim':
+            myy = 'dimensioncoordinate' + myy[3:]           
+
         
-        mytype = plotvars.contour_type.split('-')
-        myx = mytype[0]
-        myy = mytype[1]
-        if 'log(' in myy:
-            print('\n\nError - cannot have a log axis for data viewing\n\n')
-            return
-        if len(myx) == 1:
-            myx = myx.upper()
-        if len(myy) == 1:
-            myy = myy.upper()
- 
+        subspace_args = Cf_funcs.subspace_args(self.parent, plotvars.index_number, call_data=True)
         
-        subspace_args = Cf_funcs.subspace_args(self.parent, plotvars.index_number)
         
         # Perform subspace
         f = f.subspace(**subspace_args)
@@ -4925,23 +5150,35 @@ class Populate_table():
         
         data = f.array.squeeze()
         
-            
-        if myx == 'T' or myy == 'T':
-           if not f.has_construct('T'):
-               print('\ndata viewing error - the is no time axis in this data\n')
-               return
+        
         
         if myx == 'T':
-            x =f.coord(myx).dtarray
+            x = f.coord(myx).dtarray
         else:
             x = f.coord(myx).array         
             
-        if myy == 'T':
-            y = f.coord(myy).dtarray    
+        if myy != 'one dimensional data':    
+            if myy == 'T':
+                y = f.coord(myy).dtarray    
+            else:
+                y = f.coord(myy).array    
         else:
-            y = f.coord(myy).array    
+            y = ['one dimensional data', 'one dimensional data']
         
-                
+        # Check axes and swap if necessary
+        if myy != 'one dimensional data':
+            mycoords = Cf_funcs.find_dim_names(f.squeeze())
+            if mycoords[0][:19] == 'dimensioncoordinate':
+                mycoords[0] = 'dim' + mycoords[0][19:]
+            if mycoords[1][:19] == 'dimensioncoordinate':
+                mycoords[1] = 'dim' + mycoords[1][19:]           
+            
+            if mycoords[0] == myy:
+                data = np.flipud(np.rot90(data))
+    
+        else:
+             data = np.tile(data, (2, 1))
+        
         if len(x) <= 1 or len(y) <= 1:
             if len(x) < 1:
                 print('\ndata viewing error - the length of the ' + myx + ' coordinate must be two or greater\n')
@@ -4960,10 +5197,53 @@ class Populate_table():
 
 
         # Set the titles for the data
-        field_name = 'field name: ' + Cf_funcs.field_name(field=f)
         dim_titles = cfp.generate_titles(f=f)
-        plot_type = 'plot type = ' + plotvars.contour_type
-        self.parent.titlesLabel.setText(field_name + '\n' + dim_titles + plot_type)
+
+        # Delete all items in self.parent.vbox_titles
+        if self.parent.vbox_titles.count() > 0:
+            # Delete each widget in the layout one by one
+            # We only have labels and hboxes
+            while self.parent.vbox_titles.count():
+                item = self.parent.vbox_titles.takeAt(0)
+
+                # Remove single Qlabels
+                if isinstance(item.widget(), QLabel):
+                    item.widget().setParent(None)
+                    self.parent.vbox_titles.removeItem(item)
+
+                # Remove QHBoxLayouts
+                if type(item) == QHBoxLayout:
+                    for i in reversed(range(item.count())):
+                        item_hbox = item.itemAt(i)
+                        if item_hbox.widget() is not None:
+                            item_hbox.widget().setParent(None)
+
+        myfont = QFont(plotvars.font)
+        myfont.setBold(True)
+        
+        
+        titles = ['field name: ' + Cf_funcs.field_name(field=f)]
+        for dim in dim_titles.split('\n'):
+            titles.append(dim)
+        
+        
+        for title in titles:
+            index = title.find(':')
+            #print('name' + title[0:index + 1] + 'value' + title[index + 1:])
+            if title[0:index + 1] != '':
+                myvar = title[0:index + 1]
+                if myvar[:19] == 'dimensioncoordinate':
+                    myvar = 'dim' + myvar[19:]
+                var = QLabel(myvar)
+                var.setFont(myfont)
+                value = QLabel(title[index + 1:])
+                myhbox = QHBoxLayout()
+                myhbox.addWidget(var)
+                myhbox.addWidget(value)
+                myhbox.addStretch(1)
+                self.parent.vbox_titles.addLayout(myhbox)
+        
+
         
         model = TableModel(data, x, y, ndecs, datamin, datamax, datamin_colour, datamax_colour)
 
@@ -5167,44 +5447,63 @@ class Names_window(QWidget):
                    
                    
             if status in ['C', 'D']:
-                if status == 'C':
-                    if mytype == 'field':
-                        if name == 'netCDF name':
-                            plotvars.fields[plotvars.index_number].nc_set_variable(val)
-                            com += "f.nc_set_variable(" + val_str  + ")\n"
-                        else:
-                            plotvars.fields[plotvars.index_number].set_property(name, val)
-                            com += "f.set_property(" + name_str  + ", " + val_str  + ")\n"
-                        
+            
+            
+                if mytype == 'field':
+                    myvar = plotvars.fields[plotvars.index_number]
+                    myvar_str = 'f'
+                else:
+                    myvar = plotvars.fields[plotvars.index_number].coord(mytype)    
+                    myvar_str = "f.coord('" + mytype + "')"
+                    
+            
+                if status == 'C':                           
+                    if name == 'netCDF name':
+                        plotvars.fields[plotvars.index_number].nc_set_variable(val)
+                        com += "f.nc_set_variable(" + val_str  + ")\n"    
                     else:
-                        if name == 'netCDF name':
-                            plotvars.fields[plotvars.index_number].coord(mytype).nc_set_variable(val)
-                            com += "f.coord(" + mytype_str + ").nc_set_variable(" + val_str  + ")\n"
+                        if name_str == "'units'":
+                            if cf.Units(val_str[1:-1]).isvalid is False:
+                                print('\nWarning - units of ' + val_str[1:-1] + ' are not recognised as CF units')
+                                
+                            if myvar.Units.equivalent(cf.Units(val_str[1:-1])):
+                                myvar.units = val_str[1:-1]
+                                com += myvar_str + ".units = " + val_str  + "\n"                        
+                            else:
+                                print('\nWarning - setting units to non-equivalent units')
+                                myvar.override_units(val_str[1:-1], inplace=True)
+                                com += myvar_str + ".override_units(" + val_str  + ", inplace=True)\n"                        
                         else:
-                            plotvars.fields[plotvars.index_number].coord(mytype).set_property(name, val)
-                            com += "f.coord(" + mytype_str + ").set_property(" + name_str  + ", " + val_str  + ")\n"
+                            myvar.set_property(name, val)
+                            com += myvar_str + ".set_property(" + name_str  + ", " + val_str  + ")\n"                   
+
                         
                     # Reset the status field for this var
                     self.vardict[var][3] = 'U'         
                             
                 if status == 'D':                    
-                    if mytype == 'field':
-                        plotvars.fields[plotvars.index_number].del_property(name)
-                        deletion_list.append(mytype + '.' + name)
-                        com += "f.del_property(" + name_str + ")\n"
+                    if name_str == "'units'":
+                        myvar.override_units(None, inplace=True)
+                        com += myvar_str + ".override_units(None, inplace=True)\n"      
+                    
                     else:
-                        plotvars.fields[plotvars.index_number].coord(mytype).del_property(name)
-                        deletion_list.append("coord.(" + mytype_str + ")" + "." + name)
-                        com += "f.coord(" + mytype_str + ")" + ".del_property(" + name_str + ")\n"
-                        
-                # Reset the status field for this var
-                self.vardict[var][3] = 'U'
-                           
+                        myvar.del_property(name)
+                        com += myvar_str + ".del_property(" + name_str + ")\n"
+
+                    if mytype == 'field':
+                        deletion_list.append(mytype + "." + name)
+                    else:
+                        deletion_list.append("coord.('" + mytype + "')." + name)
+
+                    # Reset the status field for this var
+                    self.vardict[var][3] = 'D'
+
                     
         # Delete any vardict entries that have been assigned 'D' for deletion
         for item in deletion_list:
             self.vardict.pop(item)
                
+        
         # Reload data if one of masking properties has changed
         if reload:
             plotvars.fields[plotvars.index_number].apply_masking(inplace=True)
@@ -5228,6 +5527,33 @@ class Names_window(QWidget):
         # Call fieldnumber to reset the field names
         # in case dim2 -> X etc
         self.parent.fieldnumber()
+        
+        
+        
+        # Reset new_property_window radio buttons in case a dimension has changed
+        #if self.new_property_window is not None:
+
+        #    #Set radio buttons to be initially invisible
+        #    radiobuttons = [self.new_property_window.xRadioButton, self.new_property_window.yRadioButton,\
+        #                    self.new_property_window.zRadioButton, self.new_property_window.tRadioButton]
+                            
+        #    #Set radio buttons to be initially invisible
+        #    for i in np.arange(4):
+        #        radiobuttons[i]. setVisible(False)
+            
+        #    # Change radio button names based on field dimension names and make visible
+        #    mydims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
+
+        #    for i in np.arange(len(mydims)):
+        #        if mydims[i] in ['X', 'Y', 'Z', 'T']:
+        #            mydims[i] = mydims[i].lower()
+        #        if mydims[i][:19] == 'dimensioncoordinate':
+        #            mydims[i] = 'dim' + mydims[i][-1]
+        #        radiobuttons[i].setText(mydims[i])
+        #        radiobuttons[i].setVisible(True)  
+        
+        
+        
         
 
     def new_property(self):
@@ -5308,6 +5634,9 @@ class Names_window(QWidget):
             
         if text[: 19] == 'dimensioncoordinate':
             name = "coord.('" + text[:20] + "')." + text[21:] 
+            
+        if text[: 19] == 'auxiliarycoordinate':
+            name = "coord.('" + text[:20] + "')." + text[21:]            
         
         if text.split(' ')[0] == 'field':
             name = 'field.' + text[6:]
@@ -5381,15 +5710,9 @@ class Populate_names():
             # Work out the dimension names
             # dims = of form X, Y, dimensioncoordinate2 etc
             # dim_names = of form X, Y, dim2 etc
-            dims = plotvars.dim_names
-            dnames = deepcopy(dims)
-            for i in np.arange(len(dims)):
-                if dims[i][:3] == 'dim':
-                    dims[i] = 'dimensioncoordinate' + dims[i][-1]
-                if dims[i] in ['x', 'y', 'z', 't']:
-                    dims[i] = dims[i].upper()
-                    dnames[i] = dims[i].upper()
 
+            dims = Cf_funcs.find_all_dims()
+            dnames = dims
 
             # Field netCDF name
             vardict['field.netCDF name'] = ['field', 'netCDF name', field.nc_get_variable(), 'U']
@@ -5430,8 +5753,8 @@ class Populate_names():
             # Use a set of dictionaries 
             dicts = [{}]
             
-            mydims = Cf_funcs.find_dim_names(field)
-            for idict in np.arange(len(mydims)):
+            dims = Cf_funcs.find_all_dims()
+            for idict in np.arange(len(dims)):
                 dicts.append({})
 
             # Field dict
@@ -5443,23 +5766,19 @@ class Populate_names():
                     dicts[0][var] = vardict[var]
                 
             # Dimension dicts
-            for j in np.arange(len(mydims)):
+            for j in np.arange(len(dims)):
                 for var in vardict:
                     vals = vardict[var]
                     mydim = vals[0]
-
-                    if mydim in ['X', 'Y', 'Z', 'T', 'dimensioncoordinate3',\
-                                 'dimensioncoordinate2', 'dimensioncoordinate1',\
-                                 'dimensioncoordinate0']:
-
-                        if mydim == mydims[j]:
+                              
+                    if mydim in ['X', 'Y', 'Z', 'T'] or mydim[:19] in ['dimensioncoordinate', 'auxiliarycoordinate']:
+                        if mydim == dims[j]:
                             dicts[j + 1][var]  = vardict[var]
-            
             
             # Reassemble and order so that the netCDF name is at the top of the lists of field and dimensions
             new_dict = {}
             
-            for idict in np.arange(len(mydims) + 1):
+            for idict in np.arange(len(dims) + 1):
                 dicts[idict] = dict(sorted(dicts[idict].items())) 
 
                 # Add the netCDF name at the top of the field and dimension lists
@@ -5505,6 +5824,10 @@ class Populate_names():
         # Populate self.parent.vbox_names based on vardict
         i = 0
         dim_present = ''
+        data_dim_counter = 0
+        data_aux_counter = 0
+        data_dim_extra_counter = 0
+        data_dims = []
         
         for var in vardict:
         
@@ -5520,8 +5843,10 @@ class Populate_names():
             mydim = ''
             
 
-            if mytype[:-1] == 'dimensioncoordinate':
-                mydim = 'dim' + mytype[-1]
+            if mytype[:19] == 'dimensioncoordinate':
+                mydim = 'dim' + mytype[19:]
+            if mytype[:19] == 'auxiliarycoordinate':
+                mydim = 'aux' + mytype[19:]                
             if mytype in ['X', 'Y', 'Z', 'T']:
                 mydim = mytype
                 
@@ -5530,10 +5855,47 @@ class Populate_names():
             
             # Add headers
             if i == 0:
-                getattr(self.parent, 'vbox_names').addWidget(QLabel('Field properties'))
+                title = QLabel('Field properties')
+                getattr(self.parent, 'vbox_names').addWidget(title)                
+                myFont=QFont(plotvars.font)
+                myFont.setBold(True)
+                title.setFont(myFont)                
+                
+            if mydim in ['X', 'Y', 'Z', 'T'] or mydim[:3] == 'dim':
+                if mydim not in data_dims:
+                    data_dims.append(mydim)
+                data_dim_counter += 1
+                if data_dim_counter == 1:
+                    title = QLabel('\nField data dimension axes')
+                    getattr(self.parent, 'vbox_names').addWidget(title)                
+                    myFont=QFont(plotvars.font)
+                    myFont.setBold(True)
+                    title.setFont(myFont)
+          
+            # Add in code for Additional dimension axes
+            if len(data_dims) > len(field.get_data_axes()):
+                if data_dim_extra_counter == 0:
+                    data_dim_extra_counter += 1
+                    title = QLabel('\nAdditional dimension axes')
+                    getattr(self.parent, 'vbox_names').addWidget(title)                
+                    myFont=QFont(plotvars.font)
+                    myFont.setBold(True)
+                    title.setFont(myFont)
+            
+            
+                        
+            if mydim[:3] == 'aux':
+                data_aux_counter += 1
+                if data_aux_counter == 1:
+                    title = QLabel('\nField auxiliary coordinates')
+                    getattr(self.parent, 'vbox_names').addWidget(title)                
+                    myFont=QFont(plotvars.font)
+                    myFont.setBold(True)
+                    title.setFont(myFont)            
                 
 
-            if mydim in ['X', 'Y', 'Z', 'T', 'dim3', 'dim2', 'dim1', 'dim0']:
+            if mydim in ['X', 'Y', 'Z', 'T'] or mydim[:3] in ['dim', 'aux']:
+                
                 if mydim != dim_present:
                     dim_present = mydim
                     getattr(self.parent, 'vbox_names').addWidget(QLabel(''))
@@ -5598,44 +5960,28 @@ class New_property_window(QWidget):
         helpButton.clicked.connect(self.help)
         quitButton = QPushButton("Quit")
         quitButton.clicked.connect(self.closeEvent)
-
-        fieldRadioButton = QRadioButton("field")
-        xRadioButton = QRadioButton("x")
-        yRadioButton = QRadioButton("y")
-        zRadioButton = QRadioButton("z")
-        tRadioButton = QRadioButton("t")
-        fieldRadioButton.clicked.connect(lambda: self.button_changed('field'))
-
-        xRadioButton.clicked.connect(lambda: self.button_changed('x'))
-        yRadioButton.clicked.connect(lambda: self.button_changed('y'))
-        zRadioButton.clicked.connect(lambda: self.button_changed('z'))
-        tRadioButton.clicked.connect(lambda: self.button_changed('t'))
         
-        #Set radio buttons to be initially invisible
-        radiobuttons = [xRadioButton, yRadioButton, zRadioButton, tRadioButton]
-        for i in np.arange(4):
-            radiobuttons[i]. setVisible(False)
-            
-            
-        # Change radio button names based on field dimension names and make visible
-        field = self.parent.field
-        mydims = Cf_funcs.find_dim_names(field)
+        dims = Cf_funcs.find_all_dims()
+        
+        # Make radio buttons
+        rbuttons = ['field']
+        for dim in dims:
+            if len(dim) == 1:
+                rbuttons.append(dim.lower())
+            else:
+                rbuttons.append(dim[:3] + dim[19:])
 
-        for i in np.arange(len(mydims)):
-            if mydims[i] in ['X', 'Y', 'Z', 'T']:
-                mydims[i] = mydims[i].lower()
-            if mydims[i][:19] == 'dimensioncoordinate':
-                mydims[i] = 'dim' + mydims[i][-1]
-            radiobuttons[i].setText(mydims[i])
-            radiobuttons[i].setVisible(True)    
-                
-        
-        
-        
-        
-        fieldRadioButton.setChecked(True)
+        # Make the radiobutons
+        radiobuttons = []
+        for rbutton in rbuttons:
+            setattr(self, rbutton + 'RadioButton', QRadioButton(rbutton))
+            getattr(self, rbutton + 'RadioButton').clicked.connect(partial(self.button_changed, rbutton))
+            radiobuttons.append(getattr(self, rbutton + 'RadioButton'))
+        self.radiobuttons = radiobuttons
 
-
+        # Set the inital selection
+        self.varname = 'field'
+        self.fieldRadioButton.setChecked(True)        
 
         nameLabel = QLabel('New property')
         nameTextbox = QLineEdit()
@@ -5657,11 +6003,8 @@ class New_property_window(QWidget):
         vbox.addLayout(hbox_value)
 
         hbox_radio_buttons = QHBoxLayout()
-        hbox_radio_buttons.addWidget(fieldRadioButton)
-        hbox_radio_buttons.addWidget(xRadioButton)
-        hbox_radio_buttons.addWidget(yRadioButton)
-        hbox_radio_buttons.addWidget(zRadioButton)
-        hbox_radio_buttons.addWidget(tRadioButton)
+        for radiobutton in radiobuttons:
+            hbox_radio_buttons.addWidget(radiobutton)
         vbox.addLayout(hbox_radio_buttons)
 
         hbox_buttons = QHBoxLayout()
@@ -5674,13 +6017,6 @@ class New_property_window(QWidget):
         self.setLayout(vbox)
         self.nameTextbox = nameTextbox
         self.valueTextbox = valueTextbox
-        self.fieldRadioButton = fieldRadioButton
-        self.xRadioButton = xRadioButton
-        self.yRadioButton = yRadioButton
-        self.zRadioButton = zRadioButton
-        self.tRadioButton = tRadioButton
-
-
         self.new_property_help =  None  # No external window yet.
 
         palette = QPalette()    
@@ -5710,46 +6046,36 @@ class New_property_window(QWidget):
             name = 'dimension ' + name
 
         val = Data_check.test_type(self.valueTextbox.text())
+        
+        if name == '':
+            print('Error - no property specified')
+            return
 
-        if self.fieldRadioButton.isChecked():
-            if 'field.' + name in self.parent.vardict:
-                print('Error - ' + name + ' already exists in the data')
-                return
-
+        #if self.fieldRadioButton.isChecked():
+        varname = self.varname
+        
+        if varname == 'field':
             myvar = "field." + name
             mytype = 'field'
-            
-            self.parent.vardict[myvar] = [mytype, name, val, 'C']
-            
-            
+        
+        if varname in ['x', 'y', 'z', 't']:
+            myvar = "coord.('" + varname.upper() + "')." + name
+            mytype = varname.upper()
+        if varname[:3] == 'dim':
+            myvar = "coord.(dimensioncoordinate" + varname[3:] + "')." + name
+            mytype = 'dimensioncoordinate' + varname[3:]
+        if varname[:3] == 'aux':
+            myvar = "coord.('auxiliarycoordinate" + varname[3:] + "')." + name   
+            mytype = 'auxiliarycoordinate' + varname[3:]
+        
 
-        else:
+        if myvar in self.parent.vardict:
+            print('Error - ' + self.varname + name + ' already exists in the data')
+            return
 
-
-            if self.xRadioButton.isChecked():
-                dim = self.xRadioButton.text()
-            if self.yRadioButton.isChecked():
-                dim = self.yRadioButton.text()
-            if self.zRadioButton.isChecked():
-                dim = self.zRadioButton.text()
-            if self.tRadioButton.isChecked():
-                dim = self.tRadioButton.text()
-                
-            mytype = deepcopy(dim)
-                
-            if dim in ['x', 'y', 'z', 't']:
-                dim = dim.upper()
-                mytype = mytype.upper()
-            if dim[:3] == 'dim':
-                dim = 'dimensioncoordinate' + dim[-1]
-                
-            myvar = "coord.('" + dim + "')." + name
-            
-            if myvar in self.parent.vardict:
-                print('Error - ' + dim + ' value ' + name + ' already exists in the data')
-                return
-
-            self.parent.vardict[myvar] = [dim, name, val, 'C']
+        # Set in vardict
+        self.parent.vardict[myvar] = [mytype, name, val, 'C']
+        
 
         # Set the data source to be 'Changed'
         plotvars.data_source_list[plotvars.index_number] = 'Changed'
@@ -5760,32 +6086,8 @@ class New_property_window(QWidget):
 
 
     def button_changed(self, text):
-
-
-        field = False
-        x = False
-        y = False
-        z = False
-        t = False
          
-        if self.fieldRadioButton.isChecked():
-            field = True
-        if self.xRadioButton.isChecked():
-            x = True
-        if self.yRadioButton.isChecked():
-            y = True
-        if self.zRadioButton.isChecked():
-            z = True
-        if self.tRadioButton.isChecked():
-            t = True
-
-        self.fieldRadioButton.setChecked(field)
-        self.xRadioButton.setChecked(x)
-        self.yRadioButton.setChecked(y)
-        self.zRadioButton.setChecked(z)
-        self.tRadioButton.setChecked(t)
-
-
+        self.varname = text       
 
 
 
@@ -5794,7 +6096,7 @@ class New_property_window(QWidget):
         if self.new_property_help is None:
 
             html = '<body><h2>Add a new field property</h2>'
-            html += 'Add a new property and value for the field or dimensions'
+            html += 'Add a new property and value for the field, dimension or auxiliary coordinate'
 
 
             self.new_property_help = Help(html)
@@ -6701,40 +7003,49 @@ class Cf_funcs():
         
         # Find dimension names
         dim_names = Cf_funcs.find_dim_names(field)
-        mycoords = list(field.dimension_coordinates())
-        mycoords.reverse()
+        
+        # Reset plotvars.dim_names
+        plotvars.dim_names = ['x', 'y', 'z', 't']
+        
+        #mycoords = list(field.dimension_coordinates())
+        #mycoords.reverse()
         
         # Test to see if any dimensions in the coordinates are not X, Y, Z, or T 
         dim_test = [x[:-1] for x in dim_names]
 
 
-        # Extract coordinate data if a matching CF standard_name or axis is found
-        for mycoord in mycoords:
-          
-            if field.dimension_coordinate(mycoord).X:
-                x = field.construct(mycoord).array
+        # Extract coordinate data if a matching CF standard_name or axis is found                
+        for dim in dim_names:
+        
+            if dim == 'X':
+                x = field.construct(dim).array
                 nx = np.size(x)
                 allocated[0] = True
                 plotvars.dim_names[0] = 'x'
                     
-            if field.dimension_coordinate(mycoord).Y:
-                y = field.construct(mycoord).array
+            if dim == 'Y':
+                y = field.construct(dim).array
                 ny = np.size(y)
                 allocated[1] = True
                 plotvars.dim_names[1] = 'y'
                 
-            if field.dimension_coordinate(mycoord).Z:
-                z = field.construct(mycoord).array
+            if dim == 'Z':
+                z = field.construct(dim).array
                 nz = np.size(z)
                 allocated[2] = True
                 plotvars.dim_names[2] = 'z'
                 
-            if field.dimension_coordinate(mycoord).T:
-                t = field.construct(mycoord).dtarray
+            if dim == 'T':
+                t = field.construct(dim).dtarray
                 nt = np.size(t)
                 allocated[3] = True
-                plotvars.dim_names[3] = 't'
+                plotvars.dim_names[3] = 't'                
                 
+                
+        #print('allocated are', allocated)
+        #print('dim_test are ', dim_test)
+        
+        
         # Code for dimension coordinates not of form X, Y, Z, T
         if 'dimensioncoordinate' in dim_test:
             
@@ -6744,14 +7055,23 @@ class Cf_funcs():
             
             # Find unallocated dimension coordinates indicies
             unalloc = [i for i, s in enumerate(dim_test) if 'dimensioncoordinate' in s]
+            #print('unalloc is ', unalloc)
             
             # Find available slots
             avail = [i for i, s in enumerate(allocated) if not s]
+            #print('avail is ', avail)
             
-            for i in np.arange(len(unalloc)):
-                dims[avail[i]] = field.dimension_coordinate(mycoords[avail[i]]).array
-                lengths[avail[i]] = np.size(dims[avail[i]])
-                plotvars.dim_names[avail[i]] = 'dim' + mycoords[avail[i]][-1]
+            if len(avail) > 0:
+                for i in np.arange(len(unalloc)):
+                    dims[avail[i]] = field.dimension_coordinate(dim_names[avail[i]]).array
+                    lengths[avail[i]] = np.size(dims[avail[i]])
+                    plotvars.dim_names[avail[i]] = 'dim' + dim_names[avail[i]][-1]
+                    
+
+
+            
+            
+                    
 
             # Unpack the return values
             x, y, z, t = dims[0], dims[1], dims[2], dims[3]
@@ -6763,17 +7083,36 @@ class Cf_funcs():
         #if hasattr(field, 'featureType'):
         if field.get_property('featureType', False) is not False:
             if field.featureType == 'trajectory':
-                nx = np.shape(field.auxiliary_coordinate('longitude').array)[0]
-                ny = np.shape(field.auxiliary_coordinate('latitude').array)[0]
-                nt = np.shape(field.auxiliary_coordinate('time').array)[0]
-
+            
+                coords = list(field.coords())
+                has_right_coords = 0
+                nx = 0
+                ny = 0
+                nz = 0
+                
+                for mycoord in coords:
+                    if field.coord(mycoord).nc_get_variable() == 'longitude':
+                        nx = np.shape(field.auxiliary_coordinate('longitude').array)[0]
+                        has_right_coords += 1
+                    if field.coord(mycoord).nc_get_variable() == 'latitude':
+                        ny = np.shape(field.auxiliary_coordinate('latitude').array)[0]
+                        has_right_coords += 1
+                    if field.coord(mycoord).nc_get_variable() == 'time':
+                        nt = np.shape(field.auxiliary_coordinate('time').array)[0]
+                        has_right_coords += 1
+                        
+                # has_right_coords must be 3 for a correctly defined trajectory field
+                # We don't print an error here as this produces too much output in the message panel
+                # It it obvious this is not a trajectory field though as it has zero tracks and trying
+                # to plot it using cf-plot gives a reasonable error message to this effect
+                        
                 x = np.arange(nx)
                 y = np.arange(ny)
                 t = np.arange(nt)
 
-                #print('in field_dims - field is ', field)
-                #print('in field_dims nx, x are', nx, x)
-
+        #print('field_dims', plotvars.dim_names)
+        #print(' ajh - field_dims - nx, ny, nz, nt are ', nx, ny, nz, nt)
+        
         return (nx, ny, nz, nt, x, y, z, t)
 
 
@@ -7072,9 +7411,12 @@ class Cf_funcs():
 
 
 
-    def subspace_args(parent, index):
+    def subspace_args(parent, index, call_data=False):
         """
          Work out the subspace args for the selected field
+         call_data is generally False but set to True if being called from
+         the data viewing section of code.  This is to allow a switch to using 
+         the data drop down widget in that popup rather than the contour dropdown
          Returns: subspace_args
         """
 
@@ -7096,9 +7438,14 @@ class Cf_funcs():
             if len(dim_names[i]) == 1:
                 dim_names[i] = dim_names[i].upper()
 
-        
-        if plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector']:
-            plot_dims = plotvars.contour_type.split('-')
+        if call_data is True:
+            plot_dims = parent.data_ComboBox.currentText().split('-')
+        else:
+            if plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector']:
+                plot_dims = plotvars.contour_type.split('-')
+            
+            
+            
 
         if plotvars.plot_type == 'Line':
             plot_dims = [plotvars.line_type] 
@@ -7155,8 +7502,27 @@ class Cf_funcs():
 
                 collapses = plotvars.stored_collapses['f' + str(plotvars.index_number)]
                 
+
+
+                #if dim == 'Z':
+                #    z_count = 0
+                #    z_names =[]
+                #    for mycoord in list(f.coords()):
+                #        if f.coord(mycoord).Z:
+                #            z_count += 1
+                #            z_names.append(mycoord)
+
+                #    if z_count > 1:
+                #        dim = z_names[-1]
+
+
+
+
+
+
+                                
                 if f.has_construct(dim):
-                
+
                     # Only need to subspace if this dimension has more than one value
                     if np.size(f.coord(dim).array) > 1:
                     
@@ -7175,21 +7541,8 @@ class Cf_funcs():
                             else:
                                 args[dim] = f.coord(dim).dtarray[ind]
 
-
         return args
-
-
-
-
-
-
-
-
-
-
-
- 
-
+        
 
     def com_subspace_collapse(subspace_args):
         """
@@ -7300,6 +7653,7 @@ class Cf_funcs():
         # and add them if they are missing
         vars = [plotvars.collapse_x, plotvars.collapse_y,\
                 plotvars.collapse_z, plotvars.collapse_t]
+            
         dims = ['X', 'Y', 'Z', 'T']
         dims = Cf_funcs.find_dim_names(f)
         
@@ -7329,31 +7683,247 @@ class Cf_funcs():
 
 
     def find_dim_names(field):
-        ''' Find the field dimension names
+        ''' Find the field dimension coordinate names
+            Ignores auxiliary coordinates (for now)
             returns:
-            coordinates in the order [X, Y, Z, T]            
+            coordinates in the order [T, X, Y, Z]       
+        '''
+        
+        # Get the field domain axes
+        daxes = list(field.get_data_axes())
+        
+        # Get the field coordinates
+        dcoords = list(field.coords())     
+        
+        
+        # Calculate the number of coordinates of type X, Y, Z and T
+        nx = 0
+        ny = 0
+        nz = 0
+        nt = 0
+        for i in np.arange(len(dcoords)):
+            if field.coord(dcoords[i]).X:
+                nx += 1
+            if field.coord(dcoords[i]).Y:
+                ny += 1            
+            if field.coord(dcoords[i]).Z:
+                nz += 1        
+            if field.coord(dcoords[i]).T:
+                #print('ajh - t found - ', coords[i])
+                nt += 1      
+                
+                
+        #print('ajh - find_dim_names - nx, ny, nz, nt are ', nx, ny, nz, nt)
+        
+   
+        # Strip out any auxiliary coordinates if the field is not a trajectory field
+        remove_aux = True
+        if field.get_property('featureType', False) is not False:
+            if field.featureType == 'trajectory':
+                remove_aux = False
+                
+                
+        # Strip out any auxiliary coordinates if the field is not a trajectory field
+        if remove_aux:
+            for i in np.arange(len(dcoords)):
+                if dcoords[i][:-1] == 'auxiliarycoordinate':
+                    dcoords[i] = 'aux' 
+            dcoords = list(filter(('aux').__ne__,dcoords))
+        
+        
+        #print('ajh - daxes are', daxes)
+        #print('ajh - dcoords are', dcoords)
+        
+        
+        
+        # Convert these into corresponding dimension coordinates
+        if remove_aux:
+            coords = []
+            for i in np.arange(len(daxes)):
+                val = daxes[i]
+                coord = None
+                for j in np.arange(len(dcoords)):
+            
+                    #print('ajh - ', daxes[i], dcoords[j], field.get_data_axes(dcoords[j])[0])
+                
+                    if daxes[i] == field.get_data_axes(dcoords[j])[0]:
+                        coord = dcoords[j]      
+        
+                if coord is not None:
+                    coords.append(coord)
+
+        else:
+            coords = dcoords
+       
+        
+        # Blank daxes if coords has no elements
+        if len(coords) == 0:
+            daxes = []
+                
+        # Make a copy of coords in mycoords
+        mycoords = deepcopy(coords)
+        
+        # Convert to X, Y, Z, T if coordinate is one of these
+        # If the number of coordinates of this type is greater than 1 then don't do this as f.coord('Z') gives an 
+        # error as there are more that one coordinates to return
+        #print('daxes are ', daxes)
+        #print('coords are ', coords)
+        
+        for i in np.arange(len(daxes)):
+            if field.coord(coords[i]).X:
+                if nx == 1:
+                    mycoords[i] = 'X'
+            if field.coord(coords[i]).Y:
+                if ny == 1:
+                    mycoords[i] = 'Y'            
+            if field.coord(coords[i]).Z:
+                if nz == 1:
+                    mycoords[i] = 'Z'  
+            if field.coord(coords[i]).T:
+                if nt == 1:
+                    mycoords[i] = 'T'            
+            
+            
+        # Return the reverse of the coordinates so that they are in the order [X, Y, Z, T]
+        mycoords.reverse()
+        
+        #print('ajh - find_dim_names - mycoords are ', mycoords)
+        
+        return mycoords
+
+    def find_dim_names_orig(field):
+        ''' Find the field dimension coordinate names
+            Ignores auxiliary coordinates (for now)
+            returns:
+            coordinates in the order [T, X, Y, Z]       
         '''
         
         coords = list(field.coords())
         mycoords = deepcopy(coords)
         
         for i in np.arange(len(coords)):
-            c = field.coord(coords[i])
-            if c.X:
-                mycoords[i] = 'X'
-            if c.Y:
-                mycoords[i] = 'Y'
-            if c.Z:
-                mycoords[i] = 'Z'
-            if c.T:
-                mycoords[i] = 'T'
+            if coords[i][:-1] == 'dimensioncoordinate':
+                c = field.coord(coords[i])
+                if c.X:
+                    mycoords[i] = 'X'
+                if c.Y:
+                    mycoords[i] = 'Y'
+                if c.Z:
+                    mycoords[i] = 'Z'
+                if c.T:
+                    mycoords[i] = 'T'
+            else:
+                mycoords[i] = 'auxiliarycoordinate'
             
-        # Return the reverse of the coordinates so that they are in the order [X, Y, Z, T]
+        # Remove any auxiliary coordinates
+        mycoords = list(filter(('auxiliarycoordinate').__ne__,mycoords))
+            
+            
+        # Return the reverse of the coordinates so that they are in the order [T, X, Y, Z]
         mycoords.reverse()
         
+        #print('mycoords are ', mycoords)
+        
         return mycoords
-
+        
+                    
+    def find_all_dims():
             
+        if plotvars.fields[plotvars.index_number] is not None:
+            field = plotvars.fields[plotvars.index_number]
+        else:
+            return
+         
+        # Assign lists of data axes and field coordinates   
+        daxes = list(field.get_data_axes())
+        coords = list(field.coords())
+            
+            
+        # Calculate the number of coordinates of type X, Y, Z and T
+        nx = 0
+        ny = 0
+        nz = 0
+        nt = 0
+        for i in np.arange(len(coords)):
+            if field.coord(coords[i]).X:
+                nx += 1
+            if field.coord(coords[i]).Y:
+                ny += 1            
+            if field.coord(coords[i]).Z:
+                nz += 1        
+            if field.coord(coords[i]).T:
+                nt += 1          
+                
+        # Extract the dimension coordinates
+        dcoords = []
+        for i in np.arange(len(coords)):
+            if coords[i][:19] == 'dimensioncoordinate':
+                dcoords.append(coords[i])
+                
+                
+        # Extract the dimension coords that are data axes
+        data_coords = []
+        for i in np.arange(len(daxes)):
+            val = daxes[i]
+            coord = None
+            for j in np.arange(len(dcoords)):
+            
+                    #print('ajh - ', daxes[i], dcoords[j], field.get_data_axes(dcoords[j])[0])
+                
+                if daxes[i] == field.get_data_axes(dcoords[j])[0]:
+                   coord = dcoords[j]      
+        
+            if coord is not None:
+                data_coords.append(coord)
+
+               
+        # Extract dimension coords that are not data axes 
+        extra_coords = []
+        for i in np.arange(len(dcoords)):
+            if dcoords[i] not in data_coords:
+                extra_coords.append(dcoords[i])
+        
+        
+        # Translate data axes into X, Y, Z, T if possible
+        for i in np.arange(len(data_coords)):
+            if field.coord(data_coords[i]).X:
+                if nx == 1:
+                    data_coords[i] = 'X'
+            if field.coord(data_coords[i]).Y:
+                if ny == 1:
+                    data_coords[i] = 'Y'            
+            if field.coord(data_coords[i]).Z:
+                if nz == 1:
+                    data_coords[i] = 'Z'  
+            if field.coord(data_coords[i]).T:
+                if nt == 1:
+                    data_coords[i] = 'T'        
+                    
+        # Reverse data_coords so they go in the normal X, Y, Z, T order
+        data_coords.reverse()
+        
+                        
+        # Assemble the coordinates in order
+        all_coords = []        
+        for coord in data_coords:
+            all_coords.append(coord)
+            
+        for coord in extra_coords:
+            all_coords.append(coord)            
+        
+        for i in np.arange(len(coords)):
+            if coords[i][:19] == 'auxiliarycoordinate':
+                all_coords.append(coords[i])
+            
+
+        return all_coords                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
     def check_well_formed(field):
         ''' 
             Check the coordinates are all recognizably of the form X, Y, Z, T
@@ -8182,6 +8752,8 @@ class Trajectory_window(QWidget):
         # Close parent.trajectory_window
         self.parent.trajectory_window = None
         self.close()
+
+
 
 
 def main(filename, defaults='~/.cfview_defaults'):
