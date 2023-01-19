@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# Temporary fix for pillow warning
+# DeprecationWarning: Support for PyQt5 is deprecated and will be removed in Pillow 10 (2023-07-01). Use PyQt6 or PySide6 instead.
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 import cf
 import cfplot as cfp
 import numpy as np
@@ -9,9 +14,9 @@ import sys
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib
-from PyQt5.QtWidgets import QApplication, QLabel, QCheckBox, QFileDialog, QDialog, QRadioButton
+from PyQt5.QtWidgets import QApplication, QLabel, QCheckBox, QFileDialog, QDialog, QRadioButton, QAction
 from PyQt5.QtWidgets import QComboBox, QListWidget, QListWidgetItem, QHBoxLayout, QVBoxLayout, QWidget, QPushButton
-from PyQt5.QtWidgets import QLineEdit, QTextEdit, QSlider, QMenu, QAction, QFontDialog, QMenuBar
+from PyQt5.QtWidgets import QLineEdit, QTextEdit, QSlider, QMenu, QFontDialog, QMenuBar
 from PyQt5.QtWidgets import QMainWindow, QFrame, QSizePolicy, QScrollBar, QScrollArea, QFormLayout, QGroupBox, QTableWidget
 from PyQt5.QtWidgets import QTableWidgetItem, QTableView, QSlider, QAbstractScrollArea, QSpacerItem, QHeaderView
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QAbstractTableModel, QVariant, QCoreApplication
@@ -58,7 +63,9 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                field__widget_indicies=None, field_widget_names=None, field_widget_title=None,\
                field_widget_listing='index', plot_type = 'Contour', contour_type='x-y', \
                collapse_x='Off', collapse_y='Off', collapse_z='Off', collapse_t='Off',\
+               collapse_labels=['X', 'Y', 'Z', 'T'],\
                nx_length=None, ny_length=None, nz_length=None, nt_length=None,\
+               stored = {},\
                stored_dimensions=None, stored_collapses=None, stored_collapse_values=None,\
                stored_lock = False,\
                background_colour=cols[0], button_colour=cols[1], buttontext_colour=cols[2],\
@@ -76,32 +83,33 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                trajectory_marker_face_colour='red', trajectory_marker_edge_colour='green', \
                trajectory_line_style='solid', trajectory_line_colour='blue', \
                trajectory_line_width='1.0', trajectory_vector=False, trajectory_legend=False,\
-               trajectory_date_min='', trajectory_date_max='', dim_names = ['x', 'y', 'z', 't'],\
-               code_output=True, data_source_list=None, terminal_output=False, next_field_index=0)
+               trajectory_date_min='', trajectory_date_max='', dim_names=['x', 'y', 'z', 't'],\
+               code_output=True, data_source_list=None, terminal_output=False, next_field_index=0,\
+               max_axes=10, nlevs=False)
 
 
-cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',
-'mch_default', 'perc2_9lev', 'percent_11lev', 'precip2_15lev', 'precip2_17lev', 'precip3_16lev',
-'precip4_11lev', 'precip4_diff_19lev', 'precip_11lev', 'precip_diff_12lev', 'precip_diff_1lev', 'rh_19lev',
-'spread_15lev', 'amwg', 'amwg_blueyellowred', 'BlueDarkRed18', 'BlueDarkOrange18', 'BlueGreen14', 'BrownBlue12',
-'Cat12', 'cmp_flux', 'cosam12', 'cosam', 'GHRSST_anomaly', 'GreenMagenta16',
-'nrl_sirkes', 'nrl_sirkes_nowhite','prcp_1', 'prcp_2',
-'prcp_3', 'radar', 'radar_1', 'seaice_1', 'seaice_2', 'so4_21',
-'StepSeq25', 'sunshine_9lev', 'sunshine_diff_12lev', 'temp_19lev', 'temp_diff_18lev', 'temp_diff_1lev',
-'topo_15lev', 'wgne15', 'wind_17lev', 'amwg256', 'BkBlAqGrYeOrReViWh200', 'BlAqGrYeOrRe', 'BlAqGrYeOrReVi200',
-'BlGrYeOrReVi200', 'BlRe', 'BlueRed', 'BlueRedGray', 'BlueWhiteOrangeRed', 'BlueYellowRed', 'BlWhRe', 'cmp_b2r',
-'cmp_haxby', 'detail', 'extrema', 'GrayWhiteGray', 'GreenYellow', 'helix', 'helix1', 'hotres', 'matlab_hot',
-'matlab_hsv', 'matlab_jet', 'matlab_lines', 'ncl_default', 'ncview_default', 'OceanLakeLandSnow', 'rainbow',
-'rainbow_white_gray', 'rainbow_white', 'rainbow_gray', 'tbr_240_300', 'tbr_stdev_0_30', 'tbr_var_0_500',
-'tbrAvg1', 'tbrStd1', 'tbrVar1', 'thelix', 'ViBlGrWhYeOrRe', 'wh_bl_gr_ye_re', 'WhBlGrYeRe', 'WhBlReWh',
-'WhiteBlue', 'WhiteBlueGreenYellowRed', 'WhiteGreen', 'WhiteYellowOrangeRed', 'WhViBlGrYeOrRe', 'WhViBlGrYeOrReWh',
-'wxpEnIR', '3gauss', '3saw', 'posneg_2', 'posneg_1',
-'os250kmetres', 'wiki_1_0_2', 'wiki_1_0_3', 'wiki_2_0',
-'wiki_2_0_reduced', 'arctic', 'scale1', 'scale2', 'scale3', 'scale4', 'scale5', 'scale6', 'scale7', 'scale8',
-'scale9', 'scale10', 'scale11', 'scale12', 'scale13', 'scale14', 'scale15', 'scale16', 'scale17' , 'scale18',
-'scale19', 'scale20', 'scale21', 'scale22', 'scale23', 'scale24', 'scale25', 'scale26', 'scale27', 'scale28',
-'scale29', 'scale30', 'scale31', 'scale32', 'scale33', 'scale34', 'scale35', 'scale36', 'scale37', 'scale38',
-'scale39', 'scale40', 'scale41', 'scale42', 'scale43', 'scale44']
+cscales=['viridis', 'magma', 'inferno', 'plasma', 'parula', 'gray', 'hotcold_18lev', 'hotcolr_19lev',\
+         'mch_default', 'perc2_9lev', 'percent_11lev', 'precip2_15lev', 'precip2_17lev', 'precip3_16lev',\
+         'precip4_11lev', 'precip4_diff_19lev', 'precip_11lev', 'precip_diff_12lev', 'precip_diff_1lev', 'rh_19lev',\
+         'spread_15lev', 'amwg', 'amwg_blueyellowred', 'BlueDarkRed18', 'BlueDarkOrange18', 'BlueGreen14', 'BrownBlue12',\
+         'Cat12', 'cmp_flux', 'cosam12', 'cosam', 'GHRSST_anomaly', 'GreenMagenta16',\
+         'nrl_sirkes', 'nrl_sirkes_nowhite','prcp_1', 'prcp_2',\
+         'prcp_3', 'radar', 'radar_1', 'seaice_1', 'seaice_2', 'so4_21',\
+         'StepSeq25', 'sunshine_9lev', 'sunshine_diff_12lev', 'temp_19lev', 'temp_diff_18lev', 'temp_diff_1lev',\
+         'topo_15lev', 'wgne15', 'wind_17lev', 'amwg256', 'BkBlAqGrYeOrReViWh200', 'BlAqGrYeOrRe', 'BlAqGrYeOrReVi200',\
+         'BlGrYeOrReVi200', 'BlRe', 'BlueRed', 'BlueRedGray', 'BlueWhiteOrangeRed', 'BlueYellowRed', 'BlWhRe', 'cmp_b2r',\
+         'cmp_haxby', 'detail', 'extrema', 'GrayWhiteGray', 'GreenYellow', 'helix', 'helix1', 'hotres', 'matlab_hot',\
+         'matlab_hsv', 'matlab_jet', 'matlab_lines', 'ncl_default', 'ncview_default', 'OceanLakeLandSnow', 'rainbow',\
+         'rainbow_white_gray', 'rainbow_white', 'rainbow_gray', 'tbr_240_300', 'tbr_stdev_0_30', 'tbr_var_0_500',\
+         'tbrAvg1', 'tbrStd1', 'tbrVar1', 'thelix', 'ViBlGrWhYeOrRe', 'wh_bl_gr_ye_re', 'WhBlGrYeRe', 'WhBlReWh',\
+         'WhiteBlue', 'WhiteBlueGreenYellowRed', 'WhiteGreen', 'WhiteYellowOrangeRed', 'WhViBlGrYeOrRe', 'WhViBlGrYeOrReWh',\
+         'wxpEnIR', '3gauss', '3saw', 'posneg_2', 'posneg_1',\
+         'os250kmetres', 'wiki_1_0_2', 'wiki_1_0_3', 'wiki_2_0',\
+         'wiki_2_0_reduced', 'arctic', 'scale1', 'scale2', 'scale3', 'scale4', 'scale5', 'scale6', 'scale7', 'scale8',\
+         'scale9', 'scale10', 'scale11', 'scale12', 'scale13', 'scale14', 'scale15', 'scale16', 'scale17' , 'scale18',\
+         'scale19', 'scale20', 'scale21', 'scale22', 'scale23', 'scale24', 'scale25', 'scale26', 'scale27', 'scale28',\
+         'scale29', 'scale30', 'scale31', 'scale32', 'scale33', 'scale34', 'scale35', 'scale36', 'scale37', 'scale38',\
+         'scale39', 'scale40', 'scale41', 'scale42', 'scale43', 'scale44']
 
 plotvars.cscales=cscales
 
@@ -160,7 +168,6 @@ class Cfview(QMainWindow):
         check = os.path.isfile(full_path) 
 
         if check:
-
             datafile = open(full_path, 'r')
             for line in datafile:
                 vars = line.split(' ')
@@ -239,11 +246,7 @@ class Cfview(QMainWindow):
         plotButton.clicked.connect(self.plot)
 
         reset_dimensionButton = QPushButton("Reset Dimensions")
-        reset_dimensionButton.clicked.connect(lambda: self.dim_traj_reset('reset'))
-
-
-        reset_tracksButton = QPushButton("Reset Tracks")
-        reset_tracksButton.clicked.connect(lambda: self.dim_traj_reset('reset'))
+        reset_dimensionButton.clicked.connect(lambda: self.dim_traj_reset('Reset Dimensions'))
 
 
 
@@ -259,67 +262,18 @@ class Cfview(QMainWindow):
 
         # Contour type drop down menu
         contour_type_ComboBox = QComboBox()
-        contour_type_ComboBox.addItem('x-y')
-        contour_type_ComboBox.addItem('x-z')
-        contour_type_ComboBox.addItem('x-log(z)')
-        contour_type_ComboBox.addItem('x-t')
-        contour_type_ComboBox.addItem('y-z')
-        contour_type_ComboBox.addItem('y-log(z)')
-        contour_type_ComboBox.addItem('y-t')
-        contour_type_ComboBox.addItem('t-x')
-        contour_type_ComboBox.addItem('t-y')
-        contour_type_ComboBox.addItem('t-z')
-        contour_type_ComboBox.addItem('t-log(z)')
         contour_type_ComboBox.activated[str].connect(self.contour_type)
         self.contour_type_ComboBox = contour_type_ComboBox
 
 
         # Line type drop down menu
         line_type_ComboBox = QComboBox()
-        line_type_ComboBox.addItem('x')
-        line_type_ComboBox.addItem('y')
-        line_type_ComboBox.addItem('z')
-        line_type_ComboBox.addItem('t')
+
         line_type_ComboBox.activated[str].connect(self.line_type)
         self.line_type_ComboBox = line_type_ComboBox
 
         # Dimension selection
         dimLabel = QLabel('Select:')
-        xRadioButton = QRadioButton("x")
-        yRadioButton = QRadioButton("y")
-        zRadioButton = QRadioButton("z")
-        tRadioButton = QRadioButton("t")
-        xRadioButton.clicked.connect(lambda: self.dim_view('x'))
-        yRadioButton.clicked.connect(lambda: self.dim_view('y'))
-        zRadioButton.clicked.connect(lambda: self.dim_view('z'))
-        tRadioButton.clicked.connect(lambda: self.dim_view('t'))
-        xRadioButton.setChecked(True)
-
-        # Collapse labels and boxes
-        collapse_areaLabel = QLabel('Area:')
-        collapse_xLabel = QLabel('X:')
-        collapse_yLabel = QLabel('Y:')
-        collapse_zLabel = QLabel('Z:')
-        collapse_tLabel = QLabel('T:')
-        collapse_types = plotvars.collapse_types
-        collapse_areaComboBox = QComboBox()
-        collapse_xComboBox = QComboBox()
-        collapse_yComboBox = QComboBox()
-        collapse_zComboBox = QComboBox()
-        collapse_tComboBox = QComboBox()
-        for collapse in collapse_types:
-            collapse_areaComboBox.addItem(collapse)
-            collapse_xComboBox.addItem(collapse)
-            collapse_yComboBox.addItem(collapse)
-            collapse_zComboBox.addItem(collapse)
-            collapse_tComboBox.addItem(collapse)
-        #collapse_areaComboBox.activated.connect(lambda: self.collapse_area())
-        collapse_areaComboBox.activated[str].connect(self.collapse_area)
-        collapse_xComboBox.activated.connect(lambda: self.collapse_type('x'))
-        collapse_yComboBox.activated.connect(lambda: self.collapse_type('y'))
-        collapse_zComboBox.activated.connect(lambda: self.collapse_type('z'))
-        collapse_tComboBox.activated.connect(lambda: self.collapse_type('t'))
-
 
         # Field selection widgets
         indexCheckBox = QCheckBox("index")
@@ -336,37 +290,9 @@ class Cfview(QMainWindow):
 
         fieldlist = QListWidget()
         fieldlist.setSelectionMode(QListWidget.ExtendedSelection)
-
-        field_titles = QLabel('Index  nx   ny   nz   nt   field name')
-        
-        # Put dimension buttons into self as Cf_funcs_fields_list needs to set these 
-        self.xRadioButton = xRadioButton
-        self.yRadioButton = yRadioButton
-        self.zRadioButton = zRadioButton
-        self.tRadioButton = tRadioButton
-        
-        if plotvars.file_selected is not None:
-            f = cf.read(plotvars.file_selected)
-            plotvars.fields = f
-            plotvars.data_source_list = []
-            for i in np.arange(len(f)):
-                plotvars.data_source_list.append(plotvars.file_selected)
-
-            field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=f, order=plotvars.field_widget_listing)
-            field_titles = QLabel(field_widget_title)
-
-            for i in np.arange(len(f)):
-                QListWidgetItem(field_widget_names[i], fieldlist) 
-            fieldlist.setCurrentRow(0)
-
-            field_titles.setText(field_widget_title)
-
-
-        fieldlist.setCurrentRow(0)
         fieldlist.itemSelectionChanged.connect(self.fieldnumber)
         
-        if plotvars.file_selected is not None:
-            plotvars.next_field_index = len(f)
+        field_titles = QLabel('Index  nX   nY   nZ   nT   field name')
 
         # Set fixed width font for field titles
         custom_font_fixed_width = QFont(plotvars.font_mono, plotvars.fontsize)
@@ -381,46 +307,35 @@ class Cfview(QMainWindow):
 
         # Dimension lists
         dimension_titles = QLabel('Dimension view')
-        reset_tracksButton.setVisible(False)
-        reset_dimensionButton.setVisible(True)
-        if plotvars.file_selected is not None:
-            #if hasattr(f[0], 'featureType'):
-            if f[0].get_property('featureType', False) is not False:
-                if f[0].featureType == 'trajectory':
-                    dimension_titles.setText('Trajectory number')
-                    plotvars.plot_type = 'Trajectory'
-                    plot_type_ComboBox.setCurrentIndex(4)
-                    dimLabel.setVisible(False)
-                    xRadioButton.setVisible(False)
-                    yRadioButton.setVisible(False)
-                    zRadioButton.setVisible(False)
-                    tRadioButton.setVisible(False)
-                    reset_tracksButton.setVisible(True)
-                    reset_dimensionButton.setVisible(False)
-
-        if plotvars.file_selected is not None:
-            nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f[0])
-            dims_field = [nx, ny, nz, nt, x, y, z, t]
+        
+        # New ajh code - extend up to 10 data dimensions
+        # self.lists contain axis values
+        # self.lists_collapse contain just one value for the collapse centre
+        self.axis_RadioButtons = []
+        self.lists = []
+        self.lists_collapse = []
 
 
-        xlist = QListWidget()
-        ylist = QListWidget() 
-        zlist = QListWidget()
-        tlist = QListWidget()
+        for i in np.arange(plotvars.max_axes):
+            self.axis_RadioButtons.append(QRadioButton(''))
+            self.axis_RadioButtons[i].setVisible(False)       
+            self.axis_RadioButtons[i].setChecked(False)
+            self.axis_RadioButtons[i].clicked.connect(partial(self.dim_view, i))
+            
+            self.lists.append(QListWidget())
+            self.lists[i].setSelectionMode(QListWidget.ExtendedSelection)
+            self.lists[i].setFont(custom_font_fixed_width)
+            self.lists[i].itemSelectionChanged.connect(self.reset_field_title)
+            self.lists[i].setVisible(False)
+            
+            self.lists_collapse.append(QListWidget())
+            self.lists_collapse[i].setSelectionMode(QListWidget.ExtendedSelection)
+            self.lists_collapse[i].setFont(custom_font_fixed_width)
+            self.lists_collapse[i].itemSelectionChanged.connect(self.reset_field_title)
+            self.lists_collapse[i].setVisible(False)
 
-        dim_lists = [xlist, ylist, zlist, tlist]
-
-        for i in np.arange(4):
-            dim_lists[i].setSelectionMode(QListWidget.ExtendedSelection)
-            dim_lists[i].setFont(custom_font_fixed_width)
-            dim_lists[i].itemSelectionChanged.connect(self.reset_field_title)
-
-            if plotvars.file_selected is not None:
-                if dims_field[i] > 0:
-                    for val in dims_field[i+4]:
-                        QListWidgetItem(str(val), dim_lists[i])
-                        dim_lists[i].selectAll()
-
+        self.lists[0].setVisible(True)
+            
 
 
         # Set the stored_dimensions and stored_collapses for each of the fields in the field list
@@ -428,24 +343,6 @@ class Cfview(QMainWindow):
         plotvars.stored_dimensions = {}
         plotvars.stored_collapses = {}
         plotvars.stored_collapse_values = {}
-        if plotvars.file_selected is not None:
-            for i in np.arange(len(f)):
-                plotvars.stored_dimensions['f' + str(i)] = {'x': -1, 'y': -1, 'z': -1, 't': -1}
-                plotvars.stored_collapses['f' + str(i)] = {'x': 'Off', 'y': 'Off', 'z': 'Off', 't': 'Off'}
-                plotvars.stored_collapse_values['f' + str(i)] = {'x': False, 'y': False, 'z': False, 't': False}
-
-
-        # Collapse lists - these will have just one value
-        xlist_collapse = QListWidget()
-        ylist_collapse = QListWidget()
-        zlist_collapse = QListWidget()
-        tlist_collapse = QListWidget()
-        
-        # Set font and selection mode
-        collapse_lists = [xlist_collapse, ylist_collapse, zlist_collapse, tlist_collapse]
-        for collapse_list in collapse_lists:
-            collapse_list.setFont(custom_font_fixed_width)
-            collapse_list.setSelectionMode(QListWidget.ExtendedSelection)
 
 
 
@@ -537,24 +434,12 @@ class Cfview(QMainWindow):
 
         rightHbox2.addLayout(dimension_container)
         dimension_container.addWidget(dimension_titles)
-        dimension_container.addWidget(xlist)
-        dimension_container.addWidget(ylist)
-        dimension_container.addWidget(zlist)
-        dimension_container.addWidget(tlist)
-        dimension_container.addWidget(xlist_collapse)
-        dimension_container.addWidget(ylist_collapse)
-        dimension_container.addWidget(zlist_collapse)
-        dimension_container.addWidget(tlist_collapse)
+        
+        for i in np.arange(plotvars.max_axes):
+            dimension_container.addWidget(self.lists[i])
+            dimension_container.addWidget(self.lists_collapse[i])        
 
-
-
-        rightHbox3.addWidget(dimLabel)
-        rightHbox3.addWidget(xRadioButton)
-        rightHbox3.addWidget(yRadioButton)
-        rightHbox3.addWidget(zRadioButton)
-        rightHbox3.addWidget(tRadioButton)
-        rightHbox3.addWidget(reset_dimensionButton)
-        rightHbox3.addWidget(reset_tracksButton)
+        self.rightHbox3 = rightHbox3
 
 
         leftHbox3.addWidget(sort_byLabel)
@@ -577,38 +462,11 @@ class Cfview(QMainWindow):
         self.dimension_titles = dimension_titles
         self.fieldlist = fieldlist
         self.plot_type_ComboBox = plot_type_ComboBox
-        self.xlist = xlist
-        self.ylist = ylist
-        self.zlist = zlist
-        self.tlist = tlist
-        self.xlist_collapse = xlist_collapse
-        self.ylist_collapse = ylist_collapse
-        self.zlist_collapse = zlist_collapse
-        self.tlist_collapse = tlist_collapse
-        self.collapse_areaComboBox = collapse_areaComboBox
-        self.collapse_areaLabel = collapse_areaLabel
-        self.collapse_xLabel = collapse_xLabel
-        self.collapse_yLabel = collapse_yLabel
-        self.collapse_zLabel = collapse_zLabel
-        self.collapse_tLabel = collapse_tLabel
-
-
-        self.ylist.setVisible(False)
-        self.zlist.setVisible(False)
-        self.tlist.setVisible(False)
-        self.xlist_collapse.setVisible(False)
-        self.ylist_collapse.setVisible(False)
-        self.zlist_collapse.setVisible(False)
-        self.tlist_collapse.setVisible(False)
+        
 
         self.dimLabel = dimLabel
         self.reset_dimensionButton = reset_dimensionButton
-        self.reset_tracksButton = reset_tracksButton
 
-        self.collapse_xComboBox = collapse_xComboBox
-        self.collapse_yComboBox = collapse_yComboBox
-        self.collapse_zComboBox = collapse_zComboBox
-        self.collapse_tComboBox = collapse_tComboBox
 
         self.contour_vector_indexHbox = contour_vector_indexHbox
         self.contour_indexLabel = contour_indexLabel
@@ -638,22 +496,24 @@ class Cfview(QMainWindow):
 
         self.output_terminal_textEdit = output_terminal_textEdit
 
-        # Reset the field title
-        if plotvars.file_selected is not None:
-            self.reset_field_title()
+
+        # ajh - new - Add axis radio buttons to rightHbox3
+        # Only four initially as they are set to X, Y, Z, T
+        rightHbox3.addWidget(self.dimLabel)
+        for i in np.arange(plotvars.max_axes):
+            rightHbox3.addWidget(self.axis_RadioButtons[i])
+        
+        # ajh - new - Initial setting for axes
+        myaxes = ['X', 'Y', 'Z', 'T']
+        for i in np.arange(len(myaxes)):
+            self.axis_RadioButtons[i].setVisible(True)
+            self.axis_RadioButtons[i].setText(myaxes[i])
+        self.axis_RadioButtons[0].setChecked(True)
+
             
-        # Set plotvars.dim_names based on the first field and label the collapse dimensions with them
-        if plotvars.file_selected is not None:
-            Cf_funcs.field_dims(field=f[0])
-        dims = plotvars.dim_names
+        rightHbox3.addWidget(reset_dimensionButton)
+        
             
-        labels = [self.collapse_xLabel, self.collapse_yLabel, self.collapse_zLabel, self.collapse_tLabel]
-        for i in np.arange(4):
-           dim = dims[i]
-           if len(dim) == 1:
-               dim = dim.upper()
-               
-           labels[i].setText(dim)
 
         # Interface colour settings
         palette = QPalette()    
@@ -704,10 +564,16 @@ class Cfview(QMainWindow):
                 
 
         # Set window size and show the window
-        self.setGeometry(0, 0, 1280, 1060)
+        #self.setGeometry(0, 0, 1280, 1060)
         self.setWindowTitle('cfview')
+        
+        # Read in the data and set widgets if file(s) are specified
+        if plotvars.file_selected is not None:
+            self.read_file(self)
 
+                
         self.show()
+        self.raise_()
 
 
     def open_file(self, s):
@@ -715,10 +581,12 @@ class Cfview(QMainWindow):
          Open a file and populate dimension lists
         ''' 
         dialog = QFileDialog()
+        
         dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         #dialog.setOption(QCoreApplication.AA_DontUseNativeDialogs, True)
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
-        dialog.setNameFilters(["(*.nc *.pp)", "(*.nc)", "(*.pp)", "(*.*)"])
+        #dialog.setNameFilters(["(*.nc *.pp)", "(*.nc)", "(*.pp)", "(*.*)"])
+        dialog.setNameFilters(["*.nc *.pp", "*.nc", "*.pp", "*.*"])
         dialog.setFileMode(QFileDialog.ExistingFiles)
 
  
@@ -740,48 +608,57 @@ class Cfview(QMainWindow):
         if dialog.exec_() == QDialog.Accepted:
             path =  dialog.selectedFiles()
         
+
+        plotvars.file_selected = path    
+        
+        # Read in the data and set widgets
+        self.read_file(self)
+        
+
+
+
+
+    def read_file(self, s):
+        '''
+         Read file(s) and set widget values
+        '''
+    
+        path = plotvars.file_selected
+        
         try:
             if path != '':
                 f = cf.read(path)
             else:
                 print("\nNo file selected\n")
                 return
-        except ValueError:
-            print('file not a valid, netCDF, PP or fields file')
+        except:
+            errstr = 'One of the files selected is not a valid, netCDF, PP or fields file or does not exist - '
+            for file in path:
+                errstr += file + ' '
+            print(errstr)
+                
             return
-
-
-        plotvars.file_selected = path
+        
+        
         plotvars.data_source_list = []
         for i in np.arange(len(f)):
             plotvars.data_source_list.append(plotvars.file_selected)
 
 
-        #if hasattr(f[0], 'featureType'):
+
         if f[0].get_property('featureType', False) is not False:
             if f[0].featureType == 'trajectory':
                 self.dimension_titles.setText('Trajectory number')
                 self.plot_type_ComboBox.setCurrentIndex(4)
                 plotvars.plot_type='Trajectory'
                 self.dimLabel.setVisible(False)
-                self.xRadioButton.setVisible(False)
-                self.yRadioButton.setVisible(False)
-                self.zRadioButton.setVisible(False)
-                self.tRadioButton.setVisible(False)
-                self.reset_tracksButton.setVisible(True)
-                self.reset_dimensionButton.setVisible(False)
+                self.reset_dimensionButton.setText('Reset Tracks')
         else:
             self.dimension_titles.setText('Dimension view')
             self.plot_type_ComboBox.setCurrentIndex(0)
             plotvars.plot_type = 'Contour'
             self.dimLabel.setVisible(True)
-            self.xRadioButton.setVisible(True)
-            self.yRadioButton.setVisible(True)
-            self.zRadioButton.setVisible(True)
-            self.tRadioButton.setVisible(True)
-            self.reset_tracksButton.setVisible(False)
-            self.reset_dimensionButton.setVisible(True)
-
+            self.reset_dimensionButton.setText('Reset Dimensions')
 
 
 
@@ -792,21 +669,109 @@ class Cfview(QMainWindow):
         plotvars.field_widget_indicies = None
         plotvars.next_field_index = len(f)
 
-        field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=f, order=plotvars.field_widget_listing)
+
 
         # Set the stored_dimensions
         # -1 indicates that the dimension is unchanged
         plotvars.stored_dimensions = {}
         plotvars.stored_collapses = {}
+        plotvars.stored = {}
+        max_axes_number = 0
+        maximum_axis_lengths = []
+        
         if plotvars.file_selected is not None:
-            for i in np.arange(len(f)):
-                plotvars.stored_dimensions['f' + str(i)] = {'x': -1, 'y': -1, 'z': -1, 't': -1}
-                plotvars.stored_collapses['f' + str(i)] = {'x': 'Off', 'y': 'Off', 'z': 'Off', 't': 'Off'}
-                plotvars.stored_collapse_values['f' + str(i)] = {'x': False, 'y': False, 'z': False, 't': False}
+            for i in np.arange(len(f)):       
+                                
+                data_type = 'dim'
+                if f[i].get_property('featureType', False) is not False:
+                    if f[i].featureType == 'trajectory':
+                        data_type = 'trajectory'
+                        
+          
+                axes = []
+                collapses =[]
+                collapse_values = []        
+                        
+                        
+                if data_type == 'dim':
+                
+
+                    # Axes X, Y, Z, T and dimensioncoordinate1, dimensioncoordinate0, ax0, ax1
+                    data_axes = Cf_funcs.find_dim_names(f[i])        
+                                  
+                                  
+                    axis_sizes = []
+                    for j in np.arange(len(data_axes)):
+                        axis_sizes.append(len(f[i].coord(data_axes[j]).array))
+                
+                    # ax coordinates - ax2, ax1, ax0
+                    daxes = list(f[i].get_data_axes())
+                    if len(data_axes) == 0 and len(daxes) > 0:
+                        data_type = 'axis'
+                        for j in np.arange(len(daxes)):
+                            data_axes.append('ax' + str(j))
+                            axis_sizes.append(f[i].domain_axis(daxes[j]).get_size())
+
+                    naxes = len(data_axes)
+                    for k in np.arange(naxes):
+                        axes.append(-1)
+                        collapses.append('Off')
+
+                
+                else:
+                     data_axes = ['tracks']
+                     axes.append(-1)
+                     coords = list(f[i].coords())
+                     for mycoord in coords:
+                         if f[i].coord(mycoord).nc_get_variable() == 'longitude':
+                             ntracks = np.shape(f[i].auxiliary_coordinate('longitude').array)[0]
+
+                     axis_sizes = [ntracks]
+                     
+                # Initial population of maximum_data_sizes
+                if len(data_axes) > max_axes_number:
+                    max_axes_number = len(data_axes)
+
+                    
+                # Change to axes, X, Y, Z, T and dim1, dim0, ax0, ax1
+                for j in np.arange(len(data_axes)):    
+                    if data_axes[j][:19] == 'dimensioncoordinate':
+                        data_axes[j] = 'dim' + data_axes[j][19:]                         
+                    
+                field_name = Cf_funcs.field_name(f[i])
+                
+                
+                field_dict = {'data_axes': data_axes, 'axis_sizes': axis_sizes,\
+                              'axes': axes, 'collapses': collapses, 'collapse_value': False,\
+                              'data_type': data_type, 'source': plotvars.file_selected,\
+                              'field_name': field_name}
+                              
+                plotvars.stored['f' + str(i)] = field_dict
+                
+                
+                
+                
+                
+        # Calculate maximum lengths of the data values in characters
+        # Use a minimum of 5 characters - dim0 plus a space = 5
+        for i in np.arange(max_axes_number):
+            maximum_axis_lengths.append(5)
 
         for i in np.arange(len(f)):
-            QListWidgetItem(field_widget_names[i], self.fieldlist) 
+            myaxis_sizes = plotvars.stored['f' + str(i)]['axis_sizes']
+            for j in np.arange(len(myaxis_sizes)):
+                if len(str(myaxis_sizes[j])) > maximum_axis_lengths[j]:
+                    maximum_axis_lengths[j] = len(str(myaxis_sizes[j]))
+                    
+        plotvars.maximum_axis_lengths = maximum_axis_lengths
+            
+        
+
+        
+        field_widget_names, field_widget_title = Cf_funcs.fields_list(self, fields=f, order=plotvars.field_widget_listing)       
+        self.fieldlist.addItems(list(str(w) for w in field_widget_names))
         self.fieldlist.setCurrentRow(0) 
+
 
         self.field_titles.setText(field_widget_title)
 
@@ -814,7 +779,7 @@ class Cfview(QMainWindow):
 
         # Set the file string in plotvars
         if len(plotvars.file_selected) == 1:
-             plotvars.file_read_str = "'" + plotvars.file_selected[0] + "'"
+            plotvars.file_read_str = "'" + plotvars.file_selected[0] + "'"
         else:
             fstring = "['"
             for i in np.arange(len(plotvars.file_selected)):
@@ -822,16 +787,12 @@ class Cfview(QMainWindow):
             fstring = fstring[:-4] + "']"
             plotvars.file_read_str = fstring 
 
-
-
-
+        # Call fieldnumber to set the field number
+        self.fieldnumber()
 
 
         # Print which file has been opened in the messages window
         print('File read: ' + str(path))
-
-
-
 
 
 
@@ -884,8 +845,8 @@ class Cfview(QMainWindow):
             field_title = selected[i].text()
             indicies.append(int(field_title.split()[0]))
 
-        dims_regular = ['X', 'Y', 'Z', 'T']
-        dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
+        #dims_regular = ['X', 'Y', 'Z', 'T']
+        #dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
 
 
         save_fields = []
@@ -896,71 +857,77 @@ class Cfview(QMainWindow):
         # Loop over the selected fields
         for index in np.arange(len(indicies)):
         
-            if plotvars.data_source_list[indicies[index]] == 'Changed':
-                com +="# See previous code for how to change this field's properties\n"
-            if plotvars.data_source_list[indicies[index]] == 'Computed':
-                com +='# See previous code for how to compute this field\n'
-            if plotvars.data_source_list[indicies[index]] == 'Copied':
-                com +='# See previous code for how this field was copied\n'
+            if plotvars.stored['f' + str(indicies[index])]['source'] == 'Changed':
+                com +='field index = ' + str(indicies[index]) + " - see previous code for how to change this field's properties\n"
+            if plotvars.stored['f' + str(indicies[index])]['source'] == 'Computed':
+                com +='field index = ' + str(indicies[index]) + ' - see previous code for how to compute this field\n'
+            if plotvars.stored['f' + str(indicies[index])]['source'] == 'Copied':
+                com +='field index = ' + str(indicies[index]) + ' - see previous code for how this field was copied\n'
 
             # Form the subspace dictionary
-            stored = plotvars.stored_dimensions['f' + str(indicies[index])]
-
+            stored = plotvars.stored['f' + str(indicies[index])]
+            data_axes = stored['data_axes']
+            data_axes_orig = deepcopy(data_axes)
+            for i in np.arange(len(data_axes)):
+                if data_axes[i][:3] == 'dim':
+                    data_axes[i] = 'dimensioncoordinate' + data_axes[i][3:]
+            mycollapses = stored['collapses']
+            myaxes = stored['axes']
             subspace_args = {}
 
             # Find the original nx, ny, nz, nt for this field
             field = f[indicies[index]]
             com += 'field = f[' + str(indicies[index]) + ']\n'
-            nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=field)
-            orig_vals = [nx, ny, nz, nt]
-
-            for i in np.arange(len(dims)):
+            
+            for i in np.arange(len(data_axes)):
                 # dim_indicies = -1 means no user change to this dimension
-                dim_indicies = stored[dims_regular[i].lower()]
-                if field.coord(dims[i]).T:
-                    dim_vals = field.coord(dims[i]).dtarray
+                myaxis = data_axes[i]
+                myaxis_orig = data_axes_orig[i]
+                axis_indicies = myaxes[i]
+                if field.coord(myaxis).T:
+                    axis_vals = field.coord(myaxis).dtarray
                 else:
-                    dim_vals = field.coord(dims[i]).array
+                    axis_vals = field.coord(myaxis).array
 
 
-                if dim_indicies != -1:
-                    if len(dim_indicies) == 1:
-                        subspace_args[dims[i]] = dim_vals[dim_indicies[0]]
-                        com += 'field = field.subspace(' + dims[i] + '=' + str(dim_vals[dim_indicies[0]]) + ')\n'
+                if axis_indicies != -1:
+                    if len(axis_indicies) == 1:
+                        subspace_args[myaxis_orig] = axis_vals[axis_vals[i][0]]
+                        com += 'field = field.subspace(' + mydim + '=' + str(axis_vals[i][0]) + ')\n'
                     else:
 
                         # Check for contiguous data selection
                         contig = True
-                        if max(dim_indicies) - min(dim_indicies) != len(dim_indicies) - 1:
+                        if max(axis_indicies) - min(axis_indicies) != len(axis_indicies) - 1:
                             contig = False
-
-                        valmin = dim_vals[min(dim_indicies)]
-                        valmax = dim_vals[max(dim_indicies)]
-
+                        
+                        valmin = axis_vals[min(axis_indicies)]
+                        valmax = axis_vals[max(axis_indicies)]
+                        
                         # cf-python needs ascending values for cf.wi
                         if valmax < valmin:
                             valmin, valmax = valmax, valmin
 
                         if contig:
-                            subspace_args[dims[i]] = cf.wi(valmin, valmax)
-                            com += 'field = field.subspace(' + dims[i] + ' = cf.wi('
+                            subspace_args[data_axes[i]] = cf.wi(valmin, valmax)
+                            com += 'field = field.subspace(' + data_axes[i] + ' = cf.wi('
                             com +=  str(valmin) + ', ' + str(valmax) + '))\n'
                         else:
-                            subspace_args[dims[i]] = sorted(dim_indicies)
-                            com += 'field = field.subspace(' + dims[i] + '= ['
-                            for ind in np.arange(len((dim_indicies))):
-                                com += str(sorted(dim_indicies)[ind]) 
-                                if ind < len(dim_indicies) - 1:
+                            subspace_args[data_axes[i]] = sorted(axis_indicies)
+                            com += 'field = field.subspace(' + data_axes[i] + '= ['
+                            for ind in np.arange(len((axis_indicies))):
+                                com += str(sorted(axis_indicies)[ind]) 
+                                if ind < len(axis_indicies) - 1:
                                     com += ', ' 
                             com += '])\n'
 
 
             # Form the collapse string
             collapse_str = ''
-            stored = plotvars.stored_collapses['f' + str(indicies[index])] 
+            #stored = plotvars.stored_collapses['f' + str(indicies[index])] 
             for i in np.arange(4):
-                 if stored[dims_regular[i].lower()] != 'Off':
-                     collapse_str += dims[i] + ': ' + stored[dims_regular[i].lower()] + ' '
+                 if mycollapses[i] != 'Off':
+                     collapse_str += data_axes[i] + ': ' + mycollapses[i] + ' '
             if len(collapse_str) > 0:
                 if collapse_str[-1] == ' ':
                     collapse_str = collapse_str[:-1]
@@ -972,7 +939,6 @@ class Cfview(QMainWindow):
 
             if len(collapse_str) > 0:
                 field = field.collapse(collapse_str)
-                save_fields.append(field)
                 com += "field = field.collapse('" + collapse_str + "')\n" 
 
             save_fields.append(field)
@@ -984,11 +950,11 @@ class Cfview(QMainWindow):
         cf.write(save_fields, path)
 
         # Show the cf-python code
-        com += '\n#Save the data\n'
+        com += '\n# Save the data\n'
         com += "cf.write(save_fields, '" + path + "')"
         
         if plotvars.code_output:
-           print('### Code to write file is ###\n', com)
+           print('### Code to write the file is ###\n', com)
 
 
         
@@ -1010,57 +976,79 @@ class Cfview(QMainWindow):
         # Make a copy of the field for plotting
         f = deepcopy(plotvars.fields[index])
         
+               
+        
         # Reset the file title in case the user has changed the field properties
         self.reset_field_title()
 
         # Check data and subspace if necessary
         subspace_args = {}
         con_args = {}
-        dims = ['X', 'Y', 'Z', 'T']
+        
+        # ajh - to be removed
+        #dims = ['X', 'Y', 'Z', 'T']
+        
+        # ajh - new code 
+        mystored = plotvars.stored['f' + str(index)]
+              
+        myaxes = deepcopy(mystored['data_axes'])
+        
+        for i in np.arange(len(myaxes)):
+            if myaxes[i][:3] == 'dim':
+                myaxes[i] = 'dimensioncoordinate' + myaxes[i][3:]
+        
 
         if plotvars.plot_type == 'Contour' or plotvars.plot_type == 'Contour and vector':
             
             # Check selected data has enough items to be a contour plot
-            dims = plotvars.contour_type.split('-')
-
-            if dims[0][:4] == 'log(':
-                dims[0] = dims[0][4:-1]
-            if dims[1][:4] == 'log(':
-                dims[1] = dims[1][4:-1]
-            dims_orig = deepcopy(dims)
-                
-            if len(dims[0]) > 1:
-                dims[0] = 'dimensioncoordinate' + dims[0][-1]
-            if len(dims[1]) > 1:
-                dims[1] = 'dimensioncoordinate' + dims[1][-1]
-                
-            if len(dims[0]) == 1:
-                dims[0] = dims[0].upper()
-            if len(dims[1]) == 1:
-                dims[1] = dims[1].upper()
-                
-                
-            lists = [self.xlist.selectedItems(), self.ylist.selectedItems(),\
-                     self.zlist.selectedItems(), self.tlist.selectedItems()]
-            nx = len(lists[plotvars.dim_names.index(dims_orig[0])])
-            ny = len(lists[plotvars.dim_names.index(dims_orig[1])])
+            axes = plotvars.contour_type.split('-')
+            if len(axes) == 1 and axes[0] == '':
+                print('Not enough data to make a contour plot')
+                return
             
+            if axes[0][:4] == 'log(':
+                axes[0] = axes[0][4:-1]
+            if axes[1][:4] == 'log(':
+                axes[1] = axes[1][4:-1]
+            axes_orig = deepcopy(axes)
+
+                
+            if axes[0][:3] == 'dim':
+                axes[0] = 'dimensioncoordinate' + axes[0][3:]
+            if axes[1][:3] == 'dim':
+                axes[1] = 'dimensioncoordinate' + axes[1][3:]     
+                
+            
+            # Work out the sizes of the data for the x and y directions
+            x_ind = myaxes.index(axes[0])
+            y_ind = myaxes.index(axes[1])
+            nx = mystored['axis_sizes'][x_ind]
+            ny = mystored['axis_sizes'][y_ind]
+            if mystored['axes'][x_ind] != -1:
+                nx = len(mystored['axes'][x_ind])
+            if mystored['axes'][y_ind] != -1:
+                ny = len(mystored['axes'][y_ind])
+            if mystored['collapses'][x_ind] != 'Off':
+                nx = 1
+            if mystored['collapses'][y_ind] != 'Off':
+                ny = 1                 
+                 
             
             if nx < 2 or ny < 2:
                 errstr = '\nContour error - not enough data to make requested '
                 errstr += plotvars.contour_type + ' contour plot\n'
                 errstr += 'Need a minimum of two values per contour plot dimension\n'
                 errstr += 'Field dimensions are\n'
-                errstr += dims_orig[0] + ' = ' + str(nx) + '\n'
-                errstr += dims_orig[1] + ' = ' + str(ny) + '\n\n'
+                errstr += axes[0] + ' = ' + str(nx) + '\n'
+                errstr += axes[1] + ' = ' + str(ny) + '\n\n'
                 print(errstr)
                 return
 
 
             # Form the subspace dictionary
             subspace_args = Cf_funcs.subspace_args(self.parent, index)
-            
 
+                 
             # Form the contour dictionary
             if plotvars.fill and not plotvars.lines:
                 con_args['lines'] = False
@@ -1085,10 +1073,17 @@ class Cfview(QMainWindow):
                 con_args['blockfill_fast'] = True
                 con_args['lines'] = True                   
                     
-
             if plotvars.lines and not plotvars.line_labels:
                 con_args['line_labels'] = False
-
+                
+            if plotvars.nlevs:
+                all_ints, errstr = Data_check.test_integers(plotvars.nlevs)
+                if all_ints:
+                    con_args['nlevs'] = int(plotvars.nlevs)
+                else:
+                    print('Error - number of levels defined in contour settings pop up window is not an integer')
+                    return                  
+                
             if plotvars.colorbar is False:
                 con_args['colorbar'] = False
             else:
@@ -1101,29 +1096,39 @@ class Cfview(QMainWindow):
                 con_args['ylog'] = True
 
             if plotvars.title == '':
-                con_args['titles'] = True
+                if plotvars.titles:
+                    con_args['titles'] = True
+                else:
+                    con_args['titles'] = False
             else:
                 con_args['title'] = plotvars.title
+                
+                
 
-            if plotvars.contour_type[0] == 't':
+            if plotvars.contour_type[0] == 'T':
+                con_args['swap_axes'] = True 
+
+            # Swap the axes if required
+            if x_ind > y_ind:
                 con_args['swap_axes'] = True 
 
 
+
             # Set the map
-            if plotvars.contour_type == 'x-y':
+            if plotvars.contour_type == 'X-Y':
                 cfp.mapset(proj=plotvars.proj)
+
 
 
             # Get the subspace and collapse commands
             com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
 
-
-
             # generate the code to read the data and apply subspace and collapse args
-            variable_names = ['f', 'g', 'h']
-            com_con = Cf_funcs.generate_code(com_subspace, com_collapse)
-            
+            variable_names = ['f', 'g', 'h']         
 
+            com_con = Cf_funcs.generate_code(com_subspace, com_collapse)
+
+            
 
             # Add contour levels if specified
             if plotvars.levs_set:
@@ -1139,7 +1144,7 @@ class Cfview(QMainWindow):
                 vals_okay, errstr = Data_check.test_val0_lt_val1([vals[0], vals[1]])
                 if not vals_okay:
                     print('contour level error\n' + errstr)
-                return
+                    return
     
                 # Check step > 0
                 vals_okay, errstr = Data_check.test_val_gt_zero(vals[2])
@@ -1149,8 +1154,7 @@ class Cfview(QMainWindow):
 
                 # Test for ints or floats
                 all_ints, errstr = Data_check.test_integers(vals)
-          
-
+                
                 # Set up levels and add to the com_con code
                 if all_ints:
                     cfp.levs(min=int(vals[0]), max=int(vals[1]), step=int(vals[2]))
@@ -1335,11 +1339,6 @@ class Cfview(QMainWindow):
                     print('Error in longitude centre of map domain\n' + errstr)
                     return
 
-
-
-
-
-
                 cfp.mapset(proj=plotvars.proj, boundinglat=float(plotvars.boundinglat),\
                            lon_0 = float(plotvars.lon_0))
 
@@ -1385,36 +1384,171 @@ class Cfview(QMainWindow):
                         com_con += ", '" + arg + '=' + str(con_args[arg]) + "'"
             com_con += ')'
     
-    
+            
+            # Switch based on whether the data is axis data
+            axis_switch = False
             if len(subspace_args) > 0:
-                f = f.subspace(**subspace_args)
+                if {'ax0', 'ax1', 'ax2', 'ax3'} > set(subspace_args):
+                    axis_switch = True
+                
+                
+            if axis_switch is False:
+            
+                if len(subspace_args) > 0:
+                    f = f.subspace(**subspace_args)
+
+                # Add bounds for those axes that need them
+                # ajh - new code
+                for i in np.arange(len(myaxes)):
+                    if mystored['collapses'] != 'Off':
+                        coord = f.coord(myaxes[i])
+                        if len(coord.array) > 1:
+                            if coord.has_bounds() is False:
+                                bounds = coord.create_bounds()
+                                coord.set_bounds(bounds)                
+                
+                
+                
+                
+                if com_collapse != '':
+                
+                    print('com_collapse is ', com_collapse)
+                    f = f.collapse(com_collapse.strip("'"), weights=True)
 
 
-            if com_collapse != '':
-                f = f.collapse(com_collapse.strip("'"), weights=True)
+                # Use cfp.gopen if a contour and vector plot
+                if plotvars.plot_type == 'Contour and vector':
+                    cfp.gopen()
+                
 
-
-            # Use cfp.gopen if a contour and vector plot
-            if plotvars.plot_type == 'Contour and vector':
-                cfp.gopen()
-
-            if plotvars.plot_type != 'Contour and vector':
-                if plotvars.code_output:
-                    print('### Code to make the plot is ###\n', com_con)
+                if plotvars.plot_type != 'Contour and vector':
+                    if plotvars.code_output:
+                        print('### Code to make the plot is ###\n', com_con)
                     
 
-            cfp.con(f, **con_args)
+                cfp.con(f, **con_args) 
+
+                
+            if axis_switch:
+                
+                # Just in case the data units are messed up
+                try:
+                    data = f.array
+                except:
+                    f.del_property('units')
+                    f.set_property('units', 'K')
+                    data = f.array
+                
+                
+                naxes = np.ndim(data)
+                myslice = []
+                for i in np.arange(naxes):
+                    if 'ax' + str(i) in subspace_args:
+                        vals = subspace_args['ax' +  str(i)]
+                        if np.size(vals) == 1:
+                            myslice.append(vals)
+                        else:
+                            myslice.append(slice(vals[0], vals[1] + 1))
+                    else:
+                        # A slice of None, None selects all the data
+                        myslice.append(slice(None, None))
+
+                data = data[tuple(myslice)]
+
+                
+
+                
+
+                    
+                    
+                axes = f.get_data_axes()
+                contour_dims = plotvars.contour_type.split('-')
+                axes = ['domainaxis' + contour_dims[0][2], 'domainaxis' + contour_dims[1][2]]
+                axis_values = ['', '']
+                axis_names = ['', '']
+                
+                # Extract axis names if available in the other netCDF variables
+                for iaxis in np.arange(2):
+                    axis = axes[iaxis]
+                    my_nc_name = f.domain_axis(axis).nc_get_dimension()
+
+                    match = False
+                    for ifield in np.arange(len(plotvars.fields)):
+                        test_data = plotvars.fields[ifield]
+                        if len(test_data.get_data_axes()) == 1:
+                            if my_nc_name == test_data.domain_axis('domainaxis0').nc_get_dimension():
+                                match = True
+                                axis_names[iaxis] = Cf_funcs.field_name(test_data)
+
+                                
+                    if match is False:
+                        axis_names[iaxis] = 'No axis name'
+                        
+                    ax_number = int(contour_dims[iaxis][2:])
+                    lists = [self.xlist, self.ylist, self.zlist, self.tlist]
+                    
+                    min_ind = lists[ax_number].selectedIndexes()[0].row() 
+                    max_ind = lists[ax_number].selectedIndexes()[-1].row()
+
+
+                                        
+                    items = []
+                    for index in np.arange(lists[ax_number].count()):
+                        item = Data_check.test_type(lists[ax_number].item(index).text())
+                        items.append(item)
+
+                    items = np.array(items)
+
+                    axis_values[iaxis] = items[min_ind:max_ind + 1]
+
+                         
+                        
+                         
+                         
+                x, xlabel = axis_values[1], axis_names[1]
+                y, ylabel = axis_values[0], axis_names[0]
+                
+                if int(contour_dims[1][2:]) < int(contour_dims[0][2:]):
+                    data = np.flipud(np.rot90(data))
+
+
+                
+                con_args['titles'] = False
+                
+                myfield = plotvars.fields[plotvars.index_number]
+                colorbar_title = Cf_funcs.field_name(myfield)
+                myunits = getattr(myfield, 'units', '()')
+                if myunits != '()':
+                    myunits = '(' + myunits + ')'
+                con_args['colorbar_title'] = colorbar_title + ' ' + myunits
+                
+                warnstr = '### This data is very basic and has no dimensions\n'
+                warnstr += '### The code to make the plot is not available for axis only data\n'
+                print(warnstr)
+                
+                cfp.con(f=data, x=x, y=y, xlabel=xlabel, ylabel=ylabel, **con_args)
+                         
+                return            
+            
+                
+              
     
         if plotvars.plot_type == 'Line':
             # Make a line plot
 
+
+            # No line plots available for axis only data
+            if 'ax0' in plotvars.dim_names:
+                print('### Line plots are not available for axis only data')
+                return
+
+
+
             # Check selected data has enough items to make a line plot
-            #mydim = str(self.line_type_ComboBox.currentText())
             mydim = plotvars.line_type
-            if mydim in ['x', 'y', 'z', 't']:
-                mydim = mydim.upper()
-            else:
-                mydim = 'dimensioncoordinate' + mydim[-1]
+            if mydim[:2] == 'dim':
+                mydim = 'dimensioncoordinate' + mydim[2:]
+            
             
             # Return if coordinate doesn't exist
             if not f.has_construct(mydim):
@@ -1461,6 +1595,8 @@ class Cfview(QMainWindow):
             # Get the subspace and collapse commands
             com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
 
+            
+            
             # Generate the code to read the data and apply subspace and collapse args
             com_line= Cf_funcs.generate_code(com_subspace, com_collapse)
 
@@ -1469,7 +1605,8 @@ class Cfview(QMainWindow):
             cfp.gset()
             if plotvars.line_limits == 'user':
                 # Check the input user data are numbers
-                cfp.gset(float(plotvars.line_xmin), float(plotvars.line_xmax), float(plotvars.line_ymin), float(plotvars.line_ymax))
+                cfp.gset(float(plotvars.line_xmin), float(plotvars.line_xmax), \
+                         float(plotvars.line_ymin), float(plotvars.line_ymax))
 
                 com_line += 'cfp.gset(xmin=' + plotvars.line_xmin + ', '
                 com_line += 'xmax=' + plotvars.line_xmax + ', '
@@ -1482,6 +1619,18 @@ class Cfview(QMainWindow):
             if len(subspace_args) > 0:
                 f = f.subspace(**subspace_args)
 
+                
+            # Add bounds for those axes that need them
+            for i in np.arange(len(myaxes)):
+                if mystored['collapses'] != 'Off':
+                    coord = f.coord(myaxes[i])
+                    if len(coord.array) > 1:
+                        if coord.has_bounds() is False:
+                            bounds = coord.create_bounds()
+                            coord.set_bounds(bounds)                          
+                
+
+            
             if com_collapse != '':
                 f = f.collapse(com_collapse.strip("'"), weights=True)
 
@@ -1511,7 +1660,7 @@ class Cfview(QMainWindow):
 
 
             # Reject plot if other than x-y at present
-            if plotvars.contour_type != 'x-y':
+            if plotvars.contour_type != 'X-Y':
                 print('Only longitude-latitude vector plots are supported at present')
                 return
 
@@ -1519,55 +1668,33 @@ class Cfview(QMainWindow):
             index_y = self.vector_y_indexComboBox.currentIndex()
             
             # Check dimensions have X and Y 
-            data_okay = True
-            if 'X' not in dims or 'Y' not in dims:
+            if 'X' not in myaxes or 'Y' not in myaxes:
                 print("Error - need both 'X' and 'Y' dimensions to make a longitude-latitude vector plot\n")
                 return
-            
-            
-            
-            
+                      
 
             # Check selected data has enough items to be a vector plot
             # First the x component
-            nx, ny, nz, nt = Cf_funcs.selected_dims(index_x)
-            dim_sizes = [nx, ny, nz, nt]
+            myx = 'X'
+            myy = 'Y'
+            myindicies = [index_x, index_y]
+            for i_index in np.arange(len(myindicies)): 
+                mystored = plotvars.stored['f' + str(myindicies[i_index])]
+                mysizes = mystored['axis_sizes']
+                myaxes = mystored['data_axes']
+                if mysizes[myaxes.index(myx)] <= 1 or mysizes[myaxes.index(myy)] <= 1:
+                    errstr = '\nVector error - not enough data to make requested '
+                    errstr += plotvars.contour_type + ' vector plot\n'
+                    errstr += 'Need a minimum of two values per vector plot dimension\n'
+                    errstr += 'Field dimensions are\n'
+                    for i in np.arange(len(myaxes)):
+                        errstr += myaxes[i] + ' = ' + str(mysizes[i]) + '\n'
+                    errstr += '\n'
+                    print(errstr)
+                    return
 
 
-            for i in np.arange(2):
-                if any(dim == dims[i].lower() for dim in plotvars.contour_type):
-                    if dim_sizes[i] < 2:
 
-                        errstr = '\nVector error - not enough data to make requested '
-                        errstr += plotvars.contour_type + ' vector plot\n'
-                        errstr += 'Need a minimum of two values per vector plot dimension\n'
-                        errstr += 'Field dimensions are\n'
-                        errstr += 'nx = ' + str(nx) + '\n'
-                        errstr += 'ny = ' + str(ny) + '\n'
-                        errstr += 'nz = ' + str(nz) + '\n'
-                        errstr += 'nt = ' + str(nt) + '\n'
-                        print(errstr)
-                        return
-
-
-            # Then the y component
-            nx, ny, nz, nt = Cf_funcs.selected_dims(index_y)
-            dim_sizes = [nx, ny, nz, nt]
-
-            for i in np.arange(2):
-                if any(dim == dims[i].lower() for dim in plotvars.contour_type):
-                    if dim_sizes[i] < 2:
-
-                        errstr = '\nVector error - not enough data to make requested '
-                        errstr += plotvars.contour_type + ' vector plot\n'
-                        errstr += 'Need a minimum of two values per vector plot dimension\n'
-                        errstr += 'Field dimensions are\n'
-                        errstr += 'nx = ' + str(nx) + '\n'
-                        errstr += 'ny = ' + str(ny) + '\n'
-                        errstr += 'nz = ' + str(nz) + '\n'
-                        errstr += 'nt = ' + str(nt) + '\n'
-                        print(errstr)
-                        return
 
 
 
@@ -1637,8 +1764,7 @@ class Cfview(QMainWindow):
             ucom_subspace, ucom_collapse = Cf_funcs.com_subspace_collapse(u_subspace_args)
             vcom_subspace, vcom_collapse = Cf_funcs.com_subspace_collapse(v_subspace_args)
 
-            # generate the code to read the data and apply subspace and collapse args
-
+            # Generate the code to read the data and apply subspace and collapse args
             if plotvars.plot_type == 'Vector':
                 com_u = Cf_funcs.generate_code(ucom_subspace, ucom_collapse, index=index_x, var_index=0)
                 com_v = Cf_funcs.generate_code(vcom_subspace, vcom_collapse, index=index_y, var_index=1)
@@ -1857,13 +1983,13 @@ class Cfview(QMainWindow):
 
 
             # Calculate selected tracks
-            selected_tracks = self.xlist.selectedItems()
+            selected_tracks = self.lists[i].selectedItems()
             tracks = []
             tracks_all = True
             for j in np.arange(len(selected_tracks)):
                 tracks.append(int(selected_tracks[j].text()))
 
-            if len(tracks) < self.xlist.count():
+            if len(tracks) < self.lists[i].count():
                 tracks_all = False
                 tracks = sorted(tracks)
                 tracks_contig = True
@@ -1920,64 +2046,45 @@ class Cfview(QMainWindow):
 
         plotvars.index_number = s
         f = plotvars.fields[s]
+        stored_vals = plotvars.stored['f' + str(plotvars.index_number)]
+        myaxes = stored_vals['data_axes']
 
         # Lock changes to stored variables while the new lists are made
+        # This is used to stop recursive calls 
         plotvars.stored_lock = True
 
 
+        # ajh - new code
         # Clear the dimension and collapse lists
-        lists_dim = [self.xlist, self.ylist, self.zlist, self.tlist]
-        lists_collapse = [self.xlist_collapse, self.ylist_collapse,\
-                          self.zlist_collapse, self.tlist_collapse]
-        for i in np.arange(4):
-            lists_dim[i].clear()
-            lists_collapse[i].clear()
+        for i in np.arange(plotvars.max_axes):
+            self.lists[i].clear()
+            self.lists_collapse[i].clear()        
+        
+        # Set the axis lists based on the field dimensions
+        axis_vals = Cf_funcs.field_axis_values(field=f)
+        
+        
+        for i in np.arange(len(myaxes)):
+            # Axis lists
+            str_list = list((str(w) for w in axis_vals[i]))
 
-
-        # Set the lists based on the field dimensions
-        nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f)
-        dims_field = [nx, ny, nz, nt, x, y, z, t]
-        dims = ['X', 'Y', 'Z', 'T']
-        dims_small = ['x', 'y', 'z', 't']
-        for i in np.arange(4):
-            vals = dims_field[i + 4]
-            if len(vals) > 0:
-                for val in vals:
-                    QListWidgetItem(str(val), lists_dim[i]) 
-
-
-
-        # Set selected dimensions based on stored values
-        for i in np.arange(4):
-            if plotvars.stored_dimensions['f' + str(s)][dims_small[i]] == -1:
-                lists_dim[i].selectAll()
+            self.lists[i].addItems(str_list)
+            
+            # Set the sected values to all or previously selected indicies
+            indicies = stored_vals['axes'][i]
+            
+            if indicies == -1:
+                self.lists[i].selectAll()
             else:
-                vals = plotvars.stored_dimensions['f' + str(s)][dims_small[i]]
-
-                for j in np.arange(len(vals)):
-                    lists_dim[i].item(vals[j]).setSelected(True)
-
-
-
-        # Set collapse methods from stored_collapses
-        collapses = [plotvars.collapse_x, plotvars.collapse_y,\
-                    plotvars.collapse_z, plotvars.collapse_t]
-        collapse_combos = [self.collapse_xComboBox, self.collapse_yComboBox,\
-                           self.collapse_zComboBox, self.collapse_tComboBox]
-        collapse_types = plotvars.collapse_types
-
-        for i in np.arange(4):
-            val = plotvars.stored_collapses['f' + str(s)][dims_small[i]]
-            index = collapse_types.index(val)
-            collapse_combos[i].setCurrentIndex(index)
-            collapses[i] = val
-
-            lists_collapse[i].clear()
-            val = plotvars.stored_collapse_values['f' + str(s)][dims_small[i]]
-            if val:
-                QListWidgetItem(str(val), lists_collapse[i]) 
-                lists_collapse[i].selectAll()
-
+                for index in indicies:
+                    self.lists[i].item(indicies[index]).setSelected(True)
+        
+            # Collapse lists
+            if stored_vals['data_type'] != 'trajectory':
+                if stored_vals['collapses'][i] != 'Off':
+                    self.lists_collapse[i].addItem(stored_vals['collapse_value'])
+                    self.lists_collapse[i].selectAll()
+                
 
         # Restore access to changing stored variables
         plotvars.stored_lock = False
@@ -1991,27 +2098,9 @@ class Cfview(QMainWindow):
             self.names_window.reset()
             
         # Reset dimension collapse method names if transform_window is open
-        #if self.transform_window is not None:
-        if True:
-            dims = plotvars.dim_names
-            
-            
-            labels = [self.collapse_xLabel, self.collapse_yLabel, self.collapse_zLabel, self.collapse_tLabel]
-            for i in np.arange(4):
-                dim = dims[i]
-                if len(dim) == 1:
-                    dim = dim.upper()
-               
-                labels[i].setText(dim)
-               
-            # Change the sensitivity of interpolation etc based on whether 'X' and 'Y' are available
-            if self.transform_window is not None:
-                if 'x' in dims and 'y' in dims:
-                    self.transform_window.valid_lon_lat(True)
-                else:
-                    self.transform_window.valid_lon_lat(False)
-                
-                
+        if self.transform_window is not None:
+            self.transform_window.Populate_collapses()
+                      
                 
         # Reset table data if data window is open
         if self.data_window is not None:
@@ -2019,153 +2108,188 @@ class Cfview(QMainWindow):
             
             
         # Reset the Contour plotting dimensions
-
-        #print('dim_names are ', dim_names)
-        
         contour_index = self.contour_type_ComboBox.currentIndex()
-        self.contour_type_ComboBox.clear()
-        c_options =[plotvars.dim_names[0] + '-' + plotvars.dim_names[1]]
-        c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[2])
-        c_options.append(plotvars.dim_names[0] + '-log(' + plotvars.dim_names[2] + ')')
-        c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[3])
+        if contour_index < 0:
+            contour_index = 0
+        
+        self.contour_type_ComboBox.clear()                  
+        c_options = []
+        
+        # New code
+        if len(myaxes) > 1:
+            for iax in np.arange(len(myaxes)):
+                for jax in np.arange(len(myaxes)):
+                    if myaxes[iax] != myaxes[jax] and myaxes[iax] != 'Z':
+                        if myaxes[iax] == 'Y' and myaxes[jax] == 'X':
+                            pass
+                        else:
+                            c_options.append(myaxes[iax] + '-' + myaxes[jax])
+                            if myaxes[iax] in ['X', 'Y', 'T'] and myaxes[jax] == 'Z':
+                                c_options.append(myaxes[iax] + '-log(' + myaxes[jax] + ')')
                 
-        c_options.append(plotvars.dim_names[1] + '-' + plotvars.dim_names[2])
-        c_options.append(plotvars.dim_names[1] + '-log(' + plotvars.dim_names[2] + ')')
-        c_options.append(plotvars.dim_names[1] + '-' + plotvars.dim_names[3])
-                
-        c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[0])
-        c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[1])
-        c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[2])
-        c_options.append(plotvars.dim_names[3] + '-log(' + plotvars.dim_names[2] + ')')
         self.contour_type_ComboBox.addItems(c_options)
-        self.contour_type_ComboBox.setCurrentIndex(contour_index)
+        if len(c_options) > 0 and contour_index != -1:
+            if len(c_options) - 1 > contour_index:
+                self.contour_type_ComboBox.setCurrentIndex(contour_index)
+            else:
+                self.contour_type_ComboBox.setCurrentIndex(0)            
         plotvars.contour_type = str(self.contour_type_ComboBox.currentText())
+            
+        # Set the dimension titles text to Axis view if axis data
+        self.reset_dimensionButton.setText('Reset Dimensions')
+        if myaxes[0][:2] == 'ax':
+            self.dimension_titles.setText('Axis view')
+            self.reset_dimensionButton.setText('Reset Axes')
 
         # Reset the Line plotting dimensions
         line_index = self.line_type_ComboBox.currentIndex()
+        if line_index < 0:
+            line_index = 0
         self.line_type_ComboBox.clear()
-        l_options =[plotvars.dim_names[0], plotvars.dim_names[1], plotvars.dim_names[2], plotvars.dim_names[3]]
+
+        l_options = []
+        for axis in myaxes:
+            l_options.append(axis)
         self.line_type_ComboBox.addItems(l_options)
-        self.line_type_ComboBox.setCurrentIndex(line_index)          
+        self.line_type_ComboBox.setCurrentIndex(line_index)
         plotvars.line_type = str(self.line_type_ComboBox.currentText())
 
 
         # If the data_window is open reset the data type dropdown 
         if self.data_window:
-        
+
+            # Reset the data
+            Populate_table(self.data_window, initial = False)
+            
             self.data_window.data_ComboBox.clear()
-            dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
-            options = []                            
-                            
-            for i in np.arange(len(dims)):     
-                for j in np.arange(len(dims)):    
-                    xtype = dims[i]
-                    if xtype[:19] == 'dimensioncoordinate':
-                        xtype = 'dim' + xtype[19:]
-                
-                    if len(dims) > 1:
-                        ytype = dims[j]
-                        if ytype[:19] == 'dimensioncoordinate':
-                            ytype = 'dim' + ytype[19:]                    
+            
+            options = []                                            
+            for i in np.arange(len(myaxes)):     
+                for j in np.arange(len(myaxes)):    
+                    xtype = myaxes[i]
+                    if xtype != 'Z':
+                        if len(myaxes) > 1:
+                            ytype = myaxes[j]                  
                     
-                        if xtype != ytype:
-                            if xtype == 'Y' and ytype == 'X':
-                                pass
-                            else:
-                                options.append(xtype + '-' + ytype)
+                            if xtype != ytype:
+                                if xtype == 'Y' and ytype == 'X':
+                                    pass
+                                else:
+                                    options.append(xtype + '-' + ytype)
                 
-                    else:
-                        options.append(xtype)                        
+                        else:
+                            options.append(xtype)                        
 
             self.data_window.data_ComboBox.addItems(options)
-
-
-
-
-
-
-
-        # Any other resets such as transform window collapses?
         
-        
-        
+
+                    
+        # Change the text and visibility of the axis RadioButtons
+        for i in np.arange(plotvars.max_axes):
+            self.axis_RadioButtons[i].setVisible(False)       
+            self.axis_RadioButtons[i].setChecked(False)
+            self.lists[i].setVisible(False)            
+            
+        for i in np.arange(len(myaxes)):
+            self.axis_RadioButtons[i].setText(myaxes[i])
+            self.axis_RadioButtons[i].setVisible(True)    
+
+          
+        # Set the visible axis button and list to be the first
+        self.axis_RadioButtons[0].setChecked(True)        
+        self.lists[0].setVisible(True)
+                    
+        # Add the reset dimension button
+        getattr(self, 'rightHbox3').addWidget(getattr(self, 'reset_dimensionButton'))
+
 
     def dim_traj_reset(self, option):
         '''
          Reset the dimension or trajectory selection to all
         '''
         
-        # Clear the dimension lists and reset the collapse combos to be 'Off'
+        if plotvars.fields is None:
+            return
+        if len(plotvars.fields) == 0:
+            return
+            
         f = deepcopy(plotvars.fields[plotvars.index_number])
-        lists_dim = [self.xlist, self.ylist, self.zlist, self.tlist]
-        lists_collapse = [self.xlist_collapse, self.ylist_collapse,\
-                          self.zlist_collapse, self.tlist_collapse]
-        collapse_combos = [self.collapse_xComboBox, self.collapse_yComboBox,\
-                  self.collapse_zComboBox, self.collapse_tComboBox]
-        dims = ['X', 'Y', 'Z', 'T']
-        dims_small = ['x', 'y', 'z', 't']
+        
+        
+        # ajh - new code
+        index_str = 'f' + str(plotvars.index_number)
+        
+        axis_vals = Cf_funcs.field_axis_values(field=f)
+        
+        
+        mystored = plotvars.stored[index_str]
+        myaxes = mystored['data_axes']
+        
+        
+        # Set all lists to be invisible
+        for i in np.arange(plotvars.max_axes):
+            self.lists[i].setVisible(False)                
+            self.lists_collapse[i].setVisible(False)          
+        
+        # Select all data in the lists
+        for i in np.arange(len(myaxes)):
+            self.lists[i].selectAll()
+            plotvars.stored[index_str]['axes'][i] = -1
 
-        for i in np.arange(4):
-            lists_dim[i].clear()
-            collapse_combos[i].setCurrentIndex(0)
-            field_var = 'f' + str(plotvars.index_number)
-            plotvars.stored_collapses[field_var][dims_small[i]] = 'Off'
-            plotvars.stored_collapse_values[field_var][dims_small[i]] = False
-
-        self.collapse_areaComboBox.setCurrentIndex(0)
-
-        self.collapse_xComboBox.setEnabled(True)
-        self.collapse_yComboBox.setEnabled(True)
-        color = plotvars.text_colour
-        pal = QPalette(self.collapse_xLabel.palette())
-        pal.setColor(QPalette.WindowText, QColor(color))
-        self.collapse_xLabel.setPalette(pal)
-        self.collapse_yLabel.setPalette(pal)
-
-        # Repopulate the dimension lists
-        nx, ny, nz, nt, xvals, yvals, zvals, tvals = Cf_funcs.field_dims(field=f)
-
-        for xval in xvals:
-            QListWidgetItem(str(xval), self.xlist) 
-
-        for yval in yvals:
-            QListWidgetItem(str(yval), self.ylist) 
-
-        for zval in zvals:
-            QListWidgetItem(str(zval), self.zlist) 
-
-        for tval in tvals:
-            QListWidgetItem(str(tval), self.tlist) 
-
-        self.xlist.selectAll()
-        self.ylist.selectAll()
-        self.zlist.selectAll()
-        self.tlist.selectAll()
+                                   
+        # Find which list needs to be displayed based on the selected axis
+        for i in np.arange(len(myaxes)):
+            if self.axis_RadioButtons[i].isChecked():
+                iaxis = i
+                      
+        
+        # Reset any collapses to a value based on all the coordinate data
+        for myindex in np.arange(len(myaxes)):
+            if mystored['collapses'][myindex] != 'Off':
+                indicies = [i.row() for i in self.parent.lists[myindex].selectedIndexes()]
+                mymin = min(indicies)
+                mymax = max(indicies)
 
 
-        # reset the plotvars collapse settings
-        plotvars.collapse_x = 'Off'
-        plotvars.collapse_y = 'Off'
-        plotvars.collapse_z = 'Off'
-        plotvars.collapse_t = 'Off'
+                # Code for bounds calculation
+                myaxis = myaxes[myindex]
+                if myaxis[:3] == 'dim':
+                    myaxis = 'dimensioncoordinate' + myaxis[3:]               
+                
+                coord = f.coord(myaxis)
+                if coord.has_bounds() is False:
+                    bounds = coord.create_bounds()
+                    coord.set_bounds(bounds)
 
-        # Reset the widget visibility and dimension check boxes
-        self.xlist.setVisible(True)
-        self.ylist.setVisible(False)
-        self.zlist.setVisible(False)
-        self.tlist.setVisible(False)
-        self.xlist_collapse.setVisible(False)
-        self.ylist_collapse.setVisible(False)
-        self.zlist_collapse.setVisible(False)
-        self.tlist_collapse.setVisible(False)
+                if not coord.T:
+                    # Code for bounds calculation
+                    mybounds = coord.bounds.array[mymin:mymax+1, :]
+                    val = str((np.max(mybounds) - np.min(mybounds))/2.0 + np.min(mybounds))
+                else:
+                    ref_time = coord.units
+                    ref_calendar = coord.calendar
+                    time_units = cf.Units(ref_time, ref_calendar)
 
-        self.xRadioButton.setChecked(True)
-        self.yRadioButton.setChecked(False)
-        self.zRadioButton.setChecked(False)
-        self.tRadioButton.setChecked(False)
+                    # Code for bounds calculation
+                    mybounds = coord.bounds.array[mymin:mymax+1, :]
+                    midpt = (np.max(mybounds) - np.min(mybounds)) / 2.0 + np.min(mybounds)
+                    val = str(cf.cftime.num2date(midpt, ref_time, ref_calendar))
 
+
+
+                self.lists_collapse[myindex].clear()
+
+                QListWidgetItem(str(val), self.lists_collapse[myindex]) 
+                self.lists_collapse[myindex].selectAll()        
+            
+        if mystored['collapses'][iaxis] == 'Off':
+            self.lists[iaxis].setVisible(True)     
+        else:    
+            self.lists_collapse[iaxis].setVisible(True)             
+
+        
         # Reset the field title
-        self.reset_field_title()
+        self.reset_field_title()       
 
 
 
@@ -2239,221 +2363,28 @@ class Cfview(QMainWindow):
                 obj.setVisible(False)
 
 
-    def collapse_type(self, dim):
-
-        '''
-         Set the collapse widget states in plotvars
-        '''
-        plotvars.collapse_x = self.collapse_xComboBox.currentText()
-        plotvars.collapse_y = self.collapse_yComboBox.currentText()
-        plotvars.collapse_z = self.collapse_zComboBox.currentText()
-        plotvars.collapse_t = self.collapse_tComboBox.currentText()
+ 
 
 
-        # Change the dimension lists
-        f = plotvars.fields[plotvars.index_number]
-        
-        dims = ['x', 'y', 'z', 't']
-        #dims_upper = ['X', 'Y', 'Z', 'T']
-        mycoords = Cf_funcs.find_dim_names(f)
-        
-        lists_dim = [self.xlist, self.ylist, self.zlist, self.tlist]
-        lists_collapse = [self.xlist_collapse, self.ylist_collapse,\
-                          self.zlist_collapse, self.tlist_collapse]
-        combos = [self.collapse_xComboBox, self.collapse_yComboBox,\
-                  self.collapse_zComboBox, self.collapse_tComboBox]
-        collapses = [plotvars.collapse_x, plotvars.collapse_y,\
-                    plotvars.collapse_z, plotvars.collapse_t]
+    def dim_view(self, iaxis):
 
-
-        idim = dims.index(dim)
-        #coord = f.construct(dims_upper[idim])
-        coord = f.construct(mycoords[idim])
-        collapse = collapses[idim]
-        field_key = 'f' + str(plotvars.index_number)
-
-        #  Extract the selected list
-        selected = lists_dim[idim].selectedItems()
-        mylist = []
-        for j in np.arange(len(selected)):
-            mylist.append(str(selected[j].text()))
-
-
-        # Reject collapse if the dimension has just one selected item
-        if len(mylist) == 1:
-            print('\nWarning: Cannot collapse a dimension with just one selected item\n')
-            combos[idim].setCurrentIndex(0)
-            return
-
-        indicies = [i.row() for i in lists_dim[idim].selectedIndexes()]
-        mymin = min(indicies)
-        mymax = max(indicies)
-
-        # Code for bounds calculation
-        if coord.has_bounds() is False:
-            bounds = coord.create_bounds()
-            coord.set_bounds(bounds)
-
-        if idim <= 2:
-            # Code for data value calculation
-            #val_min = np.min(np.array(mylist).astype(np.float))
-            #val_max = np.max(np.array(mylist).astype(np.float))
-            #vals = [(val_max - val_min) / 2.0 + val_min]
-
-            # Code for bounds calculation
-            mybounds = coord.bounds.array[mymin:mymax+1, :]
-            vals = [(np.max(mybounds) - np.min(mybounds))/2.0 + np.min(mybounds)]
-        else:
-            ref_time = coord.units
-            ref_calendar = coord.calendar
-            time_units = cf.Units(ref_time, ref_calendar)
-
-            # Code for data value calculation
-            #times = [min(mylist), max(mylist)]
-            #tmin = cf.Data(times[0], units=time_units)
-            #tmax = cf.Data(times[1], units=time_units)
-            #midpt = (float(tmax.array) - float(tmin.array)) / 2.0 + float(tmin.array)
-            #vals = [str(cf.cftime.num2date(midpt, ref_time, ref_calendar))]
-
-            # Code for bounds calculation
-            mybounds = coord.bounds.array[mymin:mymax+1, :]
-            midpt = (np.max(mybounds) - np.min(mybounds)) / 2.0 + np.min(mybounds)
-            vals = [str(cf.cftime.num2date(midpt, ref_time, ref_calendar))]
-
-
-        # Set collapse in the stored_collapses
-        plotvars.stored_collapses[field_key][dims[idim]] = collapse
-
-
-        lists_collapse[idim].clear()
-        for val in vals:
-            ## print('adding val to idim list', val, idim)
-            QListWidgetItem(str(val), lists_collapse[idim]) 
-            lists_collapse[idim].selectAll()
-
-        plotvars.stored_collapse_values[field_key][dims[idim]] = vals[0]
-
-
-        lists_dim[idim].setVisible(False)
-        lists_collapse[idim].setVisible(True)
-
-        # Set the viewable dimension and collapse data
-        list_vis = [False, False, False, False]
-        list_collapse_vis = [False, False, False, False]
-        list_objs = [self.xlist, self.ylist, self.zlist, self.tlist]
-        list_collapse_objs = [self.xlist_collapse, self.ylist_collapse, self.zlist_collapse, self.tlist_collapse]
-
-        if self.xRadioButton.isChecked():
-            if plotvars.collapse_x == 'Off':
-                list_vis[0] = True
-            else:
-                list_collapse_vis[0] = True
-
-        if self.yRadioButton.isChecked():
-            if plotvars.collapse_y == 'Off':
-                list_vis[1] = True
-            else:
-                list_collapse_vis[1] = True
-
-        if self.zRadioButton.isChecked():
-            if plotvars.collapse_z == 'Off':
-                list_vis[2] = True
-            else:
-                list_collapse_vis[2] = True
-
-        if self.tRadioButton.isChecked():
-            if plotvars.collapse_t == 'Off':
-                list_vis[3] = True
-            else:
-                list_collapse_vis[3] = True
-
-        for i in np.arange(4):
-            list_objs[i].setVisible(list_vis[i])
-            list_collapse_objs[i].setVisible(list_collapse_vis[i])
-
-
-
-        # Reset the field title
-        self.reset_field_title()
-        
-        
-        # Reset table data if data window is open
-        if self.data_window is not None:
-            Populate_table(self.data_window, initial = False)
-
-
-    def collapse_area(self, text):
-        '''
-         Set collapse area if selected
-        '''
-
-        nx = len(self.xlist.selectedItems())
-        ny = len(self.ylist.selectedItems())
-
-        enabled = True
-        index = 0
-
-        if nx < 2 or ny < 2:
-            print('Error - cannot collapse to an area')
-            print('Need more than 1 item for x and y')
-            print('nx = ' + str(nx))
-            print('ny = ' + str(ny))
-        else:
-            if text != 'Off':
-                enabled = False
-                index = plotvars.collapse_types.index(text)
-
-        self.collapse_xComboBox.setCurrentIndex(index)
-        self.collapse_yComboBox.setCurrentIndex(index)
-
-        self.collapse_xComboBox.setEnabled(enabled)
-        self.collapse_yComboBox.setEnabled(enabled)
-
-        color = plotvars.text_colour_insensitive
-        if enabled:
-            color = plotvars.text_colour
-        pal = QPalette(self.collapse_xLabel.palette())
-        pal.setColor(QPalette.WindowText, QColor(color))
-        self.collapse_xLabel.setPalette(pal)
-        self.collapse_yLabel.setPalette(pal)
-
-        # Reset the collapses
-        self.collapse_type('x')
-        self.collapse_type('y')
-
-
-    def dim_view(self, dim):
-        '''
+        '''    
          Set the visible state of the dimension lists and lists_collapse 
         '''
-
-        dims = ['x', 'y', 'z', 't']
-        state = [False, False, False, False]
-        loc = dims.index(dim)
-        state[loc] = True
-        lists = [self.xlist, self.ylist, self.zlist, self.tlist]
-        lists_collapse = [self.xlist_collapse, self.ylist_collapse,\
-                          self.zlist_collapse, self.tlist_collapse]
-        collapses = [plotvars.collapse_x, plotvars.collapse_y,\
-                    plotvars.collapse_z, plotvars.collapse_t]
-
-
-        self.xRadioButton.setChecked(state[0])
-        self.yRadioButton.setChecked(state[1])
-        self.zRadioButton.setChecked(state[2])
-        self.tRadioButton.setChecked(state[3])
-
-        for i in np.arange(4):
-            if state[i]:
-                if collapses[i] == 'Off':
-                    lists[i].setVisible(True)
-                    lists_collapse[i].setVisible(False)
-                else:
-                    lists[i].setVisible(False)
-                    lists_collapse[i].setVisible(True)
-            else:
-                    lists[i].setVisible(False)
-                    lists_collapse[i].setVisible(False)
+                      
+        # Turn RadioButton and list visibilty off
+        for i in np.arange(plotvars.max_axes):
+            self.axis_RadioButtons[i].setChecked(False)
+            self.lists[i].setVisible(False)
+            self.lists_collapse[i].setVisible(False)
+            
+        # Turn on RadioButton and specified list
+        self.axis_RadioButtons[iaxis].setChecked(True)
+        #if self.collapse_ComboBoxes[iaxis].currentText() == 'Off':
+        if plotvars.stored['f' + str(plotvars.index_number)]['collapses'][iaxis] == 'Off':
+            self.lists[iaxis].setVisible(True)
+        else:
+            self.lists_collapse[iaxis].setVisible(True)
 
 
 
@@ -2507,6 +2438,11 @@ class Cfview(QMainWindow):
         self.output_terminal_textEdit.append(text)
 
 
+    
+    
+             
+
+
 
     def reset_field_title(self):
         '''
@@ -2520,58 +2456,59 @@ class Cfview(QMainWindow):
 
         # Check if this field is a trajectory
         traj = False
-        f = deepcopy(plotvars.fields[plotvars.index_number])
-        if f.get_property('featureType', False) is not False:
+        if plotvars.stored['f' + str(plotvars.index_number)]['data_type'] == 'trajectory':
             traj = True
+        
+        f = deepcopy(plotvars.fields[plotvars.index_number])
+        
+        
 
         # Reset the dimension sizes in the field string 
         selected = self.fieldlist.selectedItems()
+        if len(selected) > 1:
+            return
+               
 
+        selected = self.fieldlist.selectedItems()
+        axis_lengths = plotvars.maximum_axis_lengths
         if len(selected) == 1:
-            index_length = plotvars.index_length
-            nx_length = plotvars.nx_length
-            ny_length = plotvars.ny_length
-            nz_length = plotvars.nz_length
-            nt_length = plotvars.nt_length
+            index_str = selected[0].text()[0:6]
+            index_int = int(index_str)
+            new_title = index_str     
+               
+            mystored = plotvars.stored['f' + str(index_int)]
 
-            mylen = 6 + nx_length + 1 + ny_length + 1 + nz_length + 1 + nt_length + 1
+            
+            # Work out the new title
+            for i in np.arange(len(plotvars.maximum_axis_lengths)):
+                
+                axis_str  = (plotvars.maximum_axis_lengths[i] + 1) * ' '
+                myaxes = mystored['data_axes']
+                if i + 1 <= len(myaxes):
 
-            field_title = selected[0].text()[mylen:]
-            index = selected[0].text()[0:6]
+                    mysize = len(self.lists[i].selectedItems())
 
-            lists = [self.xlist, self.ylist, self.zlist, self.tlist] 
-            dims = [0, 0, 0, 0]
-            keys = ['x', 'y', 'z', 't']
-            for i in np.arange(4):
-                vals = [v.row() for v in lists[i].selectedIndexes()]
-                dims[i] = len(vals)
+                    if traj is False:
+                        if mystored['collapses'][i] != 'Off':
+                            mysize = 1
 
 
-                if plotvars.stored_lock is False:
-                    # Reset plotvars.stored_dimensions dictionary
-                    field_key = 'f' + str(plotvars.index_number)
+                    axis_str = str(mysize) + (plotvars.maximum_axis_lengths[i] + 1 - len(str(mysize))) * ' '
 
-                    if len(lists[i]) == len(vals) or len(vals) == 0:
-                        plotvars.stored_dimensions[field_key][keys[i]] = -1
-                    else:
-                        plotvars.stored_dimensions[field_key][keys[i]] = vals
+                new_title += axis_str
 
-    
-            collapses = [plotvars.collapse_x, plotvars.collapse_y, plotvars.collapse_z, plotvars.collapse_t]
-            field_key = 'f' + str(plotvars.index_number)
- 
-            for i in np.arange(4):
-                collapses[i] = plotvars.stored_collapses[field_key][keys[i]]
 
-                if collapses[i] != 'Off':
-                    dims[i] = 1
-    
-            new_title = index 
-            new_title += str(dims[0]) +  (nx_length + 1 - len(str(dims[0]))) * ' '
-            new_title += str(dims[1]) +  (ny_length + 1 - len(str(dims[1]))) * ' '
-            new_title += str(dims[2]) +  (nz_length + 1 - len(str(dims[2]))) * ' '
-            new_title += str(dims[3]) +  (nt_length + 1 - len(str(dims[3]))) * ' '
-            new_title += field_title
+
+        # Store selected indicies
+        for i in np.arange(len(mystored['data_axes'])):
+            vals = [v.row() for v in self.lists[i].selectedIndexes()]
+            if plotvars.stored_lock is False:
+                if len(self.lists[i]) == len(vals) or len(vals) == 0:
+                    plotvars.stored['f' + str(index_int)]['axes'][i] = -1
+                else:
+                    plotvars.stored['f' + str(index_int)]['axes'][i] = vals
+        
+
 
 
             # Find the field widget titles
@@ -2580,26 +2517,100 @@ class Cfview(QMainWindow):
 
             # Make a different title if this field is a trajectory
             if traj:
-                field_title = field_widget_names[0].split(' ')[-1]
+                new_title += '  '
+            
+            
+            
+            field_widget_title = 'index '
+            myaxes = plotvars.stored['f' + str(plotvars.index_number)]['data_axes']
+            for i in np.arange(len(plotvars.maximum_axis_lengths)):
+                title_axis_label = (plotvars.maximum_axis_lengths[i] + 1) * ' '
+                if i + 1 <= len(myaxes):
+                    title_axis_label = 'n' + myaxes[i] + (plotvars.maximum_axis_lengths[i] - len(myaxes[i])) * ' '
+                field_widget_title += title_axis_label
+            if traj is False:
+                field_widget_title += 'field name'
+            else:
+                field_widget_title += ' field name'
 
-                new_title = index + str(dims[0])
-                new_title += (nx_length + 1 - len(str(dims[0]))) * ' ' + 4 * ' '
-                new_title += field_title
 
-                    
+        new_title += mystored['field_name']
 
-            self.field_titles.setText(field_widget_title)
+        self.field_titles.setText(field_widget_title)
+        
+        
+        # Set tooltip for field_titles if a dim is in the field_widget_title
+        tip = ''
 
-            selected[0].setText(new_title)
+        traj = False
+        if plotvars.stored['f' + str(plotvars.index_number)]['data_type'] == 'trajectory':
+            traj = True
+            
 
-        # Reset table data if data window is open
-        if self.data_window is not None:
-            Populate_table(self.data_window, initial = False)
+        if not traj:
+            mydims = field_widget_title.split(' ')
+            dims = Cf_funcs.find_dim_names(f)
+
+            dcoords = list(f.coords())
+            daxes = list(f.get_data_axes())
+            
+            # Convert f.get_data_axes() 'domainaxis1' output to 'dimensioncoordinate1'
+            for iaxis in np.arange(len(daxes)):
+                for idim in np.arange(len(dcoords)):
+                    if daxes[iaxis] == f.get_data_axes(dcoords[idim])[0]:
+                        daxes[iaxis] = dcoords[idim]
+
+            # Reverse coordinates so that they are of the form X, Y, Z, T
+            daxes.reverse()
+        
+            if len(dims) == len(daxes):
+                dim_names = []
+                for idim in np.arange(len(daxes)):
+                    dim_names.append(f.coord(dims[idim]).identity())
+                    if dims[idim][:3] == 'dim':
+                        dims[idim] = 'dim' + dims[idim][19:]               
+                    if daxes[idim][:3] == 'dim':
+                        daxes[idim] = 'dim' + daxes[idim][19:]          
+        
+                # Assemble tip information
+                for idim in np.arange(len(dims)):
+                    tip += dims[idim] + ' : ' + daxes[idim] + ' : ' + dim_names[idim]
+                    if idim + 1 < len(dims):
+                        tip += '\n'
+                
+        
+        # Set field tip information
+        self.field_titles.setToolTip(tip) 
+        
+        selected[0].setText(new_title)
+
+
+        # Set lists and lists_collapse visibility based on the selected axis radio button and collapse status
+        for i in np.arange(plotvars.max_axes):
+             self.lists[i].setVisible(False)
+             self.lists_collapse[i].setVisible(False)       
+
+        iaxis = 0
+        for i in np.arange(len(myaxes)):
+            if self.axis_RadioButtons[i].isChecked():
+                iaxis = i
+                
+        
+        if traj is False:
+            if plotvars.stored['f' + str(index_int)]['collapses'][iaxis] == 'Off':
+                self.lists[iaxis].setVisible(True)
+            else:
+                self.lists_collapse[iaxis].setVisible(True)
+                items = []
+                for index in np.arange(self.lists_collapse[iaxis].count()):
+                    items.append(self.lists_collapse[iaxis].item(index))
+
 
 
 
     def menu(self, value):
         '''Pop up a window based on which defaults are required'''
+        
 
         if value.text() == 'cfview defaults':
             if self.cfview_defaults is None:
@@ -2625,30 +2636,40 @@ class Cfview(QMainWindow):
             
             new_name = selected.text()
             QListWidgetItem(deepcopy(new_name), self.fieldlist)
-            plotvars.stored_dimensions['f' + str(next)] = deepcopy(plotvars.stored_dimensions['f' + str(index)])
-            plotvars.stored_collapses['f' + str(next)] = deepcopy(plotvars.stored_collapses['f' + str(index)])
-            plotvars.stored_collapse_values['f' + str(next)] = deepcopy(plotvars.stored_collapse_values['f' + str(index)])
+            plotvars.stored['f' + str(next)] = deepcopy(plotvars.stored['f' + str(index)])
             plotvars.fields.append(deepcopy(plotvars.fields[index]))
 
-            # Set the new index number
-            index_length = plotvars.index_length
-            
-            new_title = str(plotvars.next_field_index) + (6 - len(str(plotvars.next_field_index))) * ' ' + selected.text()[6:]
+            # Set the new index number in the field title
+            new_title = str(next) + (6 - len(str(next))) * ' ' + selected.text()[6:]
 
-            self.fieldlist.item(next).setText(new_title)
+            self.fieldlist.item(next).setText(new_title)      
+            plotvars.field_widget_names.append(new_title)
+            
 
             # Set a new line in plotvars.data_source_list
-            plotvars.data_source_list.append('Copied')
+            plotvars.stored['f' + str(next)]['source'] = 'Copied'
             plotvars.next_field_index += 1
 
-        if value.text() == 'Delete selected fields':
-            while len(self.fieldlist.selectedIndexes()) > 0:
-                index = int(self.fieldlist.currentItem().text().split(' ')[0])
-                plotvars.fields[index].standard_name = 'deleted'
-                self.fieldlist.currentItem().setText('deleted')
-                self.fieldlist.takeItem(self.fieldlist.selectedIndexes()[0].row())
 
+        if value.text() == 'Delete selected fields':
+        
+            listItems=self.fieldlist.selectedItems()
+            indicies = [i.row() for i in self.fieldlist.selectedIndexes()]
             
+            # Call menu agin with "Delete all fields" if all fields selected
+            if len(indicies) == len(self.fieldlist):
+                self.menu(QAction('Delete all fields'))
+                return
+            
+            if not listItems: 
+                return        
+            for i in np.arange(len(listItems)):
+                self.fieldlist.takeItem(self.fieldlist.row(listItems[i]))
+
+                plotvars.fields[indicies[i]].standard_name = 'deleted'
+
+            if len(self.fieldlist) > 0:
+                self.fieldlist.setCurrentRow(0)
 
 
         if value.text() == 'Delete all fields':
@@ -2660,20 +2681,17 @@ class Cfview(QMainWindow):
             plotvars.fields = None
             plotvars.field_widget_indicies = None
 
-            plotvars.stored_dimensions = {}
-            plotvars.stored_collapses = {}
-            plotvars.stored_collapse_values = {}
-            self.xlist.clear()
-            self.ylist.clear()
-            self.zlist.clear()
-            self.tlist.clear()
-
-
+            plotvars.stored = {}
+            for i in np.arange(plotvars.max_axes):
+                self.lists[i].clear()
+                self.lists_collapse[i].clear()                
+                
 
         if value.text() == 'contour levels':
             if self.contour_levels is None:
                 self.contour_levels = Contour_levels_window(self.parent)
             self.contour_levels.show()
+
 
         if value.text() == 'colour scale':
             if self.colour_scale is None:
@@ -2725,8 +2743,8 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 2.7.0</b><p>'
-            html += 'cfview is a netCDF and Met Ofice file format data analysis and viewer for the atmospheric sciences '
+            html += '<b>This is version 2.9.0</b><p>'
+            html += 'cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data'
             html += '<p>'
             html += 'cfview uses:<br>'
             html += '<b>cf-python</b> - data I/O and manipulation<br>'
@@ -2735,7 +2753,7 @@ class Cfview(QMainWindow):
             html += 'http://ajheaps.github.io/cf-plot<P>'
             html += '<b>PyQt5</b> - GUI toolkit<p>'
             html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS March 2022'
+            html += '&#169; NCAS CMS January 2023'
             self.about_help = Help(html)
             self.about_help.show()
 
@@ -2743,13 +2761,12 @@ class Cfview(QMainWindow):
             html = '<body><h2>Using cfview</h2>'
             html += 'cfview is available for the Unix and Mac platforms<p>'
             html += '<h4>Starting cfview</h4>'
-            html += 'On the command line type<br><b>cfview</b><br>or<br><b>cfview datafile</b><p> At the moment cfview '
-            html += 'accepts just one data file for input at a time - this will change in a future version. '
+            html += 'On the command line type<br><b>cfview</b><br>or<br><b>cfview datafile(s)</b><p>'
             html += 'Valid input formats match those of cf-python - netCDF, Met Office PP and fields files.<p>'
             html += '<h4>The main interface</h4>'
             html += 'The main interface has a list of fields on the top left with and an index number and the '
             html += 'number of x, y, z and t values for a field.  The fields can be ordered by index or field name '
-            html += 'and a search function for when there are many fields in the dataset<p>'
+            html += 'and a search function is useful for when there are many fields in the dataset<p>'
             html += 'An output messages panel lies underneath the fields listing. '
             html += 'On the right hand side a dimension view panel has x, y, z and t radio buttons to allow showing of '
             html += 'the four dimension values'
@@ -2762,11 +2779,18 @@ class Cfview(QMainWindow):
             html += 'plot can be changed using the dropdown menu above the dimension viewing panel. Contour, '
             html += 'contour level, maps and colour scales can be changed using the Setup menu item.  Once changed the '
             html += 'new settings are persistent until reset or changed again.<p>'  
+            html += '<h4>Unrecognised or multiple dimensions of the same type</h4>'
+            html += 'Dimensions not recogised as X, Y, Z, T dimensions are labelled as cf-python sees them - dim0, dim1 etc.'
+            html += 'If several dimensions exist of the same type in the data i.e. a Z coordinate and a Z auxiliary '
+            html += 'coordinate then the coordinates are labelled as dim1 etc as cf-python cannot know which Z coordinate '
+            html += 'is intended.  Hovering the mouse over the field <b>Index nX nY ndim1 field name</b> box will show a tool tip '
+            html += 'box with the dimensions and their associated names.  These can also be seen in more detail in the '
+            html += 'View -> properties pop up window' 
             html += '<h4>Default settings</h4>'
             html += 'Default settings for fonts, font size and interface colour theme are changed in the Setup '
             html += '-> cfview defaults menu item. Contour settings are also save to the cfview defaults file with is '
             html += 'generally ~/.cfview_defaults.  To load in the new defaults start cfview again.  If the defaults file '
-            html += 'is ~.cfview_defaults then no additional command line arguments are required.  For a different defaults '
+            html += 'is ~/.cfview_defaults then no additional command line arguments are required.  For a different defaults '
             html += 'file use<br><b>cfview -d mydefaults.file datafile</b><p>'
 
 
@@ -2828,7 +2852,7 @@ class Cfview_defaults_window(QWidget):
         font_Slider = QSlider(Qt.Horizontal)
         font_Slider.sliderMoved.connect(self.fontsize)
         font_Slider.setRange(2, 25)
-        font_Slider.setValue(15)
+        font_Slider.setValue(plotvars.fontsize)
 
         # Find available fonts
         db = QFontDatabase()
@@ -3294,6 +3318,7 @@ class Save_defaults():
             datafile.write('lines ' + str(plotvars.lines) + '\n')
             datafile.write('line_labels ' + str(plotvars.line_labels) + '\n')
             datafile.write('titles ' + str(plotvars.titles) + '\n')
+            datafile.write('nlevs ' + str(plotvars.nlevs) + '\n')            
             datafile.close()
 
 
@@ -4330,19 +4355,25 @@ class Contour_window(QWidget):
         # Text box labels
         titleLabel = QLabel('title')
         zero_thickLabel = QLabel('zero_thick')
-
+        contour_options = QLabel('contour options:')
+        colorbar_options = QLabel('colorbar options:')
+        title_options = QLabel('title options:')
+        nlevsLabel = QLabel('Number of levels')
+        
         # Text boxes
         titleTextBox = QLineEdit()
         titleTextBox.setText('')
         titleTextBox.textChanged.connect(lambda: self.textbox_changed('title'))
         zero_thickTextBox = QLineEdit()
         zero_thickTextBox.setText('')
-        zero_thickTextBox.textChanged.connect(lambda: self.textbox_changed('zero_thick'))
+        zero_thickTextBox.textChanged.connect(lambda: self.textbox_changed('zero_thick')) 
+        nlevsTextBox = QLineEdit()
+        nlevsTextBox.setText(plotvars.nlevs)
+        nlevsTextBox.textChanged.connect(lambda: self.textbox_changed('nlevs'))       
 
 
-
-        types = ['fill', 'blockfill', 'blockfill_fast', 'lines', 'line_labels', 'colorbar', 'automatic', 'horizontal', 'vertical']
-        status = [True, False, False, False, False, True, True, False, False]
+        types = ['fill', 'blockfill', 'blockfill_fast', 'lines', 'line_labels', 'colorbar', 'automatic', 'horizontal', 'vertical', 'titles']
+        status = [plotvars.fill, plotvars.blockfill, plotvars.blockfill_fast, plotvars.lines, plotvars.line_labels, True, True, False, False, True]
         for i in np.arange(len(types)):
             setattr(self, types[i] + 'CheckBox', QCheckBox(types[i]))
             getattr(self, types[i] + 'CheckBox').setChecked(status[i])
@@ -4353,12 +4384,12 @@ class Contour_window(QWidget):
         self.zero_thickLabel = zero_thickLabel
         self.titleTextBox = titleTextBox
         self.zero_thickTextBox = zero_thickTextBox
-
-
+        self.nlevsTextBox = nlevsTextBox
 
         # Set the layout
         vbox = QVBoxLayout()
 
+        vbox.addWidget(contour_options)
         hbox_types = QHBoxLayout()
         hbox_types.addWidget(self.fillCheckBox)
         hbox_types.addWidget(self.blockfillCheckBox)
@@ -4366,18 +4397,29 @@ class Contour_window(QWidget):
         hbox_types.addWidget(self.linesCheckBox)
         hbox_types.addWidget(self.line_labelsCheckBox)
         vbox.addLayout(hbox_types)
+        hbox_nlevs = QHBoxLayout()
+        hbox_nlevs.addWidget(nlevsLabel)
+        hbox_nlevs.addWidget(nlevsTextBox)
+        vbox.addLayout(hbox_nlevs)
+        
+        vbox.addWidget(HLine())
 
-        hbox_titles = QHBoxLayout()
-        hbox_titles.addWidget(self.titleLabel)
-        hbox_titles.addWidget(self.titleTextBox)
-        vbox.addLayout(hbox_titles)
-
+        vbox.addWidget(colorbar_options)
         hbox_colourbar = QHBoxLayout()
         hbox_colourbar.addWidget(self.colorbarCheckBox)
         hbox_colourbar.addWidget(self.automaticCheckBox)
         hbox_colourbar.addWidget(self.horizontalCheckBox)
         hbox_colourbar.addWidget(self.verticalCheckBox)
         vbox.addLayout(hbox_colourbar)
+        
+        vbox.addWidget(HLine())       
+
+        vbox.addWidget(title_options)
+        hbox_titles = QHBoxLayout()
+        hbox_titles.addWidget(self.titlesCheckBox)
+        hbox_titles.addWidget(self.titleLabel)
+        hbox_titles.addWidget(self.titleTextBox)
+        vbox.addLayout(hbox_titles)
 
 
         # The buttons
@@ -4463,6 +4505,15 @@ class Contour_window(QWidget):
         else:
             color = plotvars.text_colour_insensitive
             enabled = False
+            
+        if self.titlesCheckBox.isChecked():
+            plotvars.titles = True
+        else:
+            plotvars.titles = False
+        print('plotvars.titles is ', plotvars.titles)
+            
+            
+            
 
         objs = [self.automaticCheckBox, self.horizontalCheckBox, self.verticalCheckBox]
         for obj in objs:
@@ -4483,11 +4534,13 @@ class Contour_window(QWidget):
         self.linesCheckBox.setChecked(False)
         self.line_labelsCheckBox.setChecked(False)
         self.titleTextBox.setText('')
+        self.nlevsTextBox.setText('')
 
         self.automaticCheckBox.setChecked(True)
         self.horizontalCheckBox.setChecked(False)
         self.verticalCheckBox.setChecked(False)
-
+        self.titlesCheckBox.setChecked(True)
+        
         plotvars.fill = True
         plotvars.blockfill = False
         plotvars.blockfill_fast = False
@@ -4495,13 +4548,15 @@ class Contour_window(QWidget):
         plotvars.line_labels = False
         plotvars.text = ''
         plotvars.colorbar_orientation = None
+        plotvars.nlevs = False
+        plotvars.titles = True
 
     def textbox_changed(self, text):
 
         textbox = getattr(self, text + 'TextBox') 
-        setattr(plotvars, text, textbox.text()) 
-
-
+        setattr(plotvars, text, textbox.text())         
+        
+        
     def help(self):
 
         if self.contour_help is None:
@@ -4512,8 +4567,9 @@ class Contour_window(QWidget):
             html += 'grid will not be readily visible until the plot is zoomed in<p>'
             html += 'blockfill_fast uses the matplotlib pcolormesh blockfill method which can produce '
             html += 'different results from blackfill for low resolution data and for higher latitudes.'
-            html += 'It is though much faster for higher resolution data.'
-
+            html += 'It is though much faster for higher resolution data.<p>'
+            html += 'The number of levels is an integer and generally would have a value between 10 to 256)'
+            html += 'Finer contour level selection is available in the Setup -> contour levels pop up window.<p>'
             self.contour_help = Help(html)
 
         self.contour_help.show()
@@ -4629,7 +4685,8 @@ class Data_window(QWidget):
         
         # Plot type dropdown
         data_ComboBox = QComboBox()
-        dims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
+        f = plotvars.fields[plotvars.index_number]
+        dims = Cf_funcs.find_dim_names(f)
         
         options = []
         
@@ -4653,7 +4710,24 @@ class Data_window(QWidget):
                 else:
                     options.append(xtype)        
                         
+        if plotvars.dim_names[0] == 'ax0':
+            if plotvars.dim_names[1] != 'ax1':
+                print('Not enough axes to make a data view')
+                return
+                
+            axes = []
+            for i in np.arange(len(f.get_data_axes())):
+                axes.append('ax' + str(i))
+                    
+            for i in np.arange(len(axes)):     
+                for j in np.arange(len(axes)):    
+                    xtype = axes[i]
+                    ytype = axes[j]
+                    if xtype != ytype:
+                        options.append(xtype + '-' + ytype)
                         
+            
+            
                     
         data_ComboBox.addItems(options)
         data_ComboBox.currentTextChanged.connect(self.view_changed)
@@ -4738,6 +4812,7 @@ class Data_window(QWidget):
         table = QTableView()
         self.table = table
         
+
         Populate_table(self)
         
         # Align column labels to the left
@@ -4822,6 +4897,7 @@ class Data_window(QWidget):
         selected = self.table.selectionModel().selectedIndexes()
 
         if selected:
+            con_args ={}
             xvals = []
             yvals = []
             for item in selected:
@@ -4832,154 +4908,26 @@ class Data_window(QWidget):
             maxx = max(xvals)
             miny = min(yvals)
             maxy = max(yvals)
-
             
-            # Form the subspace dictionary from the currently selected data'''
-            index = plotvars.index_number
-            f = deepcopy(plotvars.fields[index])
-
-
-            # Form the subspace dictionary
-            nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f)
-            dim_sizes = [nx, ny, nz, nt]
-            dims = Cf_funcs.find_dim_names(f)
-            for i in np.arange(len(dims)):
-                if dims[i][:3] == 'dim':
-                    dims[i] = 'dimensioncoordinate' + dims[i][3:]
-
-
-            # Extract the selected plot type
+            
+            mycoords = Cf_funcs.find_dim_names(self.field)
+            for i in np.arange(len(mycoords)):
+               if mycoords[i][:19] == 'dimensioncoordinate':
+                   mycoords[i] = 'dim' + mycoords[i][19:]
+            
             mytypes = self.data_ComboBox.currentText().split('-')
-            myx = mytypes[0]
-            if myx[:3] == 'dim':
-                myx = 'dimensioncoordinate' + myx[3:]
-            if len(dims) == 1:
-                myx = dims[0]         
-            
             if len(mytypes) == 2:
+                myx = mytypes[0]
                 myy = mytypes[1]
-                if myy[:3] == 'dim':
-                    myy = 'dimensioncoordinate' + myy[3:]
-            else:
-                myy = 'one dimensional data'
-                       
-            
-            lists = [self.parent.xlist.selectedItems(), self.parent.ylist.selectedItems(),\
-                     self.parent.zlist.selectedItems(), self.parent.tlist.selectedItems()]
-            collapses = [plotvars.collapse_x, plotvars.collapse_y,\
-                     plotvars.collapse_z, plotvars.collapse_t]
-            subspace_args ={}
-            
-            nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=f)
-            
-            
-            dims_field = [self.parent.xRadioButton.text(), self.parent.yRadioButton.text(), \
-                          self.parent.zRadioButton.text(), self.parent.tRadioButton.text()]
-            for i in np.arange(4):
-                if len(dims_field[i]) == 1:
-                    dims_field[i] = dims_field[i].upper()
-                if dims_field[i][:3] == 'dim':
-                    dims_field[i] = 'dimensioncoordinate' + dims_field[i][3:]
-    
-                         
-            for i in np.arange(4):
-                vals = []
-                for j in np.arange(len(lists[i])):
-                    vals.append(str(lists[i][j].text()))
-
-
-                if any(dim == dims_field[i] for dim in [myx, myy]):
-                    if np.size(vals) < 2:
-                        con_okay = False
-                else:
-                    if collapses[i] == 'Off':
-                        if dim_sizes[i] > 1:
-                            vals = [vals[0]]
-
-                if len(vals) != dim_sizes[i]:
-                    if len(vals) == 1:
-
-                        if collapses[i] == 'Off':
-                            if dims_field[i] != 'T':
-                                subspace_args[dims_field[i]] = float(vals[0])
-                            else:
-                                subspace_args[dims_field[i]] = cf.dt(vals[0])
-                    else:
-                        if dims_field[i] != 'T':
-                            # cf.wi needs to go from min to max but the widget return
-                            # goes in order of selection
-                            val1 = np.min(np.array(vals).astype(np.float))
-                            val2 = np.max(np.array(vals).astype(np.float))
-                            subspace_args[dims_field[i]] = cf.wi(val1, val2)
-                        else:
-                            val1 = min(vals)
-                            val2 = max(vals)
-                            subspace_args[dims_field[i]] = cf.wi(cf.dt(val1), cf.dt(val2))
-
-            # Apply list subspace args
-            if len(subspace_args) > 0:
-                f = f.subspace(**subspace_args)
                 
-                
-            # Apply collapse args
-            com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
-
-            if len(com_collapse) > 0:
-                f = f.collapse(com_collapse[1:-1])
-
-                           
-                
-            # Apply subspace based on cells selected
-            myxmin = f.coord(myx).array[minx]
-            myxmax = f.coord(myx).array[maxx]
-            if myxmin > myxmax:
-                myxmin, myxmax = myxmax, myxmin
-                
-            
-            # Form new_subspace_args    
-            new_subspace_args = {}
-            if myxmin != myxmax:
-                new_subspace_args[myx] = cf.wi(myxmin, myxmax)
-            else:
-                new_subspace_args[myx] = myxmin    
-                
-            if myy == 'one dimensional data':
-                if len(new_subspace_args) > 0:
-                    f = f.subspace(**new_subspace_args)
-                    
-                cfp.lineplot(f, titles=True)
-                return
-                
-                
-                
-            myymin = f.coord(myy).array[miny]
-            myymax = f.coord(myy).array[maxy]  
-            if myymin > myymax:
-                myymin, myymax = myymax, myymin                      
-            
-            new_subspace_args = {}
-            if myxmin != myxmax:
-                new_subspace_args[myx] = cf.wi(myxmin, myxmax)
-            else:
-                new_subspace_args[myx] = myxmin
-            if myymin != myymax:
-                new_subspace_args[myy] = cf.wi(myymin, myymax)
-            else:
-                new_subspace_args[myy] = myymin    
-                           
-            if len(new_subspace_args) > 0:
-                f = f.subspace(**new_subspace_args)
-            
-            
+                if mycoords.index(myx) > mycoords.index(myy):
+                    minx, maxx, miny, maxy = miny, maxy, minx, maxx
+                    con_args['swap_axes'] = True 
 
             
-            
-            
-            plot_type = 'single point selected'
-            
+            # Contour plot
             if maxx > minx and maxy > miny:
-                plot_type = 'contour'
-                con_args ={}
+
                 if plotvars.fill and not plotvars.lines:
                     con_args['lines'] = False
                 if not plotvars.fill and plotvars.lines:
@@ -5002,7 +4950,6 @@ class Data_window(QWidget):
                     con_args['blockfill_fast'] = True
                     con_args['lines'] = True                   
                     
-
                 if plotvars.lines and not plotvars.line_labels:
                     con_args['line_labels'] = False
 
@@ -5012,21 +4959,36 @@ class Data_window(QWidget):
                 if plotvars.contour_type[0] == 't':
                     con_args['swap_axes'] = True 
 
-                cfp.con(f, **con_args)
-
-            if maxx > minx and miny == maxy:
-                plot_type = 'line'
-                cfp.lineplot(f, titles=True)
+                cfp.con(self.field[miny:maxy, minx:maxx], **con_args)
                 
+                
+            idims = len(self.field.get_data_axes())
+                
+            # Line plots
+            if maxx > minx and miny == maxy:
+                if idims == 2:
+                    cfp.lineplot(self.field[miny, minx:maxx], titles=True)
+                elif idims == 1:
+                    cfp.lineplot(self.field[minx:maxx], titles=True)
+                else:
+                    print('view data - lineplot issue - ndims is not 1 or 2')    
+                                   
             if maxx == minx and maxy > miny:
-                plot_type = 'line'
-                cfp.lineplot(f, titles=True)
+                if idims == 2:
+                    cfp.lineplot(self.field[miny:maxy, minx], titles=True)
+                elif idims == 1:
+                    cfp.lineplot(self.field[miny:maxy], titles=True)
+                else:
+                    print('view data - lineplot issue - ndims is not 1 or 2')
+                    
+            if minx == maxx and miny == maxy:
+                print('\n\nPloting error - only a single point selected\n\n')                
+                
 
         else:
             print('\n\nError - No data selected\n\n')
 
-        if plot_type == 'single point selected':
-            print('\n\nError - Only a single point selected\n\n')
+
 
 
 
@@ -5120,8 +5082,9 @@ class Populate_table():
     def change_table(self):
    
         # Set the field
-        f = plotvars.fields[plotvars.index_number]
+        f = deepcopy(plotvars.fields[plotvars.index_number])
 
+        
         mytypes = self.parent.data_ComboBox.currentText().split('-')
         if len(mytypes) == 2:
             myx = mytypes[0]
@@ -5136,9 +5099,14 @@ class Populate_table():
         if myy[:3] =='dim':
             myy = 'dimensioncoordinate' + myy[3:]           
 
+
         
         subspace_args = Cf_funcs.subspace_args(self.parent, plotvars.index_number, call_data=True)
-        
+
+        # Return if myx is unset
+        if myx == '':
+            return
+
         
         # Perform subspace
         f = f.subspace(**subspace_args)
@@ -5251,7 +5219,7 @@ class Populate_table():
         self.parent.table.setModel(model)
         
 
-
+        self.parent.field = f.squeeze()
         self.parent.data = data
         self.parent.x = x
         self.parent.y = y
@@ -5530,29 +5498,6 @@ class Names_window(QWidget):
         
         
         
-        # Reset new_property_window radio buttons in case a dimension has changed
-        #if self.new_property_window is not None:
-
-        #    #Set radio buttons to be initially invisible
-        #    radiobuttons = [self.new_property_window.xRadioButton, self.new_property_window.yRadioButton,\
-        #                    self.new_property_window.zRadioButton, self.new_property_window.tRadioButton]
-                            
-        #    #Set radio buttons to be initially invisible
-        #    for i in np.arange(4):
-        #        radiobuttons[i]. setVisible(False)
-            
-        #    # Change radio button names based on field dimension names and make visible
-        #    mydims = Cf_funcs.find_dim_names(plotvars.fields[plotvars.index_number])
-
-        #    for i in np.arange(len(mydims)):
-        #        if mydims[i] in ['X', 'Y', 'Z', 'T']:
-        #            mydims[i] = mydims[i].lower()
-        #        if mydims[i][:19] == 'dimensioncoordinate':
-        #            mydims[i] = 'dim' + mydims[i][-1]
-        #        radiobuttons[i].setText(mydims[i])
-        #        radiobuttons[i].setVisible(True)  
-        
-        
         
         
 
@@ -5715,7 +5660,9 @@ class Populate_names():
             dnames = dims
 
             # Field netCDF name
-            vardict['field.netCDF name'] = ['field', 'netCDF name', field.nc_get_variable(), 'U']
+            field_nc_name = field.nc_get_variable(False)
+            if field_nc_name:
+                vardict['field.netCDF name'] = ['field', 'netCDF name', field_nc_name, 'U']
                     
             # Field properties
             names = sorted(field.properties())
@@ -5728,13 +5675,14 @@ class Populate_names():
                 dname = dnames[i]
                 if field.has_construct(dim):
                     coord = field.coord(dim)
-                    nc_name = coord.nc_get_variable()  
+                    nc_name = coord.nc_get_variable(False)
         
                     # Add dimension netCDF name
-                    name = 'netCDF name'
-                    val_label = 'coord_' + dname + '_' + name
-                    label = dname + ' ' + name
-                    vardict["coord.('"+ dim + "')." + name] = [dim, 'netCDF name', coord.nc_get_variable(), 'U']
+                    if nc_name:
+                        name = 'netCDF name'
+                        val_label = 'coord_' + dname + '_' + name
+                        label = dname + ' ' + name
+                        vardict["coord.('"+ dim + "')." + name] = [dim, 'netCDF name', nc_name, 'U']
                  
                  
                     # Add dimension properties
@@ -5758,7 +5706,8 @@ class Populate_names():
                 dicts.append({})
 
             # Field dict
-            dicts[0]['field.netCDF name'] = vardict['field.netCDF name']
+            if 'field.netCDF name' in dicts[0]:
+                dicts[0]['field.netCDF name'] = vardict['field.netCDF name']
             for var in vardict:
                 vals = vardict[var]
                 mytype = vals[0]
@@ -5790,7 +5739,8 @@ class Populate_names():
                 else:
                     netcdf_name = "coord.('" + dicts[idict][first_key][0] + "').netCDF name"
                         
-                new_dict[netcdf_name]= dicts[idict][netcdf_name]
+                if netcdf_name in new_dict:
+                    new_dict[netcdf_name]= dicts[idict][netcdf_name]
                      
                 for var in dicts[idict]:
                     if dicts[idict][var][1] != 'netCDF name':                        
@@ -6141,10 +6091,38 @@ class Transform_window(QWidget):
         container = QVBoxLayout()
         container.addWidget(scroll)
 
+        # Collpase dimension and area widgets
+        self.collapse_Labels = []  
+        self.collapse_ComboBoxes = [] 
 
+        collapse_types = ['Off', 'mean', 'minimum', 'maximum', 'variance', 'standard_deviation']
+        
+        for i in np.arange(plotvars.max_axes):
+            self.collapse_ComboBoxes.append(QComboBox())
+            self.collapse_ComboBoxes[i].addItems(collapse_types)
+            self.collapse_ComboBoxes[i].setCurrentIndex(0)
+            self.collapse_ComboBoxes[i].setVisible(False)
+            self.collapse_ComboBoxes[i].activated.connect(partial(self.collapse_type, i))
+            self.collapse_Labels.append(QLabel(''))
+                       
+            
+        # Area collapse label and combobox
+        self.collapse_areaLabel = QLabel('Area:')
+        self.collapse_areaLabel.setVisible(False)    
+        self.collapse_areaComboBox = QComboBox()
+        self.collapse_areaComboBox.addItems(collapse_types)
+        self.collapse_areaComboBox.setCurrentIndex(0)
+        self.collapse_areaComboBox.activated.connect(partial(self.collapse_type, -1))
+        self.collapse_areaComboBox.setVisible(False)     
+        
+        
         # Labels
         warningLabel1 = QLabel('Field has not got a recogised pair of longitudes and latitudes')
         warningLabel2 = QLabel('Not all data transform functionality is available\n')
+        warningLabel1.setVisible(False)
+        warningLabel2.setVisible(False)    
+        
+        
         collapseLabel = QLabel('Dimension collapse methods')
         anchorLabel = QLabel('Anchor in longitude:')
         interpolationLabel = QLabel('Interpolation')
@@ -6260,38 +6238,25 @@ class Transform_window(QWidget):
         
         # Set the layout
 
-        #vbox = QVBoxLayout(content_widget)
-        vbox.addWidget(warningLabel1)
-        vbox.addWidget(warningLabel2)
-        
+        # Collapse methods
         vbox.addWidget(collapseLabel)
-
         hbox_area_collapse = QHBoxLayout()
-        hbox_area_collapse.addWidget(self.parent.collapse_areaLabel)
-        hbox_area_collapse.addWidget(self.parent.collapse_areaComboBox)
+        hbox_area_collapse.addWidget(self.collapse_areaLabel)
+        hbox_area_collapse.addWidget(self.collapse_areaComboBox)
         vbox.addLayout(hbox_area_collapse)
-
-        hbox_x_collapse = QHBoxLayout()
-        hbox_x_collapse.addWidget(self.parent.collapse_xLabel)
-        hbox_x_collapse.addWidget(self.parent.collapse_xComboBox)
-        vbox.addLayout(hbox_x_collapse)
-
-        hbox_y_collapse = QHBoxLayout()
-        hbox_y_collapse.addWidget(self.parent.collapse_yLabel)
-        hbox_y_collapse.addWidget(self.parent.collapse_yComboBox)
-        vbox.addLayout(hbox_y_collapse)
-
-        hbox_z_collapse = QHBoxLayout()
-        hbox_z_collapse.addWidget(self.parent.collapse_zLabel)
-        hbox_z_collapse.addWidget(self.parent.collapse_zComboBox)        
-        vbox.addLayout(hbox_z_collapse)
-
-        hbox_t_collapse = QHBoxLayout()
-        hbox_t_collapse.addWidget(self.parent.collapse_tLabel)
-        hbox_t_collapse.addWidget(self.parent.collapse_tComboBox)        
-        vbox.addLayout(hbox_t_collapse)
         
+        for i in np.arange(plotvars.max_axes):
+            hbox_collapse = QHBoxLayout()
+            hbox_collapse.addWidget(self.collapse_Labels[i])
+            hbox_collapse.addWidget(self.collapse_ComboBoxes[i])
+            vbox.addLayout(hbox_collapse)
+
+
         vbox.addWidget(hline1)
+
+        vbox.addWidget(warningLabel1)
+        vbox.addWidget(warningLabel2)        
+
 
         # Anchor box
         hbox_anchor = QHBoxLayout()
@@ -6384,19 +6349,135 @@ class Transform_window(QWidget):
 
         self.show()
         
-        # Change the sensitivity of interpolation etc based on whether 'X' and 'Y' are available
-        dims = plotvars.dim_names
-        if 'x' in dims and 'y' in dims:
-            self.valid_lon_lat(True)
-        else:
-            self.valid_lon_lat(False)
 
 
-    def valid_lon_lat(self, val):
-        # Set widget visibilty based on whether lon and lat pairing are present in this field
+        # Set the collapse visibility based on the field
+        self.Populate_collapses()
         
-        objs = [self.anchorLabel, self.anchorTextBox, self.parent.collapse_areaLabel, \
-                self.parent.collapse_areaComboBox, \
+
+    def collapse_type(self, idim):
+
+        '''
+         Set the collapse widget states in plotvars
+        '''
+        
+        
+        f = deepcopy(plotvars.fields[plotvars.index_number])
+        mystored = plotvars.stored['f' + str(plotvars.index_number)]
+        myaxes = mystored['data_axes']
+        myaxes_long = deepcopy(mystored['data_axes'])
+        for i in np.arange(len(myaxes_long)):
+            if myaxes_long[i][:3] == 'dim':
+                myaxes_long[i] = 'dimensioncoordinate' + myaxes_long[i][3:]
+        mycollapses = mystored['collapses'] 
+        
+          
+        if idim >= 0:
+            mycollapses[idim] = self.collapse_ComboBoxes[idim].currentText()
+            collapse_indicies = [idim]
+            
+        if idim == -1:
+            mycollapses[myaxes.index('X')] = self.collapse_areaComboBox.currentText()
+            mycollapses[myaxes.index('Y')] = self.collapse_areaComboBox.currentText()
+            collapse_indicies = [myaxes.index('X'), myaxes.index('Y')]
+            
+            
+        for myindex in collapse_indicies:
+
+        
+            indicies = [i.row() for i in self.parent.lists[myindex].selectedIndexes()]
+            mymin = min(indicies)
+            mymax = max(indicies)
+
+            # Code for bounds calculation
+            coord = f.coord(myaxes_long[myindex])
+            if coord.has_bounds() is False:
+                bounds = coord.create_bounds()
+                coord.set_bounds(bounds)
+
+            if not coord.T:
+                # Code for bounds calculation
+                mybounds = coord.bounds.array[mymin:mymax+1, :]
+                val = str((np.max(mybounds) - np.min(mybounds))/2.0 + np.min(mybounds))
+            else:
+                ref_time = coord.units
+                ref_calendar = coord.calendar
+                time_units = cf.Units(ref_time, ref_calendar)
+
+                # Code for bounds calculation
+                mybounds = coord.bounds.array[mymin:mymax+1, :]
+                midpt = (np.max(mybounds) - np.min(mybounds)) / 2.0 + np.min(mybounds)
+                val = str(cf.cftime.num2date(midpt, ref_time, ref_calendar))
+
+
+
+            self.parent.lists_collapse[myindex].clear()
+
+            QListWidgetItem(str(val), self.parent.lists_collapse[myindex]) 
+            self.parent.lists_collapse[myindex].selectAll()
+            
+            
+        # Call Populate_collapses for when area is set as both X and Y collapses will change
+        self.Populate_collapses()
+        
+               
+        
+    def Populate_collapses(self):
+        '''
+         Set the collapse widget visibilities
+        '''        
+        
+        if plotvars.fields is None:
+            return
+            
+            
+        f = deepcopy(plotvars.fields[plotvars.index_number])    
+            
+        mystored = plotvars.stored['f' + str(plotvars.index_number)]
+        myaxes = mystored['data_axes']
+        mycollapses = mystored['collapses']
+        
+        # Turn off all collapses to start
+        self.collapse_areaLabel.setVisible(False)
+        self.collapse_areaComboBox.setVisible(False)        
+        for i in np.arange(plotvars.max_axes):
+            self.collapse_ComboBoxes[i].setVisible(False)
+            self.collapse_Labels[i].setVisible(False)
+            
+        # Set area collapse labels and visibility if present and have more than one value
+        if ('X' in myaxes and len(f.coord('X').array) > 1) and ('Y' in myaxes and len(f.coord('Y').array > 1)):
+            self.collapse_areaLabel.setVisible(True)
+            self.collapse_areaComboBox.setVisible(True)
+            myxcollapse = mycollapses[myaxes.index('X')]
+            myycollapse = mycollapses[myaxes.index('Y')]
+            if myxcollapse != 'Off' or myycollapse != 'Off':
+                if myxcollapse == myycollapse:
+                    self.collapse_areaComboBox.setCurrentText(mycollapses[myaxes.index('X')])
+                else:
+                    self.collapse_areaComboBox.setCurrentText('Off')
+            
+            
+        # Set axis collapse labels and visibility if they have more than one value            
+        for i in np.arange(len(myaxes)):
+            if  mystored['axis_sizes'][i] > 1:
+                self.collapse_Labels[i].setText(myaxes[i])
+                self.collapse_Labels[i].setVisible(True)
+                self.collapse_ComboBoxes[i].setVisible(True)
+                self.collapse_ComboBoxes[i].setCurrentText(mycollapses[i])
+        
+        # Store collapses and reset the field title
+        plotvars.stored['f' + str(plotvars.index_number)]['collapses'] = mycollapses
+        
+        
+        
+        
+        # Set widget visibilty based on whether lon and lat pairing are present in this field
+        lonlat = False
+        if 'X' in myaxes and 'Y' in myaxes:
+            lonlat = True
+        
+        objs = [self.anchorLabel, self.anchorTextBox, self.collapse_areaLabel, \
+                self.collapse_areaComboBox, \
                 self.reverse_yCheckBox, self.interpolationLabel, self.interpolation_methodLabel, \
                 self.interp_regularCheckBox, self.lonminTextBox, \
                 self.lonmaxTextBox, self.lonstepTextBox, self.latminTextBox, self.latmaxTextBox, \
@@ -6406,9 +6487,8 @@ class Transform_window(QWidget):
                 self.latstepLabel, self.sourceLabel, self.destinationLabel, self.source_ComboBox, \
                 self.destination_ComboBox, self.hline1, self.hline2, self.hline3]
 
-
         
-        if val:
+        if lonlat:
             self.warningLabel1.setVisible(False)
             self.warningLabel2.setVisible(False)
             for i in np.arange(len(objs)):
@@ -6424,10 +6504,14 @@ class Transform_window(QWidget):
             self.warningLabel2.setPalette(pal)             
             
             for i in np.arange(len(objs)): 
-                objs[i].setVisible(False)
-                    
-                
+                objs[i].setVisible(False)        
+        
+        
+        # Reset the field title        
+        self.parent.reset_field_title()
+        
 
+                
 
     def interp_regular(self, text):
         # Turn sensitvity of interpolation boxes on and off
@@ -6771,46 +6855,17 @@ class Transform_window(QWidget):
         self.destination_ComboBox.setCurrentIndex(0)
         self.interp_regularCheckBox.setChecked(False)
         self.interp_to_anotherCheckBox.setChecked(False)
-        self.parent.collapse_areaComboBox.setCurrentIndex(0)
-        self.parent.collapse_xComboBox.setEnabled(True)
-        self.parent.collapse_yComboBox.setEnabled(True)
-        self.parent.collapse_areaComboBox.setCurrentIndex(0)
-        self.parent.collapse_xComboBox.setCurrentIndex(0)
-        self.parent.collapse_yComboBox.setCurrentIndex(0)
-        self.parent.collapse_zComboBox.setCurrentIndex(0)
-        self.parent.collapse_tComboBox.setCurrentIndex(0)        
         
-        color = plotvars.text_colour
-
-        pal = QPalette(self.parent.collapse_xLabel.palette())
-        pal.setColor(QPalette.WindowText, QColor(color))
-        self.parent.collapse_xLabel.setPalette(pal)
-        self.parent.collapse_yLabel.setPalette(pal)        
-
-        # reset the plotvars collapse settings
-        plotvars.collapse_x = 'Off'
-        plotvars.collapse_y = 'Off'
-        plotvars.collapse_z = 'Off'
-        plotvars.collapse_t = 'Off'
-        dims_small = ['x', 'y', 'z', 't']
-        field_var = 'f' + str(plotvars.index_number)
-        for i in np.arange(4):
-            plotvars.stored_collapses[field_var][dims_small[i]] = 'Off'
-            plotvars.stored_collapse_values[field_var][dims_small[i]] = False
-
-        # Switch back to the appropriate dimension view
-        if self.parent.xRadioButton.isChecked():  
-            self.parent.xlist_collapse.setVisible(False)
-            self.parent.xlist.setVisible(True)
-        if self.parent.yRadioButton.isChecked():  
-            self.parent.ylist_collapse.setVisible(False)
-            self.parent.ylist.setVisible(True)
-        if self.parent.zRadioButton.isChecked():  
-            self.parent.zlist_collapse.setVisible(False)
-            self.parent.zlist.setVisible(True)
-        if self.parent.tRadioButton.isChecked():  
-            self.parent.tlist_collapse.setVisible(False)
-            self.parent.tlist.setVisible(True)            
+        mystored = plotvars.stored['f' + str(plotvars.index_number)]
+        mycollapses = mystored['collapses']
+        self.collapse_areaComboBox.setCurrentText('Off')
+        for i in np.arange(len(mycollapses)):
+            mycollapses[i] = 'Off'
+            self.collapse_ComboBoxes[i].setCurrentText('Off')
+            
+            
+        self.parent.reset_field_title()
+                   
             
 
 
@@ -6885,23 +6940,25 @@ class Data_check():
         # Test if input string is an integer or float
         # Need to match the data to the value
 
+        # Return an integer if string is convertible to one
+        try:
+            return int(val)
+        except ValueError:
+            pass
+            
+
+
         try:
             a = float(val)
-            if a != 0.0:
-                if int(a)/float(a) == 1:
-                    return int(val)
-            else:
-                return int(0)
-                
-            if abs(a) > 0.0:
-                if a/int(a) > 1:
-                    if plotvars.fields[plotvars.index_number].dtype == 'float32':
-                        return np.float32(val)
-                    if plotvars.fields[plotvars.index_number].dtype == 'float64':
-                        return np.float64(val)
-
-            else:
-                return val
+            
+            if plotvars.fields[plotvars.index_number].dtype == 'float32':
+                a = np.float32(val)
+            if plotvars.fields[plotvars.index_number].dtype == 'float64':
+                a = np.float64(val)    
+                             
+            # Float section
+            return a
+            
         except ValueError:
             return str(val)
 
@@ -6985,9 +7042,117 @@ class Cf_funcs():
         return name
 
 
+
+
+    def field_axis_values(field=None):
+        '''Work out the field dimensions on the original field'''
+
+        # Make a copy so any changes are just local
+        field = deepcopy(field)
+
+        vals = []
+        stored_vals = plotvars.stored['f' + str(plotvars.index_number)]
+        myaxes = stored_vals['data_axes']
+        
+        if stored_vals['data_type'] == 'dim':
+            for dim in myaxes:
+                if len(dim) == 1:
+                    mydim = dim
+                else:
+                    mydim = 'dimensioncoordinate' + dim[3:]
+                    
+                if field.dimension_coordinate(mydim).T:
+                    vals.append(field.dimension_coordinate(mydim).dtarray)
+                else:
+                    vals.append(field.dimension_coordinate(mydim).array)
+
+        if stored_vals['data_type'] == 'trajectory':
+            coords = list(field.coords())
+            has_right_coords = 0
+            nx = 0
+            ny = 0
+            nz = 0
+                
+            for mycoord in coords:
+                if field.coord(mycoord).nc_get_variable() == 'longitude':
+                    nx = np.shape(field.auxiliary_coordinate('longitude').array)[0]
+                    has_right_coords += 1
+                if field.coord(mycoord).nc_get_variable() == 'latitude':
+                    ny = np.shape(field.auxiliary_coordinate('latitude').array)[0]
+                    has_right_coords += 1
+                if field.coord(mycoord).nc_get_variable() == 'time':
+                    nt = np.shape(field.auxiliary_coordinate('time').array)[0]
+                    has_right_coords += 1
+                        
+                # has_right_coords must be 3 for a correctly defined trajectory field
+                # We don't print an error here as this produces too much output in the message panel
+                # It it obvious this is not a trajectory field though as it has zero tracks and trying
+                # to plot it using cf-plot gives a reasonable error message to this effect
+                        
+            vals.append(np.arange(nx))
+            vals.append(np.arange(ny))
+            vals.append(np.arange(nt))
+
+
+        if stored_vals['data_type'] == 'axis':
+
+            # Set the data_shape
+            # Just in case the units are messed up we need to do a try / except construct
+            try:
+                data_shape  = np.shape(field.array)
+            except:
+                field.del_property('units')
+                field.set_property('units', 'K')
+                data_shape = np.shape(field.array)
+
+            axes = field.get_data_axes()
+            ncnames = []
+            
+            if len(axes) == 1:
+                vals.append(field.array)
+                
+            if len(axes) > 1:
+                ncnames = [] 
+                for i in np.arange(len(axes)):
+                    axis = field.domain_axis(axes[i]).nc_get_dimension()
+                    ncnames.append(axis)
+                
+                for i in np.arange(len(data_shape)):
+                    # Set dim_sizes and dim_values to initial values in case the netCDF variable 
+                    # is not found in plotvars.fields
+
+                    myvals = np.arange(data_shape[i])
+                    
+                    
+                    # Search plotvars.fields netCDF variables and set dim_sizes and dim_values if a matching axis is found
+                    for j in np.arange(len(plotvars.fields)):
+                        f = plotvars.fields[j]
+                        myaxes = f.get_data_axes()
+                        if len(myaxes) == 1:
+                            myaxis = myaxes[0]
+                            if ncnames[i] == f.domain_axis(myaxis).nc_get_dimension():
+                                myvals = f.array
+                                
+                    vals.append(myvals)
+        
+        # Return axis values
+        return vals
+
+
+
+
+
+
+
+
+
+
     def field_dims(field=None):
         '''Work out the field dimensions on the original field'''
 
+        # Make a copy so any changes are just local
+        field = deepcopy(field)
+        
         x = []
         y = []
         z = []
@@ -7066,12 +7231,7 @@ class Cf_funcs():
                     dims[avail[i]] = field.dimension_coordinate(dim_names[avail[i]]).array
                     lengths[avail[i]] = np.size(dims[avail[i]])
                     plotvars.dim_names[avail[i]] = 'dim' + dim_names[avail[i]][-1]
-                    
-
-
-            
-            
-                    
+                  
 
             # Unpack the return values
             x, y, z, t = dims[0], dims[1], dims[2], dims[3]
@@ -7110,8 +7270,61 @@ class Cf_funcs():
                 y = np.arange(ny)
                 t = np.arange(nt)
 
-        #print('field_dims', plotvars.dim_names)
-        #print(' ajh - field_dims - nx, ny, nz, nt are ', nx, ny, nz, nt)
+
+
+        # Data that has no dimensions.  Some data has stored the axis data in one of the fields in plotvars.fields.
+        # Sometimes there is no matching data so we assign a ascending array with a step of one of the correct size.
+        if len(field.coords()) == 0 and len(field.get_data_axes()) != 0:
+            dim_sizes = [nx, ny, nz, nt]
+            dim_values = [x, y, z, t]
+            plotvars.dim_names = ['--', '--', '--', '--']
+            axes = field.get_data_axes()
+            
+            # Set the data_shape
+            # Just in case the units are messed up we need to do a try / except construct
+            try:
+                data_shape  = np.shape(field.array)
+            except:
+                field.del_property('units')
+                field.set_property('units', 'K')
+                data_shape = np.shape(field.array)
+
+            
+            if len(axes) == 1:
+                axis = axes[0]
+                dim_sizes[0] = field.construct(axis).get_size()
+                dim_values[0] = field.array
+                plotvars.dim_names[0] = 'ax0'
+                
+            if len(axes) > 1:
+                ncnames = [] 
+                for i in np.arange(len(axes)):
+                    axis = field.domain_axis(axes[i]).nc_get_dimension()
+                    ncnames.append(axis)
+                    plotvars.dim_names[i] = 'ax' + str(i)
+                
+                for i in np.arange(len(axes)):
+                    # Set dim_sizes and dim_values to initial values in case the netCDF variable 
+                    # is not found in plotvars.fields
+                    dim_sizes[i] = data_shape[i]
+                    dim_values[i] = np.arange(dim_sizes[i])
+                    
+                    
+                    # Search plotvars.fields netCDF variables and set dim_sizes and dim_values if a matching axis is found
+                    for j in np.arange(len(plotvars.fields)):
+                        f = plotvars.fields[j]
+                        myaxes = f.get_data_axes()
+                        if len(myaxes) == 1:
+                            myaxis = myaxes[0]
+                            if ncnames[i] == f.domain_axis(myaxis).nc_get_dimension():
+                                dim_sizes[i] = f.construct(myaxis).get_size()
+                                dim_values[i] = f.array
+                    
+                                
+                                          
+            nx, ny, nz, nt = dim_sizes[0], dim_sizes[1], dim_sizes[2], dim_sizes[3]
+            x, y, z, t = dim_values[0], dim_values[1], dim_values[2], dim_values[3]
+
         
         return (nx, ny, nz, nt, x, y, z, t)
 
@@ -7170,7 +7383,7 @@ class Cf_funcs():
          |               don't set plotvars.field_widget_names
          |
          :Returns:
-          widget_names
+          field widget title and widget_names
         """        
         
 
@@ -7187,102 +7400,39 @@ class Cf_funcs():
             field_widget_title = plotvars.field_widget_title
             
         else:
+  
+  
             names_list = []
-            index_list = []
-            nx_list = []
-            ny_list = []
-            nz_list = []
-            nt_list = []
-            field_widget_names = []
-    
-            # Assemble field information
-            for i in np.arange(len(fields)):
-                field = fields[i]
-                name = Cf_funcs.field_name(field)
-                nx, ny, nz, nt, x, y, z, t = Cf_funcs.field_dims(field=field)
-
-                nx_list.append(str(nx))
-                ny_list.append(str(ny))
-                nz_list.append(str(nz))
-                nt_list.append(str(nt))
-                names_list.append(name)
-                index_list.append(str(i))
-
-            # Work out the maximum lengths of the dimensions
-            nx_length = len(max(nx_list, key=len))
-            ny_length = len(max(ny_list, key=len))
-            nz_length = len(max(nz_list, key=len))
-            nt_length = len(max(nt_list, key=len))
-            index_length = len(max(index_list, key=len))
-
-            nx_length = max(nx_length, 5)
-            ny_length = max(ny_length, 5)
-            nz_length = max(nz_length, 5)
-            nt_length = max(nt_length, 5)
-
-            # Save the lengths into plotvars so they can be used when changing the dimensions
-            plotvars.index_length = index_length
-            plotvars.nx_length = nx_length
-            plotvars.ny_length = ny_length
-            plotvars.nz_length = nz_length
-            plotvars.nt_length = nt_length
+            index_list = []                    
+            field_widget_names = []      
+            
 
             # Work out the widget title
             field_widget_title ='index '
 
-  
+            axis_lengths = plotvars.maximum_axis_lengths 
 
             if traj:
-                field_widget_title += 'tracks' + (nx_length - 1) * ' '
+                field_widget_title += 'tracks' + plotvars.maximum_axis_lengths[0] * ' '
+                
+                # ajh - to be deleted
+                #field_widget_title += 'tracks' + (nx_length - 1) * ' '                
+                
             else:
                 f = plotvars.fields[plotvars.index_number]
-                field_dims = list(Cf_funcs.find_dim_names(f))
                 
-                dims = ['X', 'Y', 'Z', 'T']
-                dims_translate = ['nx', 'ny', 'nz', 'nt']
-                radio_buttons =  [parent.xRadioButton, parent.yRadioButton,\
-                                  parent.zRadioButton, parent.tRadioButton]
                 
-                # Reset the field title and dimension selction buttons using the stored 
-                # plotvars.dim_names values
-                for i in np.arange(4):
 
-                    if len(plotvars.dim_names[i]) == 1:
-                        field_widget_title += 'n' + plotvars.dim_names[i] + '    '
-                    else:
-                        field_widget_title += 'n' + plotvars.dim_names[i] + ' '
-                    radio_buttons[i].setText(plotvars.dim_names[i])
+                myaxes = plotvars.stored['f' + str(plotvars.index_number)]['data_axes']
                 
+                for i in np.arange(len(axis_lengths)):
+                    axis_label = (axis_lengths[i] + 1) * ' '
+                    if i + 1 < len(myaxes) :
+                         axis_label = (axis_lengths[i] - len(myaxes[i])) * ' ' + 'n' + myaxes[i]
                     
-                # Reset the Contour plotting dimensions
-                contour_index = parent.contour_type_ComboBox.currentIndex()
-                parent.contour_type_ComboBox.clear()
-                c_options =[plotvars.dim_names[0] + '-' + plotvars.dim_names[1]]
-                c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[2])
-                c_options.append(plotvars.dim_names[0] + '-log(' + plotvars.dim_names[2] + ')')
-                c_options.append(plotvars.dim_names[0] + '-' + plotvars.dim_names[3])
+                    field_widget_title += axis_label
                 
-                c_options.append(plotvars.dim_names[1] + '-' + plotvars.dim_names[2])
-                c_options.append(plotvars.dim_names[1] + '-log(' + plotvars.dim_names[2] + ')')
-                c_options.append(plotvars.dim_names[1] + '-' + plotvars.dim_names[3])
-                
-                c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[0])
-                c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[1])
-                c_options.append(plotvars.dim_names[3] + '-' + plotvars.dim_names[2])
-                c_options.append(plotvars.dim_names[3] + '-log(' + plotvars.dim_names[2] + ')')
-                parent.contour_type_ComboBox.addItems(c_options)
-                parent.contour_type_ComboBox.setCurrentIndex(contour_index)
-                plotvars.contour_type = str(parent.contour_type_ComboBox.currentText())
-
-                # Reset the Line plotting dimensions
-                line_index = parent.line_type_ComboBox.currentIndex()
-                parent.line_type_ComboBox.clear()
-                l_options =[plotvars.dim_names[0], plotvars.dim_names[1], plotvars.dim_names[2], plotvars.dim_names[3]]
-                parent.line_type_ComboBox.addItems(l_options)
-                parent.line_type_ComboBox.setCurrentIndex(line_index)          
-                plotvars.line_type = str(parent.line_type_ComboBox.currentText())
-                
-              
+  
 
             field_widget_title += 'field name'
 
@@ -7290,15 +7440,19 @@ class Cf_funcs():
 
             # Work out the widget names
             for i in np.arange(len(fields)):
-                field_widget_name = index_list[i] + (6 -len(index_list[i])) * ' '
-                field_widget_name += nx_list[i] + (nx_length + 1 - len(nx_list[i])) * ' '
-                if plotvars.plot_type != 'Trajectory':
-                    field_widget_name += ny_list[i] + (ny_length + 1 - len(ny_list[i])) * ' '
-                    field_widget_name += nz_list[i] + (nz_length + 1 - len(nz_list[i])) * ' '
-                    field_widget_name += nt_list[i] + (nt_length + 1 - len(nt_list[i])) * ' '
-                
-                field_widget_name += names_list[i]
+                # ajh - new code
+                field_widget_name = str(i)  + (6 - len(str(i))) * ' '
+                mystored = plotvars.stored['f' + str(i)]
+                axis_sizes = mystored['axis_sizes']
+                field_name = mystored['field_name']
+                for i in np.arange(len(plotvars.maximum_axis_lengths)):
+                    axis_label = (axis_lengths[i] + 1) * ' '
                     
+                    if i + 1 <= len(axis_sizes):
+                         axis_label = str(axis_sizes[i]) + (axis_lengths[i] - len(str(axis_sizes[i])) + 1) * ' '
+                    field_widget_name += axis_label
+                    
+                field_widget_name +=  field_name                    
                 field_widget_names.append(field_widget_name)
 
         # Only set plotvars.field_widget_names if the call doesn't come from reset_field_title
@@ -7358,58 +7512,26 @@ class Cf_funcs():
         """ 
          Calculate the selected length of the data in the axes
          based on the dimension selection and the collapse method
-         Returns: axis length
+         Returns: axis size
         """
 
         # Extract the dimensions and collapses for this field
-        dims = plotvars.stored_dimensions['f' + str(index)]
-        collapses = plotvars.stored_collapses['f' + str(index)] 
-
-        f = plotvars.fields[index]
         
-        field_dims = Cf_funcs.find_dim_names(f)
-        mycoords = list(field_dims)
+        # ajh - new code
+        mystored = plotvars.stored['f' + str(index)]
         
-        # Work out the selected points for the dimensions
-        dim_vals = [ 0, 0 , 0, 0]
+        vals = mystored['axis_sizes']
         
-        well_formed = Cf_funcs.check_well_formed(f)
-        
-        dims_large = ['X', 'Y', 'Z', 'T']
-        
-        if well_formed:
-            for idim in np.arange(4):
-                dim_upper = dims_large[idim]
-                dim_lower = dim_upper.lower()
-               
-                if f.has_construct(dim_upper):
-                    if dims[dim_lower] == -1:
-                        dim_vals[idim] = len(f.coord(dim_upper).array)
-                    else:
-                        dim_vals[idim] = max(dims[dim_lower]) - min(dims[dim_lower]) + 1
+        for i in np.arange(len(vals)):
+            if mystored['axes'][i] != -1:
+                vals[i] = len(mystored['axes'][i])
+            if  mystored['collapses'][i] != 'Off':
+                vals[i] = 1
                 
-                    if collapses[dim_lower] != 'Off':
-                        dim_vals[idim] = 1
-        else:
-            mycoords.sort(reverse=True)
-            for idim in np.arange(len(mycoords)):
-                dim_upper = dims_large[idim]
-                dim_lower = dim_upper.lower()
-               
-                if dims[dim_lower] == -1:
-                    dim_vals[idim] = len(f.coord(mycoords[idim]).array)
-                else:
-                    dim_vals[idim] = max(dims[dim_lower]) - min(dims[dim_lower]) + 1
                 
-                if collapses[dim_lower] != 'Off':
-                    dim_vals[idim] = 1
+        return vals        
         
         
-        return dim_vals[0], dim_vals[1], dim_vals[2], dim_vals[3]
-
-
-
-
 
     def subspace_args(parent, index, call_data=False):
         """
@@ -7424,132 +7546,107 @@ class Cf_funcs():
         args = {}
 
         f = deepcopy(plotvars.fields[index])
-
-        # Stored names and dimensions for this field
-        dim_names = deepcopy(plotvars.dim_names)
-        dim_vals = deepcopy(plotvars.stored_dimensions['f' + str(index)])
-        
-        # Dimensions here are indicative and may be different in the data itself
-        # It is the order that is relevant to the data
-        dimensions = ['x', 'y', 'z', 't']
         
         
-        for i in np.arange(4):
-            if len(dim_names[i]) == 1:
-                dim_names[i] = dim_names[i].upper()
-
+        # ajh - new code
+        mystored = plotvars.stored['f' + str(index)]
+        
+        myaxes = deepcopy(mystored['data_axes'])
+        # Convert all dim0 instances to dimensioncoordinate0 etc
+        for i in np.arange(len(myaxes)):
+            if myaxes[i][:3] == 'dim':
+                myaxes[i] = 'dimensioncoordinate' + myaxes[i][3:]
+        
         if call_data is True:
             plot_dims = parent.data_ComboBox.currentText().split('-')
         else:
             if plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector']:
                 plot_dims = plotvars.contour_type.split('-')
             
-            
-            
-
         if plotvars.plot_type == 'Line':
-            plot_dims = [plotvars.line_type] 
-            
-            
+            plot_dims = [plotvars.line_type]         
+        
+        
         # Remove any log(dim1) and leave dim1
-        # Also convert the dimension name x to X
         for i in np.arange(np.size(plot_dims)):
             if plot_dims[i][0:4] == 'log(':
                 plot_dims[i] = plot_dims[i][4: -1]   
-            if len(plot_dims[i]) == 1 :
-                plot_dims[i] = plot_dims[i].upper()
 
 
         # Convert all dim0 instances to dimensioncoordinate0 etc
         for i in np.arange(np.size(plot_dims)):
             if plot_dims[i][0:3] == 'dim':
-                plot_dims[i] = 'dimensioncoordinate' + plot_dims[i][-1]
-
-
-        for i in np.arange(4):
-            if len(dim_names[i]) == 1:
-                dim_names[i] = dim_names[i].upper()
-            if dim_names[i][0:3] == 'dim':
-                dim_names[i] = 'dimensioncoordinate' + dim_names[i][-1]
+                plot_dims[i] = 'dimensioncoordinate' + plot_dims[i][3:]        
+              
                 
-
-        for i in np.arange(4):
-
-            dim = dim_names[i]
-            
-            if dim in plot_dims:
-                # User has changed the selected dimension indicies
-                if dim_vals[dimensions[i]] != -1:    
-                    # Find the min and max of the selected indicies
-                    ind_min = np.min(dim_vals[dimensions[i]]) 
-                    ind_max = np.max(dim_vals[dimensions[i]])
-                    
-                    # values must go from min to max in cf.wi statements
-                    if f.coord(dim).array[ind_min] > f.coord(dim).array[ind_max]:
-                        ind_min, ind_max = ind_max, ind_min
-
-                    # Set the subspace value
-                    if dim != 'T':
-                        args[dim] = cf.wi(f.coord(dim).array[ind_min], f.coord(dim).array[ind_max])
-                    else:
-                        args[dim] = cf.wi(f.coord(dim).dtarray[ind_min], f.coord(dim).dtarray[ind_max])
+        # Subspace if the axis is in the plot axes or if the axis has a collapse method
+        for i in np.arange(len(myaxes)):
+            myaxis = myaxes[i]
+            if myaxis in plot_dims or mystored['collapses'][i] != 'Off':
+                if myaxis[:2] != 'ax':
+                    if mystored['axes'][i] != -1:
+                        ind_min = np.min(mystored['axes'][i])
+                        ind_max = np.max(mystored['axes'][i])                        
                         
+                        # values must go from min to max in cf.wi statements
+                        if f.coord(myaxis).array[ind_min] > f.coord(myaxis).array[ind_max]:
+                            ind_min, ind_max = ind_max, ind_min
+            
+                        # Set the subspace value
+                        if myaxis != 'T':
+                            args[myaxis] = cf.wi(f.coord(myaxis).array[ind_min], f.coord(myaxis).array[ind_max])
+                        else:
+                            args[myaxis] = cf.wi(f.coord(myaxis).dtarray[ind_min], f.coord(myaxis).dtarray[ind_max])            
+            
+                if myaxis[:2] == 'ax':
+                    min_ind = parent.lists[i].selectedIndexes()[0].row() 
+                    max_ind = parent.lists[i].selectedIndexes()[-1].row()
+                    list_len = len(parent.lists[i])
+                    
+                    if max_ind - min_ind + 1 < list_len:
+                        args[dim] = [min_ind, max_ind]                
+        
             else:
-                
-                # Only execute code if the dimension exists in the data
-                # This is a throw back from having added nt=0 for example in a 3D data set with x, y, z 
-                # but no t dimension
-
-                collapses = plotvars.stored_collapses['f' + str(plotvars.index_number)]
-                
-
-
-                #if dim == 'Z':
-                #    z_count = 0
-                #    z_names =[]
-                #    for mycoord in list(f.coords()):
-                #        if f.coord(mycoord).Z:
-                #            z_count += 1
-                #            z_names.append(mycoord)
-
-                #    if z_count > 1:
-                #        dim = z_names[-1]
-
-
-
-
-
-
-                                
-                if f.has_construct(dim):
 
                     # Only need to subspace if this dimension has more than one value
-                    if np.size(f.coord(dim).array) > 1:
+                    if np.size(f.coord(myaxis).array) > 1:
                     
-                        # Only proceed if no collapse is specified
-                        if collapses[dimensions[i]] == 'Off': 
+                        # Use first value if no collapse is specified
+                        if mystored['collapses'][i] == 'Off': 
                     
                             # Calculate the first dimension index value
-                            if dim_vals[dimensions[i]] == -1:
+                            if mystored['axes'][i] == -1:
                                 ind = 0
                             else:
-                                ind = np.min(dim_vals[dimensions[i]]) 
+                                ind = np.min(mystored['axes'][i]) 
                         
                             # Set the subspace value
-                            if dim != 'T':
-                                args[dim] = f.coord(dim).array[ind]
+                            if myaxis != 'T':
+                                args[myaxis] = f.coord(myaxis).array[ind]
                             else:
-                                args[dim] = f.coord(dim).dtarray[ind]
-
+                                args[myaxis] = f.coord(myaxis).dtarray[ind]
+                                
+                    if myaxis[:2] == 'ax':
+                        my_ind = parent.lists[i].selectedIndexes()[0].row()
+                        args[myaxis] = my_ind        
+        
+        
         return args
+        
+        
+        
+
         
 
     def com_subspace_collapse(subspace_args):
         """
          Form the subspace and collapse args
         """
+        
         f = deepcopy(plotvars.fields[plotvars.index_number])
-        dims = Cf_funcs.find_dim_names(f)
+        mystored = plotvars.stored['f' + str(plotvars.index_number)]
+        myaxes = mystored['data_axes']
+        mycollapses = mystored['collapses']
         
         # Form the subspace command
         com_subspace = '' 
@@ -7573,37 +7670,42 @@ class Cf_funcs():
                     else:
                         com_subspace += "cf.dt('" + str(subspace_args[arg]) + "')"
 
+
         # Form the collapse command
         com_collapse = ''
         i = 0
         area = False
         
-        
-        vars = [plotvars.collapse_x, plotvars.collapse_y, plotvars.collapse_z, plotvars.collapse_t]
-
-        if vars[0] != 'Off' and vars[1] != 'Off':
-            if vars[0] == vars[1]:
-                area = True
-                i = 1
-                com_collapse += "'area: " + vars[0]
-
-        for idim in np.arange(4):
-            if vars[idim] != 'Off':
-                if idim > 1:
-                    area = False
-                if not area:
+        if 'X' in myaxes and 'Y' in myaxes:
+            x_ind = myaxes.index('X')
+            y_ind = myaxes.index('Y')
+            x_val = mycollapses[x_ind]
+            y_val = mycollapses[y_ind]            
+            
+            if x_val != 'Off' and x_val != 'Off':
+                if x_val == y_val:
+                    area = True
+                    com_collapse += "'area: " + x_val
+                
+                
+        for i in np.arange(len(myaxes)):
+            if mycollapses[i] != 'Off':
+                if area is False or mycollapses[i] not in ['X', 'Y']:
                     if i == 0:
                         com_collapse += "'"
                     if i > 0:
                         com_collapse += ' '
-                    i = i + 1
-                    com_collapse += dims[idim] + ": " + vars[idim]
 
-        if i > 0:
+                    com_collapse += myaxes[i] + ": " + mycollapses[i]      
+                    i = i + 1                    
+                                         
+        if len(com_collapse) > 0:
             com_collapse += "'"
 
 
-        return com_subspace, com_collapse
+
+        return com_subspace, com_collapse                
+                
 
 
 
@@ -7651,24 +7753,24 @@ class Cf_funcs():
 
         # Check for bounds if a collapse is required
         # and add them if they are missing
-        vars = [plotvars.collapse_x, plotvars.collapse_y,\
-                plotvars.collapse_z, plotvars.collapse_t]
-            
-        dims = ['X', 'Y', 'Z', 'T']
-        dims = Cf_funcs.find_dim_names(f)
+        mystored = plotvars.stored['f' + str(plotvars.index_number)]
+        myaxes = mystored['data_axes']
         
-        for idim in np.arange(len(dims)):
-            if vars[idim] != 'Off':
-                coord = f.coord(dims[idim])
+        for i in np.arange(len(myaxes)):
+            if mystored['collapses'][i] != 'Off':
+                coord = f.coord(myaxes[i])
                 # Check axis has more than one cell
                 if len(coord.array) > 1:
                     if coord.has_bounds() is False:
+                        #print('creating bounds')
                         bounds = coord.create_bounds()
                         coord.set_bounds(bounds)
-                        com += '\n# Adding missing bounds for ' + dims[idim] + '\n'
-                        com += "coord = " + var + ".coord('" + dims[idim] + "')\n"
+                        com += '\n# Adding missing bounds for ' + myaxes[i] + '\n'
+                        com += "coord = " + var + ".coord('" + myaxes[i] + "')\n"
                         com += 'bounds = coord.create_bounds()\n'
-                        com += 'coord.set_bounds(bounds)\n\n'
+                        com += 'coord.set_bounds(bounds)\n\n'        
+        
+        
 
         if com_subspace != '':
             com += var + ' = ' + var + '.subspace(' + com_subspace + ')\n'
@@ -7696,7 +7798,7 @@ class Cf_funcs():
         dcoords = list(field.coords())     
         
         
-        # Calculate the number of coordinates of type X, Y, Z and T
+        ## Calculate the number of coordinates of type X, Y, Z and T
         nx = 0
         ny = 0
         nz = 0
@@ -7709,12 +7811,8 @@ class Cf_funcs():
             if field.coord(dcoords[i]).Z:
                 nz += 1        
             if field.coord(dcoords[i]).T:
-                #print('ajh - t found - ', coords[i])
                 nt += 1      
-                
-                
-        #print('ajh - find_dim_names - nx, ny, nz, nt are ', nx, ny, nz, nt)
-        
+
    
         # Strip out any auxiliary coordinates if the field is not a trajectory field
         remove_aux = True
@@ -7730,11 +7828,7 @@ class Cf_funcs():
                     dcoords[i] = 'aux' 
             dcoords = list(filter(('aux').__ne__,dcoords))
         
-        
-        #print('ajh - daxes are', daxes)
-        #print('ajh - dcoords are', dcoords)
-        
-        
+
         
         # Convert these into corresponding dimension coordinates
         if remove_aux:
@@ -7742,10 +7836,7 @@ class Cf_funcs():
             for i in np.arange(len(daxes)):
                 val = daxes[i]
                 coord = None
-                for j in np.arange(len(dcoords)):
-            
-                    #print('ajh - ', daxes[i], dcoords[j], field.get_data_axes(dcoords[j])[0])
-                
+                for j in np.arange(len(dcoords)):               
                     if daxes[i] == field.get_data_axes(dcoords[j])[0]:
                         coord = dcoords[j]      
         
@@ -7769,6 +7860,7 @@ class Cf_funcs():
         #print('daxes are ', daxes)
         #print('coords are ', coords)
         
+        
         for i in np.arange(len(daxes)):
             if field.coord(coords[i]).X:
                 if nx == 1:
@@ -7787,44 +7879,16 @@ class Cf_funcs():
         # Return the reverse of the coordinates so that they are in the order [X, Y, Z, T]
         mycoords.reverse()
         
-        #print('ajh - find_dim_names - mycoords are ', mycoords)
+        daxes = list(field.get_data_axes())
+
+        #if len(mycoords) == 0 and len(daxes) > 0:
+        #    for i in np.arange(len(daxes)):
+        #        mycoords.append('ax' + str(len(daxes)-i))
+            #mycoords = ['ax2', 'ax1', 'ax0', '--']
+        
         
         return mycoords
 
-    def find_dim_names_orig(field):
-        ''' Find the field dimension coordinate names
-            Ignores auxiliary coordinates (for now)
-            returns:
-            coordinates in the order [T, X, Y, Z]       
-        '''
-        
-        coords = list(field.coords())
-        mycoords = deepcopy(coords)
-        
-        for i in np.arange(len(coords)):
-            if coords[i][:-1] == 'dimensioncoordinate':
-                c = field.coord(coords[i])
-                if c.X:
-                    mycoords[i] = 'X'
-                if c.Y:
-                    mycoords[i] = 'Y'
-                if c.Z:
-                    mycoords[i] = 'Z'
-                if c.T:
-                    mycoords[i] = 'T'
-            else:
-                mycoords[i] = 'auxiliarycoordinate'
-            
-        # Remove any auxiliary coordinates
-        mycoords = list(filter(('auxiliarycoordinate').__ne__,mycoords))
-            
-            
-        # Return the reverse of the coordinates so that they are in the order [T, X, Y, Z]
-        mycoords.reverse()
-        
-        #print('mycoords are ', mycoords)
-        
-        return mycoords
         
                     
     def find_all_dims():
@@ -7866,12 +7930,9 @@ class Cf_funcs():
         for i in np.arange(len(daxes)):
             val = daxes[i]
             coord = None
-            for j in np.arange(len(dcoords)):
-            
-                    #print('ajh - ', daxes[i], dcoords[j], field.get_data_axes(dcoords[j])[0])
-                
+            for j in np.arange(len(dcoords)):          
                 if daxes[i] == field.get_data_axes(dcoords[j])[0]:
-                   coord = dcoords[j]      
+                    coord = dcoords[j]      
         
             if coord is not None:
                 data_coords.append(coord)
