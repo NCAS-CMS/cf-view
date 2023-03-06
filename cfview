@@ -867,10 +867,6 @@ class Cfview(QMainWindow):
             # Form the subspace dictionary
             stored = plotvars.stored['f' + str(indicies[index])]
             data_axes = stored['data_axes']
-            data_axes_orig = deepcopy(data_axes)
-            for i in np.arange(len(data_axes)):
-                if data_axes[i][:3] == 'dim':
-                    data_axes[i] = 'dimensioncoordinate' + data_axes[i][3:]
             mycollapses = stored['collapses']
             myaxes = stored['axes']
             subspace_args = {}
@@ -878,11 +874,11 @@ class Cfview(QMainWindow):
             # Find the original nx, ny, nz, nt for this field
             field = f[indicies[index]]
             com += 'field = f[' + str(indicies[index]) + ']\n'
-            
+
+
             for i in np.arange(len(data_axes)):
                 # dim_indicies = -1 means no user change to this dimension
                 myaxis = data_axes[i]
-                myaxis_orig = data_axes_orig[i]
                 axis_indicies = myaxes[i]
                 if field.coord(myaxis).T:
                     axis_vals = field.coord(myaxis).dtarray
@@ -892,7 +888,7 @@ class Cfview(QMainWindow):
 
                 if axis_indicies != -1:
                     if len(axis_indicies) == 1:
-                        subspace_args[myaxis_orig] = axis_vals[axis_vals[i][0]]
+                        subspace_args[myaxis] = axis_vals[axis_vals[i][0]]
                         com += 'field = field.subspace(' + mydim + '=' + str(axis_vals[i][0]) + ')\n'
                     else:
 
@@ -939,6 +935,7 @@ class Cfview(QMainWindow):
 
             if len(collapse_str) > 0:
                 field = field.collapse(collapse_str)
+                save_fields.append(field)
                 com += "field = field.collapse('" + collapse_str + "')\n" 
 
             save_fields.append(field)
@@ -2236,6 +2233,7 @@ class Cfview(QMainWindow):
             self.lists[i].selectAll()
             plotvars.stored[index_str]['axes'][i] = -1
 
+            
                                    
         # Find which list needs to be displayed based on the selected axis
         for i in np.arange(len(myaxes)):
@@ -2250,13 +2248,8 @@ class Cfview(QMainWindow):
                 mymin = min(indicies)
                 mymax = max(indicies)
 
-
                 # Code for bounds calculation
-                myaxis = myaxes[myindex]
-                if myaxis[:3] == 'dim':
-                    myaxis = 'dimensioncoordinate' + myaxis[3:]               
-                
-                coord = f.coord(myaxis)
+                coord = f.coord(myaxes[myindex])
                 if coord.has_bounds() is False:
                     bounds = coord.create_bounds()
                     coord.set_bounds(bounds)
@@ -2743,7 +2736,7 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 2.9.0</b><p>'
+            html += '<b>This is version 3.0.0</b><p>'
             html += 'cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data'
             html += '<p>'
             html += 'cfview uses:<br>'
@@ -4897,7 +4890,6 @@ class Data_window(QWidget):
         selected = self.table.selectionModel().selectedIndexes()
 
         if selected:
-            con_args ={}
             xvals = []
             yvals = []
             for item in selected:
@@ -4908,26 +4900,34 @@ class Data_window(QWidget):
             maxx = max(xvals)
             miny = min(yvals)
             maxy = max(yvals)
-            
-            
-            mycoords = Cf_funcs.find_dim_names(self.field)
-            for i in np.arange(len(mycoords)):
-               if mycoords[i][:19] == 'dimensioncoordinate':
-                   mycoords[i] = 'dim' + mycoords[i][19:]
-            
-            mytypes = self.data_ComboBox.currentText().split('-')
-            if len(mytypes) == 2:
-                myx = mytypes[0]
-                myy = mytypes[1]
-                
-                if mycoords.index(myx) > mycoords.index(myy):
-                    minx, maxx, miny, maxy = miny, maxy, minx, maxx
-                    con_args['swap_axes'] = True 
 
+            
+                       
+ 
+            
+
+            
+            
+            
+            
+                
+            #if myy == 'one dimensional data':
+            #    if len(new_subspace_args) > 0:
+            #        f = f.subspace(**new_subspace_args)
+            #        
+            #    cfp.lineplot(f, titles=True)
+            #    return
+                
+
+            
+            
+            
+            # plot_type = 'single point selected'
             
             # Contour plot
             if maxx > minx and maxy > miny:
 
+                con_args ={}
                 if plotvars.fill and not plotvars.lines:
                     con_args['lines'] = False
                 if not plotvars.fill and plotvars.lines:
@@ -4962,25 +4962,16 @@ class Data_window(QWidget):
                 cfp.con(self.field[miny:maxy, minx:maxx], **con_args)
                 
                 
-            idims = len(self.field.get_data_axes())
-                
-            # Line plots
+
             if maxx > minx and miny == maxy:
-                if idims == 2:
-                    cfp.lineplot(self.field[miny, minx:maxx], titles=True)
-                elif idims == 1:
-                    cfp.lineplot(self.field[minx:maxx], titles=True)
-                else:
-                    print('view data - lineplot issue - ndims is not 1 or 2')    
-                                   
+                plot_type = 'line'
+                cfp.lineplot(self.field[miny, minx:maxx], titles=True)
+                
             if maxx == minx and maxy > miny:
-                if idims == 2:
-                    cfp.lineplot(self.field[miny:maxy, minx], titles=True)
-                elif idims == 1:
-                    cfp.lineplot(self.field[miny:maxy], titles=True)
-                else:
-                    print('view data - lineplot issue - ndims is not 1 or 2')
-                    
+                plot_type = 'line'
+                cfp.lineplot(self.field[miny:maxy, minx], titles=True)
+                
+                
             if minx == maxx and miny == maxy:
                 print('\n\nPloting error - only a single point selected\n\n')                
                 
@@ -6365,12 +6356,7 @@ class Transform_window(QWidget):
         f = deepcopy(plotvars.fields[plotvars.index_number])
         mystored = plotvars.stored['f' + str(plotvars.index_number)]
         myaxes = mystored['data_axes']
-        myaxes_long = deepcopy(mystored['data_axes'])
-        for i in np.arange(len(myaxes_long)):
-            if myaxes_long[i][:3] == 'dim':
-                myaxes_long[i] = 'dimensioncoordinate' + myaxes_long[i][3:]
         mycollapses = mystored['collapses'] 
-        
           
         if idim >= 0:
             mycollapses[idim] = self.collapse_ComboBoxes[idim].currentText()
@@ -6390,7 +6376,7 @@ class Transform_window(QWidget):
             mymax = max(indicies)
 
             # Code for bounds calculation
-            coord = f.coord(myaxes_long[myindex])
+            coord = f.coord(myaxes[myindex])
             if coord.has_bounds() is False:
                 bounds = coord.create_bounds()
                 coord.set_bounds(bounds)
