@@ -54,9 +54,10 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                colorbar_orientation=None,\
                proj='cyl', lonmin='-180', lonmax='180', latmin='-90', latmax='90',\
                boundinglat='0', lon_0='0',
-               resolution='c', continent_thickness='1.5', continent_color='black',\
-               vect_ufield='', vect_auto_set=True, vect_length='10', vect_scale='100',\
-               vect_stride='1', vect_pts='30', vect_stride_set=False,vect_pts_set=False,\
+               resolution='c', continent_thickness='1.5', continent_color='black',vect_title='',\
+               vect_ufield='', vect_auto_set=True, vect_key_length=10, vect_scale=100,\
+               vect_stride='', vect_pts='', vect_stride_set=False,vect_pts_set=False,\
+               vect_width = 0.02, vect_width_set=False, vect_headwidth = 3, vect_headwidth_set=False,\
                cscales=None, cscale_automatic_set=True, cscale_reverse_set=False, cscale_white='',\
                cscale_ncols='', cscale_above='', cscale_below='',cscale='viridis',\
                invalid_input=False, index_number=0, fields=None,\
@@ -77,8 +78,6 @@ plotvars=pvars(pos=0, nplots=1, code='', plot_counter=0, title='', field_selecte
                line_style='solid', line_xmin=None, line_xmax=None, line_ymin=None, line_ymax=None,\
                line_title='', line_width='1.0', line_marker = '', line_markersize='',\
                line_markeredgecolor='', line_markeredgewidth='', line_limits='automatic',\
-               vector_title='', vector_scale=100, vector_stride='', vector_pts='',\
-               vector_key_length=10, vector_pivot='middle', \
                trajectory_title='', trajectory_marker_shape='o', trajectory_marker_size='5',\
                trajectory_marker_face_colour='red', trajectory_marker_edge_colour='green', \
                trajectory_line_style='solid', trajectory_line_colour='blue', \
@@ -867,6 +866,10 @@ class Cfview(QMainWindow):
             # Form the subspace dictionary
             stored = plotvars.stored['f' + str(indicies[index])]
             data_axes = stored['data_axes']
+            data_axes_orig = deepcopy(data_axes)
+            for i in np.arange(len(data_axes)):
+                if data_axes[i][:3] == 'dim':
+                    data_axes[i] = 'dimensioncoordinate' + data_axes[i][3:]
             mycollapses = stored['collapses']
             myaxes = stored['axes']
             subspace_args = {}
@@ -874,11 +877,11 @@ class Cfview(QMainWindow):
             # Find the original nx, ny, nz, nt for this field
             field = f[indicies[index]]
             com += 'field = f[' + str(indicies[index]) + ']\n'
-
-
+            
             for i in np.arange(len(data_axes)):
                 # dim_indicies = -1 means no user change to this dimension
                 myaxis = data_axes[i]
+                myaxis_orig = data_axes_orig[i]
                 axis_indicies = myaxes[i]
                 if field.coord(myaxis).T:
                     axis_vals = field.coord(myaxis).dtarray
@@ -888,7 +891,7 @@ class Cfview(QMainWindow):
 
                 if axis_indicies != -1:
                     if len(axis_indicies) == 1:
-                        subspace_args[myaxis] = axis_vals[axis_vals[i][0]]
+                        subspace_args[myaxis_orig] = axis_vals[axis_vals[i][0]]
                         com += 'field = field.subspace(' + mydim + '=' + str(axis_vals[i][0]) + ')\n'
                     else:
 
@@ -935,7 +938,6 @@ class Cfview(QMainWindow):
 
             if len(collapse_str) > 0:
                 field = field.collapse(collapse_str)
-                save_fields.append(field)
                 com += "field = field.collapse('" + collapse_str + "')\n" 
 
             save_fields.append(field)
@@ -1347,9 +1349,9 @@ class Cfview(QMainWindow):
                 com_con += ')\n'
 
 
-            if plotvars.proj in ['EuroPP', 'lcc', 'merc', 'ortho', 'OSGB', 'robin', 'UKCP']:
+            if plotvars.proj in ['EuroPP', 'lcc', 'merc', 'ortho', 'OSGB', 'robin', 'UKCP', 'rotated']:
                 cfp.mapset(proj=plotvars.proj)
-                com_con += 'cfp.mapset(proj=' + plotvars.proj + ')\n'
+                com_con += "cfp.mapset(proj='" + plotvars.proj + "')\n"
 
 
             # Set continent properties if changed
@@ -1717,42 +1719,61 @@ class Cfview(QMainWindow):
             # Assemble vector arguments
             vect_args = {}
                             
-            if plotvars.vector_title == '':
+            if plotvars.vect_title == '':
                 vect_args['titles'] = True
             else:
-                vect_args['title'] = plotvars.vector_title
+                vect_args['title'] = plotvars.vect_title
 
-            vals_okay, errstr = Data_check.test_numbers([plotvars.vector_key_length])
+            vals_okay, errstr = Data_check.test_numbers([plotvars.vect_key_length])
             if not vals_okay:
                 print('Error in vector key length\n' + errstr)
                 return
-            vect_args['key_length'] = Data_check.test_type(plotvars.vector_key_length)
+            vect_args['key_length'] = Data_check.test_type(plotvars.vect_key_length)
 
-            vals_okay, errstr = Data_check.test_numbers([plotvars.vector_scale])
+            vals_okay, errstr = Data_check.test_numbers([plotvars.vect_scale])
             if not vals_okay:
                 print('Error in vector scale\n' + errstr)
                 return
-            vect_args['scale'] = int(float(plotvars.vector_scale))
+            vect_args['scale'] = int(float(plotvars.vect_scale))
 
-            if plotvars.vector_stride != '' and plotvars.vector_pts == '':
-                vals_okay, errstr = Data_check.test_numbers([plotvars.vector_stride])
+
+            if plotvars.vect_stride != '' and plotvars.vect_pts != '':
+                errstr = 'Cannot have both stride and pts defined at the same time\n'
+                errstr += ' Please select a value for one or the other'
+                print(errstr)
+                return
+
+            if plotvars.vect_stride != '':
+                vals_okay, errstr = Data_check.test_numbers([plotvars.vect_stride])
                 if not vals_okay:
                     print('Error in vector stride\n' + errstr)
                     return
-                vect_args['stride'] = int(float(plotvars.vector_stride))
+                vect_args['stride'] = int(float(plotvars.vect_stride))
 
-            if plotvars.vector_pts != '':
-                vals_okay, errstr = Data_check.test_numbers([plotvars.vector_pts])
+            if plotvars.vect_pts != '':
+                vals_okay, errstr = Data_check.test_numbers([plotvars.vect_pts])
                 if not vals_okay:
                     print('Error in vector interpolation pts\n' + errstr)
                     return
-                vect_args['pts'] = int(float(plotvars.vector_pts))
-         
+                vect_args['pts'] = int(plotvars.vect_pts)
+                
+            if plotvars.vect_width != 0.02:
+                vals_okay, errstr = Data_check.test_numbers([plotvars.vect_width])
+                if not vals_okay:
+                    print('Error in vector width\n' + errstr)
+                    return
+                vect_args['width'] = plotvars.vect_width                
+                
+            if plotvars.vect_headwidth != 3:
+                vals_okay, errstr = Data_check.test_numbers([plotvars.vect_headwidth])
+                if not vals_okay:
+                    print('Error in vector headwidth\n' + errstr)
+                    return
+                vect_args['headwidth'] = plotvars.vect_headwidth              
          
             com = ''
             if plotvars.plot_type =='Contour and vector':
                 com += com_con + '\n\n'
-                
                 
                 
             # Generate code to make the plot
@@ -2233,7 +2254,6 @@ class Cfview(QMainWindow):
             self.lists[i].selectAll()
             plotvars.stored[index_str]['axes'][i] = -1
 
-            
                                    
         # Find which list needs to be displayed based on the selected axis
         for i in np.arange(len(myaxes)):
@@ -2248,8 +2268,13 @@ class Cfview(QMainWindow):
                 mymin = min(indicies)
                 mymax = max(indicies)
 
+
                 # Code for bounds calculation
-                coord = f.coord(myaxes[myindex])
+                myaxis = myaxes[myindex]
+                if myaxis[:3] == 'dim':
+                    myaxis = 'dimensioncoordinate' + myaxis[3:]               
+                
+                coord = f.coord(myaxis)
                 if coord.has_bounds() is False:
                     bounds = coord.create_bounds()
                     coord.set_bounds(bounds)
@@ -2746,7 +2771,7 @@ class Cfview(QMainWindow):
             html += 'http://ajheaps.github.io/cf-plot<P>'
             html += '<b>PyQt5</b> - GUI toolkit<p>'
             html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS January 2023'
+            html += '&#169; NCAS CMS February 2023'
             self.about_help = Help(html)
             self.about_help.show()
 
@@ -4060,9 +4085,9 @@ class Map_window(QWidget):
         # Map type check boxes
         maps = ['Cylindrical', 'EuroPP', 'LambertConformal', 'Mercator', 'Mollweide',\
                 'NorthPoleStereographic', 'Orthographic', 'OSGB', 'Robinson',\
-                'SouthPoleStereographic', 'UKCP']
+                'SouthPoleStereographic', 'UKCP', 'rotated']
         maps_short = ['cyl', 'EuroPP', 'lcc', 'merc', 'moll', 'npstere', 'ortho',\
-                      'OSGB', 'robin', 'spstere', 'UKCP']
+                      'OSGB', 'robin', 'spstere', 'UKCP', 'rotated']
 
         for i in np.arange(len(maps)):
             setattr(self, maps[i] + 'CheckBox', QCheckBox(maps[i]))
@@ -4146,6 +4171,9 @@ class Map_window(QWidget):
         hbox_other2.addWidget(self.RobinsonCheckBox)
         hbox_other2.addWidget(self.UKCPCheckBox)
         vbox.addLayout(hbox_other2)
+        hbox_other3 = QHBoxLayout()
+        hbox_other3.addWidget(self.rotatedCheckBox)
+        vbox.addLayout(hbox_other3)
         vbox.addWidget(HLine())
 
         # Continent thickness and colour
@@ -4200,9 +4228,9 @@ class Map_window(QWidget):
 
         maps = ['Cylindrical', 'EuroPP', 'LambertConformal', 'Mercator', 'Mollweide',\
                 'NorthPoleStereographic', 'Orthographic', 'OSGB', 'Robinson',\
-                'SouthPoleStereographic', 'UKCP']
+                'SouthPoleStereographic', 'UKCP', 'rotated']
         maps_short = ['cyl', 'EuroPP', 'lcc', 'merc', 'moll', 'npstere', 'ortho', 'OSGB', 
-                      'robin', 'spstere', 'UKCP']
+                      'robin', 'spstere', 'UKCP', 'rotated']
 
 
         for i in np.arange(len(maps)):
@@ -4224,7 +4252,7 @@ class Map_window(QWidget):
 
 
     def set_sensitive(self):
-        # Set sensivity of plot widgets
+        # Set sensivity and colour of map widgets
 
         objs = [self.lonminLabel, self.lonminTextBox, self.lonmaxLabel,\
                 self.lonmaxTextBox, self.latminLabel, self.latminTextBox,\
@@ -4232,16 +4260,16 @@ class Map_window(QWidget):
                 self.boundinglatLabel,\
                 self.boundinglatTextBox, self.lon_0Label, self.lon_0TextBox]
 
-        colors = [plotvars.text_colour] * 15
-        enabled = [False] * 15
+        colors = [plotvars.text_colour] * 12
+        enabled = [False] * 12
 
         if plotvars.proj in ['cyl', 'EuroPP', 'lcc', 'merc', 'ortho', 'OSGB',\
                              'robin', 'UKCP']:
-            enabled[0:7] = [True] * 8
-            colors[8:] = [plotvars.text_colour_insensitive] * 6
+            enabled[0:8] = [True] * 8
+            colors[8:] = [plotvars.text_colour_insensitive] * 4
         else:
-            colors[0:7] = [plotvars.text_colour_insensitive] * 8
-            enabled[8:] = [True] * 6
+            colors[0:8] = [plotvars.text_colour_insensitive] * 8
+            enabled[8:] = [True] * 4
 
         for i in np.arange(len(objs)):
             obj = objs[i]
@@ -4255,24 +4283,18 @@ class Map_window(QWidget):
         plotvars.proj = 'cyl'
         maps = ['Cylindrical', 'EuroPP', 'LambertConformal', 'Mercator', 'Mollweide',\
                 'NorthPoleStereographic', 'Orthographic', 'OSGB', 'Robinson',\
-                'SouthPoleStereographic', 'UKCP']
+                'SouthPoleStereographic', 'UKCP', 'rotated']
         for i in np.arange(len(maps)):
             getattr(self, maps[i] + 'CheckBox').setChecked(False)
 
         self.CylindricalCheckBox.setChecked(True)
         self.set_sensitive()
 
-        plotvars.lonmin = -180
-        plotvars.lonmax = 190
-        plotvars.latmin = -90
-        plotvars.latmax = 90
         self.lonminTextBox.setText('-180')
         self.lonmaxTextBox.setText('180')
         self.latminTextBox.setText('-90')
         self.latmaxTextBox.setText('90')
         
-
-
         plotvars.boundinglat = 0
         plotvars.lon_0 = 0
         self.boundinglatTextBox.setText('0')
@@ -4280,7 +4302,7 @@ class Map_window(QWidget):
         self.continent_thicknessTextBox.setText('1.5')
         self.continent_colorTextBox.setText('black')
 
-
+        cfp.mapset()
 
     def help(self):
 
@@ -4361,7 +4383,8 @@ class Contour_window(QWidget):
         zero_thickTextBox.setText('')
         zero_thickTextBox.textChanged.connect(lambda: self.textbox_changed('zero_thick')) 
         nlevsTextBox = QLineEdit()
-        nlevsTextBox.setText(plotvars.nlevs)
+        if type(plotvars.nlevs) is int:
+            nlevsTextBox.setText(plotvars.nlevs)
         nlevsTextBox.textChanged.connect(lambda: self.textbox_changed('nlevs'))       
 
 
@@ -4890,6 +4913,7 @@ class Data_window(QWidget):
         selected = self.table.selectionModel().selectedIndexes()
 
         if selected:
+            con_args ={}
             xvals = []
             yvals = []
             for item in selected:
@@ -4900,34 +4924,26 @@ class Data_window(QWidget):
             maxx = max(xvals)
             miny = min(yvals)
             maxy = max(yvals)
-
-            
-                       
- 
-            
-
             
             
+            mycoords = Cf_funcs.find_dim_names(self.field)
+            for i in np.arange(len(mycoords)):
+               if mycoords[i][:19] == 'dimensioncoordinate':
+                   mycoords[i] = 'dim' + mycoords[i][19:]
             
-            
+            mytypes = self.data_ComboBox.currentText().split('-')
+            if len(mytypes) == 2:
+                myx = mytypes[0]
+                myy = mytypes[1]
                 
-            #if myy == 'one dimensional data':
-            #    if len(new_subspace_args) > 0:
-            #        f = f.subspace(**new_subspace_args)
-            #        
-            #    cfp.lineplot(f, titles=True)
-            #    return
-                
+                if mycoords.index(myx) > mycoords.index(myy):
+                    minx, maxx, miny, maxy = miny, maxy, minx, maxx
+                    con_args['swap_axes'] = True 
 
-            
-            
-            
-            # plot_type = 'single point selected'
             
             # Contour plot
             if maxx > minx and maxy > miny:
 
-                con_args ={}
                 if plotvars.fill and not plotvars.lines:
                     con_args['lines'] = False
                 if not plotvars.fill and plotvars.lines:
@@ -4962,16 +4978,25 @@ class Data_window(QWidget):
                 cfp.con(self.field[miny:maxy, minx:maxx], **con_args)
                 
                 
-
+            idims = len(self.field.get_data_axes())
+                
+            # Line plots
             if maxx > minx and miny == maxy:
-                plot_type = 'line'
-                cfp.lineplot(self.field[miny, minx:maxx], titles=True)
-                
+                if idims == 2:
+                    cfp.lineplot(self.field[miny, minx:maxx], titles=True)
+                elif idims == 1:
+                    cfp.lineplot(self.field[minx:maxx], titles=True)
+                else:
+                    print('view data - lineplot issue - ndims is not 1 or 2')    
+                                   
             if maxx == minx and maxy > miny:
-                plot_type = 'line'
-                cfp.lineplot(self.field[miny:maxy, minx], titles=True)
-                
-                
+                if idims == 2:
+                    cfp.lineplot(self.field[miny:maxy, minx], titles=True)
+                elif idims == 1:
+                    cfp.lineplot(self.field[miny:maxy], titles=True)
+                else:
+                    print('view data - lineplot issue - ndims is not 1 or 2')
+                    
             if minx == maxx and miny == maxy:
                 print('\n\nPloting error - only a single point selected\n\n')                
                 
@@ -6356,7 +6381,12 @@ class Transform_window(QWidget):
         f = deepcopy(plotvars.fields[plotvars.index_number])
         mystored = plotvars.stored['f' + str(plotvars.index_number)]
         myaxes = mystored['data_axes']
+        myaxes_long = deepcopy(mystored['data_axes'])
+        for i in np.arange(len(myaxes_long)):
+            if myaxes_long[i][:3] == 'dim':
+                myaxes_long[i] = 'dimensioncoordinate' + myaxes_long[i][3:]
         mycollapses = mystored['collapses'] 
+        
           
         if idim >= 0:
             mycollapses[idim] = self.collapse_ComboBoxes[idim].currentText()
@@ -6376,7 +6406,7 @@ class Transform_window(QWidget):
             mymax = max(indicies)
 
             # Code for bounds calculation
-            coord = f.coord(myaxes[myindex])
+            coord = f.coord(myaxes_long[myindex])
             if coord.has_bounds() is False:
                 bounds = coord.create_bounds()
                 coord.set_bounds(bounds)
@@ -7456,7 +7486,8 @@ class Cf_funcs():
             names = []
             for i in np.arange(len(field_widget_names)):
                 name_long = field_widget_names[i].split(' ')
-                name_field = [x for x in name_long if x != ''][5]
+                len_axes = len(plotvars.stored['f' + str(i)]['data_axes'])
+                name_field = [x for x in name_long if x != ''][len_axes + 1:][0]
                 names.append(name_field)
 
             ordered_indicies = np.argsort(names)
@@ -7476,7 +7507,8 @@ class Cf_funcs():
             names = []
             for i in np.arange(len(field_widget_names)):
                 name_long = field_widget_names[i].split(' ')
-                name_field = [x for x in name_long if x != ''][5]
+                len_axes = len(plotvars.stored['f' + str(i)]['data_axes'])
+                name_field = [x for x in name_long if x != ''][len_axes + 1:][0]
                 if search in name_field:
                     widget_names_searched.append(field_widget_names[i])
                     ordered_indicies.append(i)
@@ -8362,8 +8394,8 @@ class Vector_window(QWidget):
         vector_strideLabel = QLabel('stride')
         vector_ptsLabel = QLabel('pts')
         vector_key_lengthLabel = QLabel('key length')
-
-
+        vector_widthLabel = QLabel('width')
+        vector_headwidthLabel = QLabel('headwidth')
 
         # Text boxes
         vector_titleTextBox = QLineEdit()
@@ -8371,7 +8403,7 @@ class Vector_window(QWidget):
         vector_titleTextBox.textChanged.connect(lambda: self.textbox_changed('title'))
 
         vector_scaleTextBox = QLineEdit()
-        vector_scaleTextBox.setText(str(plotvars.vector_scale))
+        vector_scaleTextBox.setText(str(plotvars.vect_scale))
         vector_scaleTextBox.textChanged.connect(lambda: self.textbox_changed('scale'))
 
         vector_strideTextBox = QLineEdit()
@@ -8383,21 +8415,31 @@ class Vector_window(QWidget):
         vector_ptsTextBox.textChanged.connect(lambda: self.textbox_changed('pts'))
 
         vector_key_lengthTextBox = QLineEdit()
-        vector_key_lengthTextBox.setText(str(plotvars.vector_key_length))
+        vector_key_lengthTextBox.setText(str(plotvars.vect_key_length))
         vector_key_lengthTextBox.textChanged.connect(lambda: self.textbox_changed('key_length'))
-
+        
+        vector_widthTextBox = QLineEdit()
+        vector_widthTextBox.setText(str(plotvars.vect_width))
+        vector_widthTextBox.textChanged.connect(lambda: self.textbox_changed('width'))       
+        
+        vector_headwidthTextBox = QLineEdit()
+        vector_headwidthTextBox.setText(str(plotvars.vect_headwidth))
+        vector_headwidthTextBox.textChanged.connect(lambda: self.textbox_changed('headwidth'))
+        
         self.vector_titleLabel = vector_titleLabel
         self.vector_scaleLabel = vector_scaleLabel
         self.vector_strideLabel = vector_strideLabel
         self.vector_ptsLabel = vector_ptsLabel
+        self.vector_widthLabel = vector_widthLabel
+        self.vector_headwidthLabel = vector_headwidthLabel
         self.vector_key_lengthLabel = vector_key_lengthLabel
         self.vector_titleTextBox = vector_titleTextBox
         self.vector_scaleTextBox = vector_scaleTextBox
         self.vector_strideTextBox = vector_strideTextBox
         self.vector_ptsTextBox = vector_ptsTextBox
         self.vector_key_lengthTextBox = vector_key_lengthTextBox
-
-
+        self.vector_widthTextBox = vector_widthTextBox
+        self.vector_headwidthTextBox = vector_headwidthTextBox
 
         # Set the layout
         vbox = QVBoxLayout()
@@ -8429,7 +8471,16 @@ class Vector_window(QWidget):
         hbox_key_length.addWidget(self.vector_key_lengthLabel)
         hbox_key_length.addWidget(self.vector_key_lengthTextBox)
         vbox.addLayout(hbox_key_length)
-
+        
+        hbox_width = QHBoxLayout()
+        hbox_width.addWidget(self.vector_widthLabel)
+        hbox_width.addWidget(self.vector_widthTextBox)
+        vbox.addLayout(hbox_width)        
+        
+        hbox_headwidth = QHBoxLayout()
+        hbox_headwidth.addWidget(self.vector_headwidthLabel)
+        hbox_headwidth.addWidget(self.vector_headwidthTextBox)
+        vbox.addLayout(hbox_headwidth)     
 
         # The buttons
         hbox_buttons = QHBoxLayout()
@@ -8465,27 +8516,34 @@ class Vector_window(QWidget):
 
 
     def textbox_changed(self, text):
-
+    
         textbox = getattr(self, 'vector_' + text + 'TextBox') 
-        setattr(plotvars, 'vector_' + text, textbox.text()) 
-
+        if text == 'title':
+            setattr(plotvars, 'vect_' + text, textbox.text()) 
+        else:
+            val = Data_check.test_type(textbox.text())
+            setattr(plotvars, 'vect_' + text, val) 
+        
 
     def reset(self):
 
         # Reset vector options
-       
         self.vector_titleTextBox.setText('')
-        self.vector_scaleTextBox.setText('')
+        self.vector_scaleTextBox.setText('100')
         self.vector_strideTextBox.setText('')
         self.vector_ptsTextBox.setText('')
-        self.vector_key_lengthTextBox.setText('')
+        self.vector_key_lengthTextBox.setText('10')
+        self.vector_widthTextBox.setText('0.02')
+        self.vector_headwidthTextBox.setText('3')        
 
-        plotvars.vector_title = ''
-        plotvars.vector_scale = ''
-        plotvars.vector_stride = ''
-        plotvars.vector_pts = ''
-        plotvars.vector_key_length = ''
-        plotvars.vector_pivot = 'middle'
+        plotvars.vect_title = ''
+        plotvars.vect_scale = 100
+        plotvars.vect_stride = ''
+        plotvars.vect_pts = ''
+        plotvars.vect_key_length = 10
+        plotvars.vect_pivot = 'middle'
+        plotvars.vect_width = 0.02
+        plotvars.vect_headwidth = 3
 
 
     def help(self):
@@ -8498,8 +8556,9 @@ class Vector_window(QWidget):
             html += '<b>scale</b> Initially set to 100.  A value of 50 gives vectors that are twice as long<br>'
             html += '<b>pts</b> Interpolate to this number of points in the plot x and y directions<br>'
             html += '<b>stride</b> Skip this number of points in the plot x and y directions<br>' 
-            html += '<b>key_length</b> Use this value for the reference vector<br>'
-
+            html += '<b>key_length</b> Use this value for the reference vector - default is 10<br>'
+            html += '<b>width</b> Width of the arrow shaft - default is 0.02<br>'
+            html += '<b>headwidth</b> Width of the arrow head - default is 3<br>'
 
 
             self.line_help = Help(html)
