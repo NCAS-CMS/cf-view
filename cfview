@@ -1135,7 +1135,6 @@ class Cfview(QMainWindow):
                     map_com += "'"
                 if vars[i] in map_args:    
                     map_com += getattr(plotvars, vars[i])
-                    print('keyword and value are ', vars[i], getattr(plotvars, vars[i]))
                 if vars[i] in map_args and vars[i] in ['proj', 'resolution']:
                     map_com += "'"                    
                 if vars[i] in map_args:                    
@@ -2850,7 +2849,7 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 3.2.23</b><p>'
+            html += '<b>This is version 3.2.24</b><p>'
             html += 'cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data'
             html += '<p>'
             html += 'cfview uses:<br>'
@@ -2860,7 +2859,7 @@ class Cfview(QMainWindow):
             html += 'http://ajheaps.github.io/cf-plot<P>'
             html += '<b>PyQt5</b> - GUI toolkit<p>'
             html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS February 2023'
+            html += '&#169; NCAS CMS May 2023'
             self.about_help = Help(html)
             self.about_help.show()
 
