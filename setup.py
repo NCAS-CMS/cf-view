@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(name = "cf-view",
     long_description = "GUI for viewing CF files",
-    version      = "3.2.22",
+    version      = "3.2.23",
     description  = "GUI for viewing CF files",
     author       = "Andy Heaps",
     maintainer   = "Andy Heaps",

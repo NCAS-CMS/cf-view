@@ -1106,7 +1106,6 @@ class Cfview(QMainWindow):
                     map_args['latmax'] = float(plotvars.latmax) 
 
 
-            print('plotvars.proj is ', plotvars.proj)
             
             if plotvars.proj in ['rotated']:
                 if f.ref('grid_mapping_name:rotated_latitude_longitude', default=False):
@@ -2851,7 +2850,7 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 3.2.22</b><p>'
+            html += '<b>This is version 3.2.23</b><p>'
             html += 'cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data'
             html += '<p>'
             html += 'cfview uses:<br>'
