@@ -1029,7 +1029,26 @@ class Cfview(QMainWindow):
         # Assemble the map dictionary and associated cf-plot code if required
         map_args = {}
         setvars_args ={}
-        if (plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector'] and  plotvars.contour_type == 'X-Y') or \
+        
+        map_plot = False
+        if plotvars.contour_type == 'X-Y':
+                map_plot = True
+                
+        mydims = plotvars.contour_type.split('-')
+        if mydims[0][:2] == 'ax' and  mydims[1][:2] == 'ax':
+            mycoords = list(f.coords())
+            first_coord = 'auxiliarycoordinate' + mydims[0][2:]
+            second_coord = 'auxiliarycoordinate' + mydims[1][2:]
+            if first_coord in mycoords and second_coord in mycoords:
+                if f.coord(first_coord).X:
+                    if f.coord(second_coord).Y:
+                        map_plot = True
+                if f.coord(second_coord).X:
+                    if f.coord(first_coord).Y:
+                        map_plot = True    
+                            
+                                    
+        if (plotvars.plot_type in ['Contour', 'Vector', 'Contour and vector'] and  map_plot) or \
             plotvars.plot_type == 'Trajectory' or plotvars.proj == 'rotated':
 
             map_args = {}
@@ -1446,11 +1465,6 @@ class Cfview(QMainWindow):
 
 
 
-            # Set the map
-            if plotvars.contour_type == 'X-Y':
-                cfp.mapset(proj=plotvars.proj)
-
-
             # Get the subspace and collapse commands
             com_subspace, com_collapse = Cf_funcs.com_subspace_collapse(subspace_args)
 
@@ -1472,7 +1486,7 @@ class Cfview(QMainWindow):
                 com_con += cscale_com
 
             # Add map settings and code if specified
-            if len(map_args) > 0:
+            if map_plot and len(map_args) > 0:
                 cfp.mapset(**map_args)
                 com_con += map_com + '\n'
                 
@@ -1512,15 +1526,15 @@ class Cfview(QMainWindow):
 
 
 
-                # Add bounds for those axes that need them
-                # ajh - new code
+                # Add bounds for those axes that need them                
                 for i in np.arange(len(myaxes)):
                     if mystored['collapses'] != 'Off':
-                        coord = f.coord(myaxes[i])
-                        if len(coord.array) > 1:
-                            if coord.has_bounds() is False:
-                                bounds = coord.create_bounds()
-                                coord.set_bounds(bounds)                
+                        if myaxes[i][:2] != 'ax':
+                            coord = f.coord(myaxes[i])
+                            if len(coord.array) > 1:
+                                if coord.has_bounds() is False:
+                                    bounds = coord.create_bounds()
+                                    coord.set_bounds(bounds)                
                 
                 
                 
@@ -2849,7 +2863,7 @@ class Cfview(QMainWindow):
 
         if value.text() == 'about':
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 3.2.24</b><p>'
+            html += '<b>This is version 3.2.25</b><p>'
             html += 'cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data'
             html += '<p>'
             html += 'cfview uses:<br>'
