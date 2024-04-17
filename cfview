@@ -614,30 +614,30 @@ class Cfview(QMainWindow):
         '''Open a file dialog''' 
         dialog = QFileDialog()
         
-        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
         #dialog.setOption(QCoreApplication.AA_DontUseNativeDialogs, True)
-        dialog.setAcceptMode(QFileDialog.AcceptOpen)
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
         #dialog.setNameFilters(["(*.nc *.pp)", "(*.nc)", "(*.pp)", "(*.*)"])
         dialog.setNameFilters(["*.nc *.pp", "*.nc", "*.pp", "*.*"])
-        dialog.setFileMode(QFileDialog.ExistingFiles)
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
 
  
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         dialog.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
         dialog.setFont(custom_font)
 
         path =  ''
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             path =  dialog.selectedFiles()
         
 
@@ -842,21 +842,21 @@ class Cfview(QMainWindow):
         #dialog.setOption(QFileDialog.AA_DontUseNativeDialogs, True)
  
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         dialog.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
         dialog.setFont(custom_font)
 
         path =  ''
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             path =  dialog.selectedFiles()[0]
 
         # Return if no file specified or if cancel has been pressed
@@ -2289,10 +2289,10 @@ class Cfview(QMainWindow):
             
             if plotvars.fields[plotvars.index_number].ref('grid_mapping_name:rotated_latitude_longitude', default=False):
                 obj.setEnabled(True)
-                pal.setColor(QPalette.WindowText, QColor(plotvars.text_colour))
+                pal.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.text_colour))
             else:
                 obj.setEnabled(False)
-                pal.setColor(QPalette.WindowText, QColor(plotvars.text_colour_insensitive))    
+                pal.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.text_colour_insensitive))    
                             
             obj.setPalette(pal)         
 
@@ -2977,8 +2977,8 @@ class Cfview_defaults_window(QWidget):
         font_Slider.setValue(plotvars.fontsize)
 
         # Find available fonts
-        db = QFontDatabase()
-        fonts = QFontDatabase().families()
+        db = QFontDatabase
+        fonts = QFontDatabase.families()
 
         # Main font
         fontComboBox = QComboBox()
@@ -3093,14 +3093,14 @@ class Cfview_defaults_window(QWidget):
 
         # Set the window theme
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         # Set font 
@@ -3174,14 +3174,14 @@ class Cfview_defaults_window(QWidget):
 
 
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(background))
-        palette.setColor(QPalette.Base, QColor(background))    
-        palette.setColor(QPalette.Button, QColor(button))
-        palette.setColor(QPalette.ButtonText, QColor(buttontext))
-        palette.setColor(QPalette.Highlight, QColor(highlight))
-        palette.setColor(QPalette.HighlightedText, QColor(text))
-        palette.setColor(QPalette.Text,  QColor(text))    
-        palette.setColor(QPalette.WindowText, QColor(windowtext))
+        palette.setColor(QPalette.ColorRole.Window, QColor(background))
+        palette.setColor(QPalette.ColorRole.Base, QColor(background))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(button))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(buttontext))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(highlight))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(text))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(text))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(windowtext))
         self.setPalette(palette)
         self.parent.window().setPalette(palette)
         for window in self.windows: 
@@ -3381,14 +3381,14 @@ class Clobber_file(QWidget):
        
 
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         # Set font 
@@ -3687,14 +3687,14 @@ class Contour_levels_window(QWidget):
 
 
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         # Set font 
@@ -3764,7 +3764,7 @@ class Contour_levels_window(QWidget):
                 color = plotvars.text_colour
             obj.setEnabled(flags[i])
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)
 
 
@@ -3997,14 +3997,14 @@ class Help(QWidget):
        
 
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         # Set font 
@@ -4033,7 +4033,7 @@ class HLine(QFrame):
     def setColor(self, color):
         '''Set the horizontal line colour'''
         pal = self.palette()
-        pal.setColor(QPalette.WindowText, color)
+        pal.setColor(QPalette.ColorRole.WindowText, color)
         self.setPalette(pal)
 
 
@@ -4095,7 +4095,7 @@ class Colour_scale_window(QWidget):
 
 
         pal = QPalette(numberLabel.palette())
-        pal.setColor(QPalette.WindowText, QColor('#708090'))
+        pal.setColor(QPalette.ColorRole.WindowText, QColor('#708090'))
         numberLabel.setPalette(pal)
 
         # Text boxes
@@ -4321,14 +4321,14 @@ class Colour_scale_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -4396,7 +4396,7 @@ class Colour_scale_window(QWidget):
         for obj in objs:
             obj.setEnabled(enabled)
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)
 
 
@@ -4670,10 +4670,10 @@ class Map_window(QWidget):
             
             if plotvars.fields[plotvars.index_number].ref('grid_mapping_name:rotated_latitude_longitude', default=False):
                 obj.setEnabled(True)
-                pal.setColor(QPalette.WindowText, QColor(plotvars.text_colour))
+                pal.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.text_colour))
             else:
                 obj.setEnabled(False)
-                pal.setColor(QPalette.WindowText, QColor(plotvars.text_colour_insensitive))    
+                pal.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.text_colour_insensitive))    
                             
             obj.setPalette(pal)                 
         
@@ -4868,14 +4868,14 @@ class Map_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -5057,7 +5057,7 @@ class Map_window(QWidget):
             obj = objs[i]
             obj.setEnabled(enabled)
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)            
             
         
@@ -5256,14 +5256,14 @@ class Contour_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -5339,7 +5339,7 @@ class Contour_window(QWidget):
         for obj in objs:
             obj.setEnabled(enabled)
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)
 
 
@@ -5704,14 +5704,14 @@ class Data_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -6147,14 +6147,14 @@ class Names_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -6809,14 +6809,14 @@ class New_property_window(QWidget):
         self.new_property_help =  None  # No external window yet.
 
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         # Set font 
@@ -7170,14 +7170,14 @@ class Transform_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -7332,10 +7332,10 @@ class Transform_window(QWidget):
             self.warningLabel1.setVisible(True)
             self.warningLabel2.setVisible(True)
             pal = QPalette(self.warningLabel1.palette())
-            pal.setColor(QPalette.WindowText, QColor(Qt.red))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(Qt.red))
             self.warningLabel1.setPalette(pal) 
             pal = QPalette(self.warningLabel2.palette())
-            pal.setColor(QPalette.WindowText, QColor(Qt.red))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(Qt.red))
             self.warningLabel2.setPalette(pal)             
             
             for i in np.arange(len(objs)): 
@@ -7368,7 +7368,7 @@ class Transform_window(QWidget):
                 color = plotvars.text_colour
             obj.setEnabled(flags[i])
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)
 
 
@@ -7390,7 +7390,7 @@ class Transform_window(QWidget):
                 color = plotvars.text_colour
             obj.setEnabled(flags[i])
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)
 
 
@@ -9073,14 +9073,14 @@ class Line_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -9154,7 +9154,7 @@ class Line_window(QWidget):
                 color = plotvars.text_colour
             obj.setEnabled(flags[i])
             pal = QPalette(obj.palette())
-            pal.setColor(QPalette.WindowText, QColor(color))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(color))
             obj.setPalette(pal)
 
 
@@ -9324,14 +9324,14 @@ class Vector_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
@@ -9602,14 +9602,14 @@ class Trajectory_window(QWidget):
 
         # Set theme and font
         palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
         custom_font = QFont(plotvars.font, plotvars.fontsize)
