@@ -14,13 +14,13 @@ import sys
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib
-from PyQt5.QtWidgets import QApplication, QLabel, QCheckBox, QFileDialog, QDialog, QRadioButton, QAction
-from PyQt5.QtWidgets import QComboBox, QListWidget, QListWidgetItem, QHBoxLayout, QVBoxLayout, QWidget, QPushButton
-from PyQt5.QtWidgets import QLineEdit, QTextEdit, QSlider, QMenu, QFontDialog, QMenuBar
-from PyQt5.QtWidgets import QMainWindow, QFrame, QSizePolicy, QScrollBar, QScrollArea, QFormLayout, QGroupBox, QTableWidget
-from PyQt5.QtWidgets import QTableWidgetItem, QTableView, QSlider, QAbstractScrollArea, QSpacerItem, QHeaderView
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, QAbstractTableModel, QVariant, QCoreApplication
-from PyQt5.QtGui import QFont, QPalette, QColor, QTextDocument, QPixmap, QImage, QStandardItemModel, QFontDatabase, QFontMetrics
+from PyQt6.QtWidgets import QApplication, QLabel, QCheckBox, QFileDialog, QDialog, QRadioButton, QAbstractItemView
+from PyQt6.QtWidgets import QComboBox, QListWidget, QListWidgetItem, QHBoxLayout, QVBoxLayout, QWidget, QPushButton
+from PyQt6.QtWidgets import QLineEdit, QTextEdit, QSlider, QMenu, QFontDialog, QMenuBar
+from PyQt6.QtWidgets import QMainWindow, QFrame, QSizePolicy, QScrollBar, QScrollArea, QFormLayout, QGroupBox, QTableWidget
+from PyQt6.QtWidgets import QTableWidgetItem, QTableView, QSlider, QAbstractScrollArea, QSpacerItem, QHeaderView
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QAbstractTableModel, QVariant, QCoreApplication
+from PyQt6.QtGui import QFont, QPalette, QColor, QTextDocument, QPixmap, QImage, QStandardItemModel, QFontDatabase, QFontMetrics, QAction 
 from copy import deepcopy
 from functools import partial
 from PIL import Image, ImageDraw
@@ -297,19 +297,19 @@ class Cfview(QMainWindow):
         plot_type_ComboBox.addItem('Contour and vector')
         plot_type_ComboBox.addItem('Line')
         plot_type_ComboBox.addItem('Trajectory')
-        plot_type_ComboBox.activated[str].connect(self.plot_type)
+        plot_type_ComboBox.textActivated.connect(self.plot_type)
 
 
         # Contour type drop down menu
         contour_type_ComboBox = QComboBox()
-        contour_type_ComboBox.activated[str].connect(self.contour_type)
+        contour_type_ComboBox.textActivated.connect(self.contour_type)
         self.contour_type_ComboBox = contour_type_ComboBox
 
 
         # Line type drop down menu
         line_type_ComboBox = QComboBox()
 
-        line_type_ComboBox.activated[str].connect(self.line_type)
+        line_type_ComboBox.textActivated.connect(self.line_type)
         self.line_type_ComboBox = line_type_ComboBox
 
         # Dimension selection
@@ -329,7 +329,7 @@ class Cfview(QMainWindow):
 
 
         fieldlist = QListWidget()
-        fieldlist.setSelectionMode(QListWidget.ExtendedSelection)
+        fieldlist.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         fieldlist.itemSelectionChanged.connect(self.fieldnumber)
         
         field_titles = QLabel('Index  nX   nY   nZ   nT   field name')
@@ -342,7 +342,7 @@ class Cfview(QMainWindow):
 
         # Messages label
         messagesLabel = QLabel('Output messages')
-        messagesLabel.setAlignment(Qt.AlignCenter)
+        messagesLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
 
         # Dimension lists
@@ -363,13 +363,13 @@ class Cfview(QMainWindow):
             self.axis_RadioButtons[i].clicked.connect(partial(self.dim_view, i))
             
             self.lists.append(QListWidget())
-            self.lists[i].setSelectionMode(QListWidget.ExtendedSelection)
+            self.lists[i].setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
             self.lists[i].setFont(custom_font_fixed_width)
             self.lists[i].itemSelectionChanged.connect(self.reset_field_title)
             self.lists[i].setVisible(False)
             
             self.lists_collapse.append(QListWidget())
-            self.lists_collapse[i].setSelectionMode(QListWidget.ExtendedSelection)
+            self.lists_collapse[i].setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
             self.lists_collapse[i].setFont(custom_font_fixed_width)
             self.lists_collapse[i].itemSelectionChanged.connect(self.reset_field_title)
             self.lists_collapse[i].setVisible(False)
@@ -551,20 +551,20 @@ class Cfview(QMainWindow):
 
         # Interface colour settings
         palette = QPalette()    
-        palette.setColor(QPalette.Window, QColor(plotvars.background_colour))
-        palette.setColor(QPalette.Base, QColor(plotvars.background_colour))    
-        palette.setColor(QPalette.Button, QColor(plotvars.button_colour))
-        palette.setColor(QPalette.ButtonText, QColor(plotvars.buttontext_colour))
-        palette.setColor(QPalette.Highlight, QColor(plotvars.highlight_colour))
-        palette.setColor(QPalette.HighlightedText, QColor(plotvars.text_colour))
-        palette.setColor(QPalette.Text,  QColor(plotvars.text_colour))    
-        palette.setColor(QPalette.WindowText, QColor(plotvars.windowtext_colour))
+        palette.setColor(QPalette.ColorRole.Window, QColor(plotvars.background_colour))
+        palette.setColor(QPalette.ColorRole.Base, QColor(plotvars.background_colour))    
+        palette.setColor(QPalette.ColorRole.Button, QColor(plotvars.button_colour))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(plotvars.buttontext_colour))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(plotvars.highlight_colour))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(plotvars.text_colour))
+        palette.setColor(QPalette.ColorRole.Text,  QColor(plotvars.text_colour))    
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(plotvars.windowtext_colour))
         self.setPalette(palette)
 
 
         # Set main font
-        db = QFontDatabase()
-        fonts = QFontDatabase().families()
+        db = QFontDatabase
+        fonts = QFontDatabase.families()
         test_fonts = ['Times', 'Helvetica', 'Arial', deepcopy(plotvars.font)]
         for font in test_fonts:
             if font in fonts:
@@ -637,7 +637,7 @@ class Cfview(QMainWindow):
         dialog.setFont(custom_font)
 
         path =  ''
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.Accepted:
             path =  dialog.selectedFiles()
         
 
@@ -856,7 +856,7 @@ class Cfview(QMainWindow):
         dialog.setFont(custom_font)
 
         path =  ''
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.Accepted:
             path =  dialog.selectedFiles()[0]
 
         # Return if no file specified or if cancel has been pressed
@@ -3490,7 +3490,7 @@ class Contour_levels_window(QWidget):
         mylevels = plotvars.levels_stored
         for mylevel in mylevels:
             user_levelsComboBox.addItem(mylevel)
-        user_levelsComboBox.activated[str].connect(self.user_levels_changed)
+        user_levelsComboBox.textActivated.connect(self.user_levels_changed)
         self.user_levelsComboBox = user_levelsComboBox
 
 
@@ -4072,7 +4072,7 @@ class Colour_scale_window(QWidget):
         myscales = plotvars.scales_stored
         for myscale in myscales:
             user_scalesComboBox.addItem(myscale)
-        user_scalesComboBox.activated[str].connect(self.user_scale_changed)
+        user_scalesComboBox.textActivated.connect(self.user_scale_changed)
         self.user_scalesComboBox = user_scalesComboBox
 
 
@@ -4684,7 +4684,7 @@ class Map_window(QWidget):
         mymaps = plotvars.maps_stored
         for mymap in mymaps:
             user_mapsComboBox.addItem(mymap)
-        user_mapsComboBox.activated[str].connect(self.user_map_changed)
+        user_mapsComboBox.textActivated.connect(self.user_map_changed)
         self.user_mapsComboBox = user_mapsComboBox
         
 
@@ -4791,7 +4791,7 @@ class Map_window(QWidget):
         resolutionComboBox.addItem('110m')
         resolutionComboBox.addItem('50m')
         resolutionComboBox.addItem('10m')
-        resolutionComboBox.activated[str].connect(self.resolution_changed)
+        resolutionComboBox.textActivated.connect(self.resolution_changed)
         self.resolutionComboBox = resolutionComboBox
         self.resolutionComboBox.setCurrentText(plotvars.resolution)
         
@@ -8953,7 +8953,7 @@ class Line_window(QWidget):
         line_style_ComboBox.addItem('dashed')
         line_style_ComboBox.addItem('dashdot')
         line_style_ComboBox.addItem('dotted')
-        line_style_ComboBox.activated[str].connect(self.line_style)
+        line_style_ComboBox.textActivated.connect(self.line_style)
 
         # Check boxes
         user_data_limitsCheckBox = QCheckBox("User defined plot limits")
@@ -9488,7 +9488,7 @@ class Trajectory_window(QWidget):
         trajectory_line_style_ComboBox.addItem('dashed')
         trajectory_line_style_ComboBox.addItem('dashdot')
         trajectory_line_style_ComboBox.addItem('dotted')
-        trajectory_line_style_ComboBox.activated[str].connect(self.trajectory_line_style)
+        trajectory_line_style_ComboBox.textActivated.connect(self.trajectory_line_style)
 
 
         # Tick boxes
@@ -9699,7 +9699,7 @@ def main(filename, defaults='~/.cfview_defaults'):
     app.setStyle('Fusion')
 
     ex = Cfview(filename, defaults)
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 if __name__ == '__main__':
 
