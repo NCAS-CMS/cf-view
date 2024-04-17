@@ -2971,7 +2971,7 @@ class Cfview_defaults_window(QWidget):
         themeComboBox.highlighted[str].connect(self.theme)
 
         # Font size slider
-        font_Slider = QSlider(Qt.Horizontal)
+        font_Slider = QSlider(Qt.Orientation.Horizontal)
         font_Slider.sliderMoved.connect(self.fontsize)
         font_Slider.setRange(2, 25)
         font_Slider.setValue(plotvars.fontsize)
@@ -4022,8 +4022,8 @@ class HLine(QFrame):
     def __init__(self, parent=None, color=QColor(plotvars.text_colour)):
 
         super(HLine, self).__init__(parent)
-        self.setFrameShape(QFrame.HLine)
-        self.setFrameShadow(QFrame.Plain)
+        self.setFrameShape(QFrame.Shape.HLine)
+        self.setFrameShadow(QFrame.Shadow.Plain)
         self.setFixedHeight(40)
         self.setLineWidth(0)
         self.setMidLineWidth(3)
@@ -5447,7 +5447,7 @@ class TableModel(QAbstractTableModel):
             pass
 
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             value = self._data[index.row(), index.column()]
             
             if ma.is_masked(value):
@@ -5472,16 +5472,16 @@ class TableModel(QAbstractTableModel):
     def headerData(self, section, orientation, role):
         '''xlabels and ylabels for the data'''
         
-        if role != Qt.DisplayRole:
+        if role != Qt.ItemDataRole.DisplayRole:
             return QVariant()
 
-        if orientation == Qt.Horizontal:
+        if orientation == Qt.Orientation.Horizontal:
             xlabels = []
             for ix in np.arange(len(self._x)):
                 xlabels.append(str(self._x[ix]))
             return xlabels[section]
                 
-        if orientation == Qt.Vertical:
+        if orientation == Qt.Orientation.Vertical:
             ylabels = []
             for iy in np.arange(len(self._y)):
                 ylabels.append(str(self._y[iy]))
@@ -5591,19 +5591,19 @@ class Data_window(QWidget):
         datamax_colourTextBox.textChanged.connect(self.value_changed)
 
         # ndecs and text size sliders
-        ndecsSlider = QSlider(Qt.Horizontal)
+        ndecsSlider = QSlider(Qt.Orientation.Horizontal)
         ndecsSlider.setMinimum(0)
         ndecsSlider.setMaximum(9)
         ndecsSlider.setValue(2)
         ndecsSlider.valueChanged.connect(self.value_changed)
 
-        text_sizeSlider = QSlider(Qt.Horizontal)
+        text_sizeSlider = QSlider(Qt.Orientation.Horizontal)
         text_sizeSlider.setMinimum(1)
         text_sizeSlider.setMaximum(30)
         text_sizeSlider.setValue(plotvars.fontsize)
         text_sizeSlider.valueChanged.connect(self.value_changed)
         
-        column_widthSlider = QSlider(Qt.Horizontal)
+        column_widthSlider = QSlider(Qt.Orientation.Horizontal)
         column_widthSlider.setMinimum(1)
         column_widthSlider.setMaximum(30)
         column_widthSlider.setValue(10)        
@@ -5647,7 +5647,7 @@ class Data_window(QWidget):
         Populate_table(self)
         
         # Align column labels to the left
-        table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft)
+        table.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
         
 
         vbox = QVBoxLayout()
