@@ -1556,7 +1556,6 @@ class Cfview(QMainWindow):
                     if plotvars.code_output:
                         print('### Code to make the plot is ###\n', com_con)
                     
-
                 cfp.con(f, **con_args) 
 
                 
@@ -2969,7 +2968,7 @@ class Cfview_defaults_window(QWidget):
     
         for theme in themes:
             themeComboBox.addItem(theme)
-        themeComboBox.highlighted[str].connect(self.theme)
+        themeComboBox.highlighted.connect(self.theme)
 
         # Font size slider
         font_Slider = QSlider(Qt.Orientation.Horizontal)
@@ -2997,7 +2996,7 @@ class Cfview_defaults_window(QWidget):
 
 
         fontComboBox.setCurrentIndex(index)
-        fontComboBox.highlighted[str].connect(self.font_main)
+        fontComboBox.highlighted.connect(self.font_main)
 
 
         # Mono font
@@ -3014,7 +3013,7 @@ class Cfview_defaults_window(QWidget):
                 plotvars.font = font
 
         font_monoComboBox.setCurrentIndex(index)
-        font_monoComboBox.highlighted[str].connect(self.font_mono)
+        font_monoComboBox.highlighted.connect(self.font_mono)
         
         # Code output tick box
         code_outputCheckBox = QCheckBox("Output code")
@@ -4237,7 +4236,7 @@ class Colour_scale_window(QWidget):
             
             im2 = im.convert("RGBA")
             data = im2.tobytes("raw", "RGBA")
-            qim = QImage(data, im.size[0], im.size[1], QImage.Format_ARGB32)
+            qim = QImage(data, im.size[0], im.size[1], QImage.Format.Format_ARGB32)
             pixmap = QPixmap.fromImage(qim)
             image.setPixmap(pixmap)
 
