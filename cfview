@@ -2,8 +2,8 @@
 
 # Temporary fix for pillow warning
 # DeprecationWarning: Support for PyQt5 is deprecated and will be removed in Pillow 10 (2023-07-01). Use PyQt6 or PySide6 instead.
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+#import warnings
+#warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import cf
 import cfplot as cfp
@@ -27,7 +27,7 @@ from PIL import Image, ImageDraw
 from PIL.ImageQt import ImageQt
 import csv
 import json
-
+from importlib.metadata import metadata
 
 
 # Initiate the pvars class
@@ -119,7 +119,7 @@ plotvars.collapse_types = ['Off', 'mean', 'minimum', 'maximum', 'variance', 'sta
 # https://stackoverflow.com/questions/64833558/apps-not-popping-up-on-macos-big-sur-11-0-1
 # has resurfaced with pyqt5 = 4.19.18
 # pip install PyQt5==5.15.4 fixes it and also the following environment variable
-os.environ["QT_MAC_WANTS_LAYER"] = "1"
+# os.environ["QT_MAC_WANTS_LAYER"] = "1"
 
 class EmittingStream(QObject):
     '''Class for output and errors'''
@@ -2862,18 +2862,19 @@ class Cfview(QMainWindow):
             self.transform_window.show()
 
         if value.text() == 'about':
+            meta = metadata('cf-view')
             html = '<body><h2>About cfview</h2>'
-            html += '<b>This is version 3.2.25</b><p>'
-            html += 'cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data'
-            html += '<p>'
-            html += 'cfview uses:<br>'
-            html += '<b>cf-python</b> - data I/O and manipulation<br>'
-            html += 'https://ncas-cms.github.io/cf-python<p>'
-            html += '<b>cf-plot</b> - plotting<br>'
-            html += 'http://ajheaps.github.io/cf-plot<P>'
-            html += '<b>PyQt5</b> - GUI toolkit<p>'
-            html += 'Author: Andy Heaps andy.heaps@ncas.ac.uk<br>'
-            html += '&#169; NCAS CMS May 2023'
+            html += f"<h4>This is version {meta['Version']}</h4>"
+            html += '<p>cfview is a quick look data exploration tool for netCDF, Met Office PP and fields file data</p>'
+            html += '<p>cfview uses:<ul>'
+            html += '<li><b>cf-python</b> - data I/O and manipulation<br>'
+            html += 'https://ncas-cms.github.io/cf-python</li>'
+            html += '<li><b>cf-plot</b> - plotting<br>'
+            html += 'http://ncas-cms.github.io/cf-plot</li>'
+            html += '<li><b>PyQt6</b> - GUI toolkit</li></ul></p>'
+            html += f"<p>Author: {meta['Author']}</p>"
+            html += f"<p>Maintainer: {meta['Maintainer']} ({meta['Maintainer-email']})</p>"
+            html += f"<p>&#169; NCAS and the University of Reading 2024 </p>"
             self.about_help = Help(html)
             self.about_help.show()
 
