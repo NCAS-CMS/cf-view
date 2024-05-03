@@ -1,6 +1,6 @@
 # cf-view
 
-## Exploration & plotting Graphical User Interface (GUI) for netCDF & Met Office data
+## Exploration & plotting Graphical User Interface (GUI) for netCDF & Met Office format data
 
 ### Documentation
 
