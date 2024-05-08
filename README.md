@@ -15,7 +15,7 @@ the [xconv+](https://ncas-cms.github.io/xconv-doc/html/index.html) tool,
 using the power of:
 
 * Python ([PyQt](https://www.riverbankcomputing.com/software/pyqt/)) for the GUI;
-* [cf-plot](https://github.com/NCAS-CMS/cf-plot)
+* [cf-plot](https://ncas-cms.github.io/cf-plot/build/)
   (building on top of
   [matplotlib](https://matplotlib.org/) and
   [Cartopy](https://scitools.org.uk/cartopy/docs/latest/)) for the plotting;
@@ -52,12 +52,8 @@ Future releases will add support for data:
 
 ### Documentation
 
-For now, please see the static cf-view documentation hosted at 
-[https://ajheaps.github.io/cf-view](https://ajheaps.github.io/cf-view)
-(`https://ajheaps.github.io/cf-view`), noting that soon the canonical
-location for the full documentation will be moved to be under the NCAS-CMS
-organisation space, at `https://ncas-cms.github.io/cf-view/build/index.html`
-(these pages do not currently exist).
+See [the cf-view homepage](https://ncas-cms.github.io/cf-view/build/)
+(`https://ncas-cms.github.io/cf-view/build/`) for the full online documentation.
 
 
 ### Quickstart
@@ -134,7 +130,7 @@ bash cfview_install.sh
 #### Further installation information
 
 More detail about installation is provided on the
-[installation page](https://ajheaps.github.io/cf-view/download.html)
+[installation page](https://ncas-cms.github.io/cf-view/build/download.html)
 (`https://ajheaps.github.io/cf-view/download.html`)
 of the documentation.
 
@@ -150,5 +146,5 @@ Contributing guidelines will be added to the repository shortly.
 ### Help: Issues, Questions, Feature Requests, etc.
 
 For any queries, see the
-[guidance page](https://ajheaps.github.io/cf-view/issues.html)
+[guidance page](https://ncas-cms.github.io/cf-view/build/issues.html)
 (`https://ajheaps.github.io/cf-view/issues.html`).
