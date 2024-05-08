@@ -42,16 +42,15 @@ cf-view is developed and maintained by the
 Features
 ^^^^^^^^
 
-Features include:
+With cf-view you can, in a self-contained specialised GUI environment:
 
-- Easy installation;
 - Inspect, analyse and manipulate field constructs and their data;
 - Edit, delete and create field metadata and properties;
 - Output the underlying cf-python and cf-plot code;
 - View and produce plots such as map, contour, zonal means, vector, line and
   trajectory plots;
 - Change plotting properties such as map, colour scale, contour levels and
-  vector properties;
+  vector properties; and
 - Change interface colour scheme, fonts and font sizes.
 
 Future releases will add support for data:
