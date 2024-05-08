@@ -8,8 +8,9 @@
 research which supports the exploration, analysis and plotting of netCDF
 and Met Office format (PP or fields) data.**
 
-It is intended to be an updated
-replacement and improvement on
+![cf-view screenshot preview](docs/source/images/cfview.png "Preview of the cf-view GUI")
+
+It is intended to be an updated replacement and improvement on
 the [xconv+](https://ncas-cms.github.io/xconv-doc/html/index.html) tool,
 using the power of:
 
@@ -29,7 +30,24 @@ research. cf-view is developed and maintained by the
 [NCAS](https://ncas.ac.uk/).
 
 
-![cf-view screenshot preview](media/cfview-screenshot-preview-1.png "Preview of the cf-view GUI")
+#### Features
+
+With cf-view you can, in a self-contained specialised GUI environment:
+
+* Inspect, analyse and manipulate field constructs and their data;
+* Edit, delete and create field metadata and properties;
+* Output the underlying cf-python and cf-plot code;
+* View and produce plots such as map, contour, zonal means, vector, line and
+  trajectory plots;
+* Change plotting properties such as map, colour scale, contour levels and
+  vector properties; and
+* Change interface colour scheme, fonts and font sizes.
+
+Future releases will add support for data:
+
+* with 2D dimensions;
+* defined on rotated pole grids;
+* defined on unstructured grids i.e. UGRID data.
 
 
 ### Documentation
