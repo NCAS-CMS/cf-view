@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>cf-view documentation &#8212; cf-view 3.2.25 documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="nav-item nav-item-0"><a href="#">cf-view 3.2.25 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="cf-view-documentation">
+<h1>cf-view documentation<a class="headerlink" href="#cf-view-documentation" title="Permalink to this headline">¶</a></h1>
+<p><strong>Exploration &amp; plotting GUI for netCDF &amp; Met Office format data</strong></p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>cf-view is a Graphical User Interface (GUI) for earth science and
+aligned research which supports the exploration, analysis and plotting
+of netCDF and Met Office format (PP or fields) data.</p>
+<a class="reference internal image-reference" href="_images/cfview.png"><img alt="Preview of the cf-view GUI" src="_images/cfview.png" style="width: 459.6px; height: 338.40000000000003px;" /></a>
+<p>It is intended to be an updated replacement and improvement on the
+<a class="reference external" href="https://ncas-cms.github.io/xconv-doc/html/index.html">xconv+</a> tool,
+using the power of:</p>
+<ul class="simple">
+<li><p>Python (<a class="reference external" href="https://www.riverbankcomputing.com/software/pyqt/">PyQt</a>)
+for the GUI;</p></li>
+<li><p><a class="reference external" href="https://github.com/NCAS-CMS/cf-plot">cf-plot</a> (building on top of
+<a class="reference external" href="https://matplotlib.org/">matplotlib</a> and
+<a class="reference external" href="https://scitools.org.uk/cartopy/docs/latest/">Cartopy</a>) for the
+plotting;</p></li>
+<li><p><a class="reference external" href="https://ncas-cms.github.io/cf-python/">cf-python</a> for the data
+reading, processing and analysis; and</p></li>
+<li><p><a class="reference external" href="https://ncas-cms.github.io/cfdm/">cfdm</a> for the underlying data
+model.</p></li>
+</ul>
+<p>It is designed to be a useful tool for environmental, earth and aligned
+sciences, for example to facilitate climate and meteorological research.
+cf-view is developed and maintained by the
+<a class="reference external" href="https://cms.ncas.ac.uk/index.html">NCAS-CMS</a> group, part of
+<a class="reference external" href="https://ncas.ac.uk/">NCAS</a>.</p>
+<section id="features">
+<h3>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h3>
+<p>With cf-view you can, in a self-contained specialised GUI environment:</p>
+<ul class="simple">
+<li><p>Inspect, analyse and manipulate field constructs and their data;</p></li>
+<li><p>Edit, delete and create field metadata and properties;</p></li>
+<li><p>Output the underlying cf-python and cf-plot code;</p></li>
+<li><p>View and produce plots such as map, contour, zonal means, vector, line and
+trajectory plots;</p></li>
+<li><p>Change plotting properties such as map, colour scale, contour levels and
+vector properties; and</p></li>
+<li><p>Change interface colour scheme, fonts and font sizes.</p></li>
+</ul>
+<p>Future releases will add support for data:</p>
+<ul class="simple">
+<li><p>with 2D dimensions;</p></li>
+<li><p>defined on rotated pole grids;</p></li>
+<li><p>defined on unstructured grids i.e. UGRID data.</p></li>
+</ul>
+</section>
+</section>
+<section id="quickstart">
+<h2>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h2>
+<p>After installing (see below), start cf-view through the command line via
+running:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cfview
+</pre></div>
+</div>
+<p>or if you wish to start working with a specific file, add a positional
+argument:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cfview<span class="w"> </span>&lt;file&gt;
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">&lt;file&gt;</span></code> is the path to the netCDF, Met Office PP or fields
+file.</p>
+<p><em>Note:</em> when starting cf-view for the first time, it might take twenty
+or so seconds to start while matplotlib does some initialisation work.</p>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>There are two main ways to install cf-view: through a package manager,
+or by downloading and running a dedicated installation script.</p>
+<section id="installation-by-package-manager">
+<h3>Installation by package manager<a class="headerlink" href="#installation-by-package-manager" title="Permalink to this headline">¶</a></h3>
+<p>You can use <code class="docutils literal notranslate"><span class="pre">pip</span></code> with <code class="docutils literal notranslate"><span class="pre">conda</span></code> (or similar package managers such as
+<code class="docutils literal notranslate"><span class="pre">mamba</span></code>) as follows.</p>
+<p>To use <code class="docutils literal notranslate"><span class="pre">pip</span></code>, run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>cf-python<span class="w"> </span>cf-plot<span class="w"> </span>cf-view
+</pre></div>
+</div>
+<p>In future you will be able to install cf-view and all of its
+dependencies fully with <code class="docutils literal notranslate"><span class="pre">conda</span></code>, but for now only the dependencies are
+installable this way, like so:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>ncas<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>cf-python<span class="w"> </span>cf-plot<span class="w"> </span>udunits2
+</pre></div>
+</div>
+<p>and you must use e.g. <code class="docutils literal notranslate"><span class="pre">pip</span></code> to install the cf-view library itself.</p>
+</section>
+<section id="installation-by-download-script">
+<h3>Installation by download script<a class="headerlink" href="#installation-by-download-script" title="Permalink to this headline">¶</a></h3>
+<p>Alternatively, to install cf-view with its required dependencies, you
+can download from source. For Linux, run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>http://gws-access.jasmin.ac.uk/public/ncas_climate/ajh/cfview_install/cfview_install.sh
+</pre></div>
+</div>
+<p>or for Mac, instead run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-O<span class="w"> </span>-L<span class="w"> </span>http://gws-access.jasmin.ac.uk/public/ncas_climate/ajh/cfview_install/cfview_install.sh
+</pre></div>
+</div>
+<p>and then install by running the <code class="docutils literal notranslate"><span class="pre">cfview_install.sh</span></code> script, for
+example with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>cfview_install.sh
+</pre></div>
+</div>
+</section>
+<section id="further-installation-information">
+<h3>Further installation information<a class="headerlink" href="#further-installation-information" title="Permalink to this headline">¶</a></h3>
+<p>More detail about installation is provided on the <a class="reference external" href="https://ajheaps.github.io/cf-view/download.html">installation
+page</a>
+(<code class="docutils literal notranslate"><span class="pre">https://ajheaps.github.io/cf-view/download.html</span></code>) of the
+documentation.</p>
+</section>
+</section>
+<section id="contributing">
+<h2>Contributing<a class="headerlink" href="#contributing" title="Permalink to this headline">¶</a></h2>
+<p>Everyone is welcome to contribute to cf-view in the form of bug reports,
+documentation, code, design proposals, and more.</p>
+<p>Contributing guidelines will be added to the repository shortly.</p>
+</section>
+<section id="help-issues-questions-feature-requests-etc">
+<h2>Help: Issues, Questions, Feature Requests, etc.<a class="headerlink" href="#help-issues-questions-feature-requests-etc" title="Permalink to this headline">¶</a></h2>
+<p>For any queries, see the <a class="reference external" href="https://ajheaps.github.io/cf-view/issues.html">guidance
+page</a>
+(<code class="docutils literal notranslate"><span class="pre">https://ajheaps.github.io/cf-view/issues.html</span></code>).</p>
+</section>
+</section>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+
+<h3><a href="index.html">Homepage</a><p></h3>
+<h5><a href="download.html">Download/Install</a><p></h5>
+<h5><a href="videos.html">Training Videos</a><p></h5>
+<h5><a href="versions.html">Versions</a><p></h5>
+<h5><a href="issues.html">Issues</a><p></h5>
+<h5><a href="routines.html">Routines</a><p></h5>
+<h5><a href="license.html">License</a><p></h5>
+<h5><a href="search.html">Search</a><p></h5>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="nav-item nav-item-0"><a href="#">cf-view 3.2.25 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, Sadie Bartholomew NCAS-CMS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.4.5.
+    </div>
+  </body>
+</html>
