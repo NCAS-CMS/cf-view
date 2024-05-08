@@ -8,7 +8,7 @@
 research which supports the exploration, analysis and plotting of netCDF
 and Met Office format (PP or fields) data.**
 
-![cf-view screenshot preview](media/cfview-screenshot-preview-1.png "Preview of the cf-view GUI")
+![cf-view screenshot preview](docs/source/images/cfview.png "Preview of the cf-view GUI")
 
 It is intended to be an updated replacement and improvement on
 the [xconv+](https://ncas-cms.github.io/xconv-doc/html/index.html) tool,
