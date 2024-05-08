@@ -1,0 +1,22 @@
+version 0.4 changes
+*******************
+
+0. View code button
+===================
+
+Add view and save code buttons.  The code to make a plot is stored in plotvars.code.
+
+::
+
+     Done
+
+
+
+1. View data
+============
+
+
+::
+
+     Done
+

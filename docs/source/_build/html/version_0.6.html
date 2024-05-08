@@ -1,0 +1,186 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>version 0.6 changes &#8212; cf-view 1.0.4 documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head>
+  <body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="nav-item nav-item-0"><a href="index.html">cf-view 1.0.4 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="version-0-6-changes">
+<h1>version 0.6 changes<a class="headerlink" href="#version-0-6-changes" title="Permalink to this headline">¶</a></h1>
+<p>Testing against lots of files to find the bugs in cf-view and cf-plot.</p>
+<div class="section" id="string-formatting-issues">
+<h2>0. String formatting issues<a class="headerlink" href="#string-formatting-issues" title="Permalink to this headline">¶</a></h2>
+<p>In cf-view the description of the needs to be correct to allow data subspacing in cf-python but rounding and interpretation errors when translating from floats to strings meant that in some cases this to not be the case.  For example a time axis value of 1496205.0 was set to 1.4962e+06.  In another case the Gaussian latitude of 3.92521453 was truncated to 3.925.  In both of the above cases cf-view would crash with an error saying it wasn’t possible to subspace the data.</p>
+<p>The code was modified to pass the float of the data rather than just the data.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="masked-iterator-issue-when-doing-np-nanmin">
+<h2>1. Masked iterator issue when doing np.nanmin<a class="headerlink" href="#masked-iterator-issue-when-doing-np-nanmin" title="Permalink to this headline">¶</a></h2>
+<p>This isn’t a cf-view issue as such but one in numpy.  When cf-plot does a numpy.nanmin of a masked array version numpy 1.7 produces a masked iterator object and numpy 1.8.1 produces a single number.   The error is produced in cf-plot in the automatic levels selection call to the gval routine.</p>
+<p>A line has been put in the cf-view code to check that the numpy version is &gt; 1.8.1 and abort if otherwise.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="data-with-only-x-y-t-causes-a-crash-in-the-creation-of-the-cf-view-widget">
+<h2>2. Data with only X, Y, T causes a crash in the creation of the cf-view widget<a class="headerlink" href="#data-with-only-x-y-t-causes-a-crash-in-the-creation-of-the-cf-view-widget" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="data-with-no-standard-name-or-long-name-causes-cf-view-to-crash">
+<h2>3. Data with no standard_name or long_name causes cf-view to crash<a class="headerlink" href="#data-with-no-standard-name-or-long-name-causes-cf-view-to-crash" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="axes-in-the-field-selector-don-t-always-have-the-proper-dimensions-in-the-x-y-z-t-fields">
+<h2>4. Axes in the Field Selector don’t always have the proper dimensions in the X Y Z T fields<a class="headerlink" href="#axes-in-the-field-selector-don-t-always-have-the-proper-dimensions-in-the-x-y-z-t-fields" title="Permalink to this headline">¶</a></h2>
+<p>This was because in cf-python if there are two valid Z axes, for example, then None is returned
+for the Z dimension as it is ambiguous.  Use</p>
+<dl class="docutils">
+<dt>&lt;B&gt;for k, v  in field.items(‘Z’).iteritems():</dt>
+<dd>if v.isdimension is True: nz=len(field.item(k).array)&lt;/B&gt;</dd>
+</dl>
+<p>as the construct to get the number of values in the ‘Z’ dimension.</p>
+<p>Can also use v.isauxillary to get auxillary coordinates.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="in-the-grid-selector-the-dimension-1-parts-of-a-variable-aren-t-always-listed">
+<h2>5. In the grid selector the dimension 1 parts of a variable aren’t always listed<a class="headerlink" href="#in-the-grid-selector-the-dimension-1-parts-of-a-variable-aren-t-always-listed" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="error-in-subspace-of-data-that-has-almost-matching-vertical-coordinates">
+<h2>6. Error in subspace of data that has almost matching vertical coordinates<a class="headerlink" href="#error-in-subspace-of-data-that-has-almost-matching-vertical-coordinates" title="Permalink to this headline">¶</a></h2>
+<p>In a field we have:
+atmosphere_hybrid_sigma_pressure_coordinate
+and
+atmosphere_hybrid_sigma_pressure_coordinate_ak</p>
+<p>Need to use f.subspace(‘exact’, atmosphere_hybrid_sigma_pressure_coordinate=0.0291614404296875)
+to pick up the atmosphere_hybrid_sigma_pressure_coordinate coordinate.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="ranges-after-number-2-in-the-grid-selector-are-set-to-the-maximum">
+<h2>7. Ranges after number 2 in the grid selector are set to the maximum<a class="headerlink" href="#ranges-after-number-2-in-the-grid-selector-are-set-to-the-maximum" title="Permalink to this headline">¶</a></h2>
+<p>After the first two ranges set additional ranges to be the first value of the field.
+If the axis is a pressure or height coordinate set it to be the maximim value of
+the field i.e. that nearest the ground.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="non-valid-combobox-value">
+<h2>8. Non-valid combobox value<a class="headerlink" href="#non-valid-combobox-value" title="Permalink to this headline">¶</a></h2>
+<p>This was quite a complex problem relating to the translation of floats to strings and back again and
+needed further work after the initial fix in issle 0.</p>
+<p>There are floats, numpy.float32 and numpy.float64 beging passed in as axis values.  When these are
+extracted and turned back into floats a loss of precision occurs with the higher numbers of decimal
+places in the numpy.float64 values causing the numbers to not match any more.</p>
+<p>Use repr to pass in the value as a string for display in the interface.  When extracting use a float
+for the value up to seven decimal places and then a numpy.float64.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="when-opening-a-new-file-an-warniing-is-displayed">
+<h2>9. When opening a new file an warniing is displayed<a class="headerlink" href="#when-opening-a-new-file-an-warniing-is-displayed" title="Permalink to this headline">¶</a></h2>
+<p>The fields list is empty at this stage so put a check in to only do something if the length of the fields variable is &gt; 0.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="markup-issue-in-field-metatdata-ampersand-characters-cause-a-warning">
+<h2>10. Markup issue in Field metatdata - ampersand characters cause a warning<a class="headerlink" href="#markup-issue-in-field-metatdata-ampersand-characters-cause-a-warning" title="Permalink to this headline">¶</a></h2>
+<p>Translate any ‘&amp;’ characters in the metadata string to ‘and’</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="no-change">
+<h2>11. No change<a class="headerlink" href="#no-change" title="Permalink to this headline">¶</a></h2>
+<p>Version updated with no code change.</p>
+</div>
+<div class="section" id="change-graph-plotting-code-to-use-new-cf-plot-lineplot-code">
+<h2>12. Change graph plotting code to use new cf-plot lineplot code<a class="headerlink" href="#change-graph-plotting-code-to-use-new-cf-plot-lineplot-code" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+
+<h3><a href="http://ajheaps.github.io/cf-view/#">Homepage</a><p></h3>
+<h5><a href="http://ajheaps.github.io/cf-view/download.html">Download/Install</a><p></h5>
+<h5><a href="http://ajheaps.github.io/cf-view/versions.html">Versions</a><p></h5>
+<h5><a href="http://ajheaps.github.io/cf-view/issues.html">Issues</a><p></h5
+><h5><a href="http://ajheaps.github.io/cf-view/routines.html">Routines</a><p></h5>
+<h5><a href="http://ajheaps.github.io/cf-view/license.html">License</a><p></h5>
+<h5><a href="http://ajheaps.github.io/cf-view/search.html">Search</a><p></h5>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="nav-item nav-item-0"><a href="index.html">cf-view 1.0.4 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, Bryan Lawrence, Andy Heaps, Mudit Gupta.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.6.3.
+    </div>
+  </body>
+</html>

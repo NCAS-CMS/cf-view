@@ -1,0 +1,157 @@
+version 0.6 changes
+*******************
+
+
+Testing against lots of files to find the bugs in cf-view and cf-plot.  
+
+
+0. String formatting issues
+===========================
+        
+In cf-view the description of the needs to be correct to allow data subspacing in cf-python but rounding and interpretation errors when translating from floats to strings meant that in some cases this to not be the case.  For example a time axis value of 1496205.0 was set to 1.4962e+06.  In another case the Gaussian latitude of 3.92521453 was truncated to 3.925.  In both of the above cases cf-view would crash with an error saying it wasn't possible to subspace the data.  
+
+The code was modified to pass the float of the data rather than just the data.
+
+::
+
+     Done
+
+
+
+1. Masked iterator issue when doing np.nanmin
+=============================================
+
+This isn't a cf-view issue as such but one in numpy.  When cf-plot does a numpy.nanmin of a masked array version numpy 1.7 produces a masked iterator object and numpy 1.8.1 produces a single number.   The error is produced in cf-plot in the automatic levels selection call to the gval routine.  
+
+A line has been put in the cf-view code to check that the numpy version is > 1.8.1 and abort if otherwise.
+
+::
+
+    Fixed
+
+
+2. Data with only X, Y, T causes a crash in the creation of the cf-view widget
+==============================================================================
+
+::
+
+    Fixed
+
+
+3. Data with no standard_name or long_name causes cf-view to crash
+==================================================================
+
+::
+
+    Fixed
+
+
+4. Axes in the Field Selector don't always have the proper dimensions in the X Y Z T fields 
+===========================================================================================
+
+This was because in cf-python if there are two valid Z axes, for example, then None is returned 
+for the Z dimension as it is ambiguous.  Use 
+
+<B>for k, v  in field.items('Z').iteritems():
+            if v.isdimension is True: nz=len(field.item(k).array)</B>
+
+as the construct to get the number of values in the 'Z' dimension.  
+
+Can also use v.isauxillary to get auxillary coordinates.
+
+::
+
+    Fixed
+
+5. In the grid selector the dimension 1 parts of a variable aren't always listed
+================================================================================
+
+::
+
+    Fixed
+
+
+6. Error in subspace of data that has almost matching vertical coordinates
+==========================================================================
+
+In a field we have:
+atmosphere_hybrid_sigma_pressure_coordinate
+and
+atmosphere_hybrid_sigma_pressure_coordinate_ak
+
+Need to use f.subspace('exact', atmosphere_hybrid_sigma_pressure_coordinate=0.0291614404296875) 
+to pick up the atmosphere_hybrid_sigma_pressure_coordinate coordinate.
+
+::
+
+    Fixed
+
+
+7. Ranges after number 2 in the grid selector are set to the maximum
+====================================================================
+
+After the first two ranges set additional ranges to be the first value of the field.
+If the axis is a pressure or height coordinate set it to be the maximim value of
+the field i.e. that nearest the ground. 
+
+::
+
+    Fixed
+
+
+8. Non-valid combobox value
+===========================
+
+This was quite a complex problem relating to the translation of floats to strings and back again and 
+needed further work after the initial fix in issle 0.
+
+There are floats, numpy.float32 and numpy.float64 beging passed in as axis values.  When these are 
+extracted and turned back into floats a loss of precision occurs with the higher numbers of decimal 
+places in the numpy.float64 values causing the numbers to not match any more.
+
+Use repr to pass in the value as a string for display in the interface.  When extracting use a float
+for the value up to seven decimal places and then a numpy.float64.
+
+::
+
+    Fixed
+
+
+9. When opening a new file an warniing is displayed
+===================================================
+
+The fields list is empty at this stage so put a check in to only do something if the length of the fields variable is > 0.
+
+::
+
+    Fixed
+
+
+10. Markup issue in Field metatdata - ampersand characters cause a warning
+==========================================================================
+
+Translate any '&' characters in the metadata string to 'and'
+
+
+::
+
+    Fixed
+
+
+11. No change
+=============
+
+Version updated with no code change.
+
+
+
+12. Change graph plotting code to use new cf-plot lineplot code
+===============================================================
+
+::
+
+    Done
+
+
+
+

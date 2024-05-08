@@ -1,0 +1,16 @@
+
+
+cf-view homepage
+================
+
+cf-view is a graphical user interface that is used for plotting `Climate and Forecast convention <http://cfconventions.org>`_, CF  , data.
+
+
+.. image::  images/cfview.png
+   :scale: 60% 
+
+
+
+
+
+

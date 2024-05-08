@@ -1,0 +1,100 @@
+version 0.9 - pre-release work
+******************************
+
+1. Remove unused code
+=====================
+
+Remove unused code and print statements
+
+::
+
+    Done
+
+
+2. Consolidate textview code in one class
+=========================================
+
+::
+
+    Done
+
+
+3. Review all Help sections to make clear
+=========================================
+
+::
+
+    Done
+
+
+4. Move save code button to view code panel
+===========================================
+
+Move save code button to view code panel and add a help button.
+
+::
+
+    Done
+
+
+
+5. Consolidate library imports
+==============================
+
+Remove and consolidate library imports.
+
+::
+
+    Done
+
+
+6. Make a working conda install
+===============================
+
+Need a working conda install for pygtk dependencies and a conda package for cfview.
+
+::
+
+    Done
+
+
+7. Consolidate integer and float input checking
+===============================================
+
+::
+
+    Done
+
+
+8. Check code for use of exec
+=============================
+
+exec is used to build and run the cf-plot commands i.e.
+A user changes the contour levels to have min, max and step.  
+These are checked to make sure they are numbers and that min <man and step is positve.
+A cf-plot command is then assembled and run with the exec command:
+cfp.levs(min=min, max=max, step=step)
+Is this safe? Is there an easy work around for this?
+
+::
+
+    All exec calls removed and recoded to make more readable
+
+
+9. Time axis with many values causes slow start-up
+==================================================
+
+A time axis with 18,000 values causes cfview to have a very slow start-up
+
+::
+
+    Moved the list append loop to before the list is added to a gtk.combobox. This changed the start-up 
+    time from 180 seconds to 14 seconds.
+
+    Done
+ 
+
+
+
+
+

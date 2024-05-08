@@ -1,0 +1,51 @@
+version 0.5 changes
+*******************
+
+0. Initial data selection should be X:, Y:, Z:0, T:0
+====================================================
+
+Set the initial data selection to be a longitude latitude cross section if available.
+
+::
+
+     Done
+
+
+
+1. Display data axes in the order X, Y, Z, T
+============================================
+
+The original code selected the data axes in the internal cf-python dimension order.  
+This has been changed to be in the normal axis order of X, Y, Z, T
+
+::
+
+     Done
+
+
+
+
+2. Merge all code into main cfview program
+==========================================
+
+The merge will make it easier to distribute cf-view.  It will also make finding routines more difficult 
+and some thought needs to be given to this to make teh code flow in a more logical way.
+
+::
+
+     Done
+
+
+3. Add .gitignore file
+======================
+
+Added .gitignore file to tidy up some inadvertently added ~ files.
+
+::
+
+     Done
+
+
+Interface changes have been put on hold at this point as it is more important to get cf-view working better with a range of CF data.
+
+

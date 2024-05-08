@@ -1,0 +1,4 @@
+cfview
+******
+
+.. autofunction:: cfview

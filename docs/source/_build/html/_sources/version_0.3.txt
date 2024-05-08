@@ -1,0 +1,28 @@
+version 0.3 changes
+*******************
+
+0. Vector plots
+===============
+
+Add code to plot vectors.
+
+::
+
+     Done
+
+     To plot vectors first select the u conponent for the x-axis and then the v conponent for the y-axis.
+     The code works for longitude-latitude (cylindrical projection) and latitude-pressure vector plots. 
+
+
+
+1. Contours with vectors on top
+===============================
+
+::
+
+     Done
+
+     Add code so that a user can plot contours with a vector plot on top.
+
+
+

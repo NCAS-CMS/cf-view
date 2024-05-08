@@ -1,0 +1,28 @@
+version 0.7 changes
+*******************
+
+1. Change web doumentation
+==========================
+
+Web documentation location changed to http://ajheaps.github.io/cf-view
+
+::
+
+    Done
+
+
+2. Specifying subset of time axis in time / date notation
+=========================================================
+        
+This will require some work in cf-plot as well
+
+::
+
+     To do
+
+
+
+
+
+
+

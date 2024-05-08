@@ -1,0 +1,145 @@
+version 0.8 - interface changes
+*******************************
+
+1. Advanced configuration - contour levels
+==========================================
+
+Add levels selection inteface to Configure drop down.  Even and uneven levels and colorbar extensions.
+
+::
+
+    Done
+
+
+
+2. Advanced configuration - map specification
+=============================================
+
+
+::
+
+    Done
+
+
+
+3. Advanced configuration - vector specification
+================================================
+
+
+::
+
+    Done
+
+
+
+4. Advanced configuration - add help pop-up windows
+===================================================
+
+
+::
+
+    Done
+
+
+
+5. Advanced configuration - colour maps
+=======================================
+
+
+::
+
+    Done
+
+
+
+6. Advanced configuration - adjust spacing of text input boxes
+==============================================================
+
+Spacing of text input boxes in advanced configuration sections needs fine tuning.
+
+::
+
+    Done
+
+
+
+
+7. Main interface - remove Select, Inspect and Gallery row
+==========================================================
+
+The Select, Inspect and Gallery row in main interface isn't needed any more.
+
+
+::
+
+    Done
+
+
+
+
+8. Generate and Configure Plots panel - remove Help button
+==========================================================
+
+This button has it has been superseeded by the main help drop down. 
+
+
+::
+
+    Done
+
+
+
+
+9. Generate and Configure Plots panel - remove Projection button 
+================================================================
+
+Remove button and associated code as this is now done in the Configure Map drop down.
+
+::
+
+    Done
+
+
+
+10. Configure and Generate Plots panel - add lines dropdown
+===========================================================
+
+
+::
+
+    Done
+
+
+
+
+11. Configure and Generate Plots panel - remove On-- from labels dropdown
+=========================================================================
+
+
+
+::
+
+    Done
+
+
+
+
+12. Configure and Generate Plots panel - rearrange contour options 
+==================================================================
+
+
+
+::
+
+    Done
+
+
+
+
+
+
+
+
+
+
+

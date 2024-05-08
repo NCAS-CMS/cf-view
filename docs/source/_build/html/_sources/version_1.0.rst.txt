@@ -1,0 +1,78 @@
+version 1.0 - small feature enhancements and bug fixes
+******************************************************
+
+1. Look at plot blocking 
+========================
+
+Once a plot is made and is displayed this blocks any further interaction with cfview until the plot is destroyed.
+
+
+::
+
+     cf-plot was changed to use the display command from ImageMagick if this is available.  
+     This allows the subprocesss module to be used and the plots will display in a non-blocking manner.
+
+
+2. Configure -> reset all needs to reset everything
+===================================================
+
+
+::
+
+    Done
+
+
+
+3. Combined colour bar
+======================
+
+Need a method of making a combined colour bar.  This is selected in the configure -> contour levels window and must be done before making the first plot in a multi-plot picture.
+
+
+::
+
+    Done.
+
+
+
+4. Use actual times in the time grid selector
+=============================================
+
+
+::
+
+    Done
+
+
+
+5. Field selector needs modifying
+=================================
+
+The field selector only works properly when the Field Name is in alphabetical order.
+The Field Name is the standard_name if this exists and need to be able to select field based 
+on long_name and short_name.
+
+::
+
+    To do
+
+
+6. Multiple vector plots fail to produce any plots
+==================================================
+
+::
+
+    To do
+
+
+
+
+
+
+
+
+
+
+
+
+

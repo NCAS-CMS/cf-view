@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>version 3.2 changes &#8212; cf-view 3.2.25 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=97decc96" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+    
+    <script src="_static/documentation_options.js?v=025fcf83"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="nav-item nav-item-0"><a href="index.html">cf-view 3.2.25 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">version 3.2 changes</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="version-3-2-changes">
+<span id="version-3-2"></span><h1>version 3.2 changes<a class="headerlink" href="#version-3-2-changes" title="Link to this heading">¶</a></h1>
+<section id="map-popup-changes">
+<h2>0. Map popup changes<a class="headerlink" href="#map-popup-changes" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>clean up code for npstere and spstere sensitivity</p></li>
+<li><p>rotated option doesn’t make it into the plotting code</p></li>
+<li><p>rotated option to be insensitive when data is not in rotated coordinates</p></li>
+<li><p>map resolution drop added to map options</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Changed</span>
+</pre></div>
+</div>
+</section>
+<section id="colour-bar-extensions-don-t-work">
+<h2>1. Colour bar extensions don’t work<a class="headerlink" href="#colour-bar-extensions-don-t-work" title="Link to this heading">¶</a></h2>
+<p>No code for colour bar extensions - levs_extend_min and levs_extend_max were missing.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Code</span> <span class="n">added</span>
+</pre></div>
+</div>
+</section>
+<section id="code-to-remove-auxiliary-coordinates-removed">
+<h2>2. Code to remove auxiliary coordinates removed<a class="headerlink" href="#code-to-remove-auxiliary-coordinates-removed" title="Link to this heading">¶</a></h2>
+<p>Change code to remove extra auxiliary coodinates as this is no longer needed - remove_aux=False</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="colour-scale-code-changes">
+<h2>3. Colour scale code changes<a class="headerlink" href="#colour-scale-code-changes" title="Link to this heading">¶</a></h2>
+<p>The colour scale code was changed:</p>
+<ul class="simple">
+<li><p>change to viridis - colour scale doesn’t change</p></li>
+<li><p>output code is cscale=’inferno’ rather than scale=’inferno’</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="contour-levels-bug-with-nlevs-definition-as-a-boolean">
+<h2>4. contour levels - bug with nlevs definition as a boolean<a class="headerlink" href="#contour-levels-bug-with-nlevs-definition-as-a-boolean" title="Link to this heading">¶</a></h2>
+<p>There was a bug in the contour levels code with nlevs definition as a boolean</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Fixed</span>
+</pre></div>
+</div>
+</section>
+<section id="maps-user-configuration-and-saving">
+<h2>5. Maps  - user configuration and saving<a class="headerlink" href="#maps-user-configuration-and-saving" title="Link to this heading">¶</a></h2>
+<p>Maps  - user configuration and saving options added to map popup.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="contour-levels-user-configuration-and-saving">
+<h2>6. Contour levels  - user configuration and saving<a class="headerlink" href="#contour-levels-user-configuration-and-saving" title="Link to this heading">¶</a></h2>
+<p>Contour levels  - user configuration and saving options added to map popup.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="colour-scale-user-configuration-and-saving">
+<h2>7. Colour scale - user configuration and saving<a class="headerlink" href="#colour-scale-user-configuration-and-saving" title="Link to this heading">¶</a></h2>
+<p>Colour scale - user configuration and saving options added to map popup.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="new-sections-for-user-settings-to-be-scrollable">
+<h2>8. New sections for user settings to be scrollable<a class="headerlink" href="#new-sections-for-user-settings-to-be-scrollable" title="Link to this heading">¶</a></h2>
+<p>New sections for user settings to be scrollable.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="new-sections-for-user-settings-to-be-visible-after-clicking-a-checkbox">
+<h2>9. New sections for user settings to be visible after clicking a checkbox<a class="headerlink" href="#new-sections-for-user-settings-to-be-visible-after-clicking-a-checkbox" title="Link to this heading">¶</a></h2>
+<p>New sections for user settings to be visible after clicking a checkbox.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="defaults-file-code-rewrite">
+<h2>10. Defaults file code rewrite<a class="headerlink" href="#defaults-file-code-rewrite" title="Link to this heading">¶</a></h2>
+<p>Defaults file code rewrite to use dictionaries for user defined map, contour level and colour scale options.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="issues-with-cf-python-3-14-0-investigated">
+<h2>11. Issues with cf-python 3.14.0 investigated<a class="headerlink" href="#issues-with-cf-python-3-14-0-investigated" title="Link to this heading">¶</a></h2>
+<p>Issues with cf-python 3.14.0 were investigated.  These mostly seemed related to the version of netCDF4 with 1.6.1 causing issues.  With a fresh install a few weeks later the issues had gone away so it is assumed that this was fixed somewhere in conda.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Investigated</span>
+</pre></div>
+</div>
+</section>
+<section id="check-all-menus-look-okay-and-adjust-spacing-if-necessary">
+<h2>12. Check all menus look okay and adjust spacing if necessary<a class="headerlink" href="#check-all-menus-look-okay-and-adjust-spacing-if-necessary" title="Link to this heading">¶</a></h2>
+<p>Check all menus and adjust with hbox.addStretch(1) as required</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="new-property-popup-window-to-properties-popup-needs-recoding">
+<h2>13. New property popup window to properties popup needs recoding<a class="headerlink" href="#new-property-popup-window-to-properties-popup-needs-recoding" title="Link to this heading">¶</a></h2>
+<p>The new property popup window to properties popup needed recoding.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="doc-strings-for-all-routines">
+<h2>14. Doc strings for all routines<a class="headerlink" href="#doc-strings-for-all-routines" title="Link to this heading">¶</a></h2>
+<p>Doc strings were added for all routines.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="make-a-plot-code-rework-map-settings">
+<h2>15. Make a plot code - rework map settings<a class="headerlink" href="#make-a-plot-code-rework-map-settings" title="Link to this heading">¶</a></h2>
+<p>Rework code for making a plot: map settings
+Use dictionaries for working out settings and code generation.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="make-a-plot-code-rework-colour-settings">
+<h2>16. Make a plot code - rework colour settings<a class="headerlink" href="#make-a-plot-code-rework-colour-settings" title="Link to this heading">¶</a></h2>
+<p>Rework code for making a plot: map settings
+Use dictionaries for working out settings and code generation.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="make-a-plot-code-rework-contour-level-settings">
+<h2>17. Make a plot code - rework contour level settings<a class="headerlink" href="#make-a-plot-code-rework-contour-level-settings" title="Link to this heading">¶</a></h2>
+<p>Rework code for making a plot: map settings
+Use dictionaries for working out settings and code generation.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="netcdf-file-with-no-fields-but-doesn-t-produce-a-sensible-error">
+<h2>18. netCDF file with no fields but doesn’t produce a sensible error<a class="headerlink" href="#netcdf-file-with-no-fields-but-doesn-t-produce-a-sensible-error" title="Link to this heading">¶</a></h2>
+<p>A netCDF file with no fields but doesn’t produce a sensible error.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Corrected</span>
+</pre></div>
+</div>
+</section>
+<section id="update-cfview-interpolation-code">
+<h2>19. Update cfview interpolation code<a class="headerlink" href="#update-cfview-interpolation-code" title="Link to this heading">¶</a></h2>
+<p>Update interpolation to use a sequence of Coordinate instances.  This changed in cf-python at version 3.14.1.</p>
+<ul class="simple">
+<li><p>g = f.regrids({‘longitude’: lons, ‘latitude’: lats}, method=method)</p></li>
+<li><p>becomes</p></li>
+<li><p>g = f.regrids([lats, lons], method=method)</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="changes-to-cope-better-with-dodgy-data">
+<h2>20. Changes to cope better with dodgy data<a class="headerlink" href="#changes-to-cope-better-with-dodgy-data" title="Link to this heading">¶</a></h2>
+<p>Changes to various parts of cfview were made to cope better with some dodgy data found in cn134a.pl1m_195006-195006.nc</p>
+<ul class="simple">
+<li><p>cannot read - cf-python issue with a dodgy 7th field - no data</p></li>
+<li><p>cf-view now has an issue with this data</p></li>
+<li><p>find_dim_names - have five domain axes and four coordinates</p></li>
+<li><p>change loop to check for coordinate type to go over coords rather than daxes</p></li>
+<li><p>field 5 fails as the data is dodgy - subspace fails in plot routine - add an exception test</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="remove-references-to-plotvars-stored-collapses-and-plotvars-stored-dimensions">
+<h2>21. Remove references to plotvars.stored collapses and plotvars.stored dimensions<a class="headerlink" href="#remove-references-to-plotvars-stored-collapses-and-plotvars-stored-dimensions" title="Link to this heading">¶</a></h2>
+<p>Remove references to plotvars.stored collapses and plotvars.stored dimensions.
+These are now plotvars.stored[‘f0’][‘collapses’] and plotvars.stored[‘f0’][‘axes’]</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="field-search-code-update">
+<h2>22. Field search code update<a class="headerlink" href="#field-search-code-update" title="Link to this heading">¶</a></h2>
+<p>Field search code update.  A new field gets lost internally and doesn’t display as expected.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="stray-print-removal">
+<h2>23. Stray print removal<a class="headerlink" href="#stray-print-removal" title="Link to this heading">¶</a></h2>
+<p>A stray print statement was removed.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="stray-print-removal-and-again">
+<h2>24. Stray print removal - and again<a class="headerlink" href="#stray-print-removal-and-again" title="Link to this heading">¶</a></h2>
+<p>A stray print statement was removed.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="support-for-2d-lon-lat-data-added">
+<h2>25. Support for 2D lon-lat data added<a class="headerlink" href="#support-for-2d-lon-lat-data-added" title="Link to this heading">¶</a></h2>
+<p>Support for 2D lon-lat data contouring and blockfill was added.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Done</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+
+<h3><a href="index.html">Homepage</a><p></h3>
+<h5><a href="download.html">Download/Install</a><p></h5>
+<h5><a href="videos.html">Training Videos</a><p></h5>
+<h5><a href="versions.html">Versions</a><p></h5>
+<h5><a href="issues.html">Issues</a><p></h5>
+<h5><a href="routines.html">Routines</a><p></h5>
+<h5><a href="license.html">License</a><p></h5>
+<h5><a href="search.html">Search</a><p></h5>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="nav-item nav-item-0"><a href="index.html">cf-view 3.2.25 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">version 3.2 changes</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, Sadie Bartholomew NCAS-CMS.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

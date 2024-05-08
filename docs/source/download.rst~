@@ -1,0 +1,62 @@
+Download/Install
+****************
+
+To install cf-view
+==================
+
+Download and install Anaconda Python 2.7 for Linux if this is not already installed. The following will work on a more recent version of Linux i.e. Mint 17:
+
+::
+
+   conda install -c ncas -c conda-forge -c jochym cf-python=1.5.4.post6 cf-plot=1.9.29 cf-view pygobject2 pygtk pango libiconv pcre
+
+
+
+cf-view is also available as an install using pip:
+
+::
+
+   pip install cf-python
+   pip install cf-plot
+   pip install cf-view
+
+
+cfview dependencies are pygtk, Numpy, Matplotlib, Netcdf4 and Basemap and these will also need to be installed before using cfview.
+
+
+To run cf-view
+==============
+
+::
+
+   cfview <optional netCDF, Met Office PP or fields file(s)>
+
+
+
+Possible missing zlib error
+===========================
+
+If you get a libz.so.1: version `ZLIB_1.2.9' not found error then you'll need to compile and link in this version of zlib:
+
+Download https://sourceforge.net/projects/libpng/files/zlib/1.2.9/zlib-1.2.9.tar.gz/download
+tar 
+cd zlib-1.2.9.tar
+mkdir ~myzlib
+./configure --prefix=~/myzlib
+make
+make install
+
+export LD_LIBRARY_PATH=~/myzlib::LD_LIBRARY_PATH
+
+
+
+|
+|
+|
+|
+|
+|
+|
+| 
+
+

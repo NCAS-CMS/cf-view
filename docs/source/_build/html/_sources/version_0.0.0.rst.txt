@@ -1,0 +1,52 @@
+version 0.0.0 changes
+*********************
+
+0. Add code to reset plotting in between plots
+==============================================
+Resetting the plotting between plots to make plots reflect current settings
+
+::
+
+     Done
+
+
+1. Corrrect typo in calling map projections
+===========================================
+
+::
+
+     Done
+
+
+2. Update to use cf-python 1.0
+==============================
+
+
+::
+
+    plotConfigWidgets.py
+
+    Change
+    for axis in axes: sizes[axis]=f.domain.dimension_sizes[axis]
+    to
+    for axis in axes: sizes[axis]=f.domain.axes_sizes(key=True)[axis]
+
+    cfview.py
+
+    sfield=cf.collapse(sfield,grid[d][2],axes=d)
+    to
+    sfield=sfield.collapse(grid[d][2],axes=d) 
+
+
+3. Move cfgui.py to cfview.py
+=============================
+
+::
+
+   Moved cfgui.py to cfview.py as it is a more intuitive name.
+
+
+
+
+
+
