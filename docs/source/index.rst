@@ -38,22 +38,27 @@ cf-view is developed and maintained by the
 `NCAS-CMS <https://cms.ncas.ac.uk/index.html>`__ group, part of
 `NCAS <https://ncas.ac.uk/>`__.
 
+
+Features
+^^^^^^^^
+
 Features include:
 
-- Easy installation
-- Outputs cf-python / cf-plot code
-- Map plots, zonal means, vector, line plots and Kevin Hodges' trajectory data plots
-- Change map, colour scale, contour levels, vector properties
-- Change interface colour scheme, fonts and font sizes
-- Spherical regridding from field to field and field to specified regular grid
-- View the data and colour the cells by a minimum or maximum value
-- Field properties editing, deletion and creation
+- Easy installation;
+- Inspect, analyse and manipulate field constructs and their data;
+- Edit, delete and create field metadata and properties;
+- Output the underlying cf-python and cf-plot code;
+- View and produce plots such as map, contour, zonal means, vector, line and
+  trajectory plots;
+- Change plotting properties such as map, colour scale, contour levels and
+  vector properties;
+- Change interface colour scheme, fonts and font sizes.
 
-Future releases will add support for:
+Future releases will add support for data:
 
-- 2D dimensions
-- Rotated pole data
-- UGRID data
+- with 2D dimensions;
+- defined on rotated pole grids;
+- defined on unstructured grids i.e. UGRID data.
 
 
 ##########
