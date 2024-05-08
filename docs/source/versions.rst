@@ -15,14 +15,15 @@ The current version is |release|
 - 2.9 Interim release of internal rewrite
 - 3.0 Rewrite internal code to support more than 4 dimensional data
 - 3.1 Rotated pole data
-- 3.2 :ref:`Minor changes and bugfix release <version_3.2>`_
+- 3.2 :ref:`Minor changes and bugfix release <version_3.2>`
 - 3.3 Two dimensional X and Y data such as ORCA
 - 3.4 Move from PyQt5 to PyQt6
 - 3.5 UGRID data
 
 
 
-Further functionality may be added on request - please email <sadir.bartholomew@ncas.ac.uk> with details.
+Further functionality may be added on request - please email
+<sadie.bartholomew@ncas.ac.uk> with details.
 
 
 
