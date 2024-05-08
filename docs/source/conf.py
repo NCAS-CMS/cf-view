@@ -17,7 +17,7 @@ import sys, os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, '/home/andy/cfview.src')
+sys.path.insert(0, '../../cfview.src')
 
 # -- General configuration -----------------------------------------------------
 
@@ -56,7 +56,7 @@ copyright = u'2024, Sadie Bartholomew NCAS-CMS'
 # built documents.
 #
 # The short X.Y version.
-version = '2.0'
+version = '3.2'
 # The full version, including alpha/beta/rc tags.
 release = '3.2.25'
 
@@ -248,7 +248,8 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'cf-view', u'cf-view Documentation',
-   u'Andy Heaps', 'cf-view', 'One line description of project.',
+   u'Andy Heaps', 'cf-view',
+   'Exploration and plotting GUI for netCDF and Met Office format data.',
    'Miscellaneous'),
 ]
 
