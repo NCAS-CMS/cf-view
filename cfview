@@ -2869,7 +2869,7 @@ class Cfview(QMainWindow):
             html += '<li><b>cf-python</b> - data I/O and manipulation<br>'
             html += 'https://ncas-cms.github.io/cf-python</li>'
             html += '<li><b>cf-plot</b> - plotting<br>'
-            html += 'http://ncas-cms.github.io/cf-plot</li>'
+            html += 'http://ncas-cms.github.io/cf-plot/build</li>'
             html += '<li><b>PyQt6</b> - GUI toolkit</li></ul></p>'
             html += f"<p>Author: {meta['Author']}</p>"
             html += f"<p>Maintainer: {meta['Maintainer']} ({meta['Maintainer-email']})</p>"
